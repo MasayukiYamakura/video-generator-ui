@@ -23,7 +23,8 @@ const http=require('node:http');
   const catalog={version:1,tracks:[{id:'calm_01',title:'穏やかな曲',categories:['calm']}]};
   const data=value=>({content:Buffer.from(JSON.stringify(value)).toString('base64'),sha});
   await page.route('https://api.github.com/**',async route=>{
-   const req=route.request(),url=new URL(req.url()),endpoint=url.pathname.replace('/repos/MasayukiYamakura/video-generator/',''),body=req.postDataJSON();
+   const req=route.request(),url=new URL(req.url()),base='/repos/MasayukiYamakura/video-generator',endpoint=url.pathname===base?'':url.pathname.replace(base+'/',''),body=req.postDataJSON();
+   assert.notEqual(url.pathname,base+'/', 'Repository root must not have a trailing slash: GitHub rejects its CORS preflight');
    let result={};
    if(endpoint==='config/prompt-builder.json')throw Error('bad endpoint');
    if(endpoint==='contents/config/prompt-builder.json'){
@@ -34,6 +35,7 @@ const http=require('node:http');
    else if(endpoint==='git/trees'||endpoint==='git/commits'||endpoint==='git/refs')result={sha:'a'.repeat(40)};
    else if(endpoint==='actions/workflows/generate_video_ui.yml/dispatches'){receipt=body.inputs.receipt_id;return route.fulfill({status:204});}
    else if(endpoint==='actions/workflows/generate_video_ui.yml/runs')result={workflow_runs:receipt?[{id:123,display_title:'Pages '+receipt,status:'completed',conclusion:'success'}]:[]};
+   else if(endpoint==='actions/workflows/generate_video_ui.yml')result={state:'active'};
    else if(endpoint==='')result={private:true};
    else if(endpoint==='contents/media/background.png')result={content:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j7M8AAAAASUVORK5CYII=','base64').toString('base64')};
    else throw Error('Unexpected GitHub endpoint: '+endpoint);
@@ -55,7 +57,8 @@ const http=require('node:http');
   await page.locator('#pb_voice_mode').selectOption('anonymous');
   await page.locator('#pbBuild').click();await page.locator('#pbApply').click();
   let result=JSON.parse(await page.locator('#script').inputValue());assert.equal(result.global_settings.brand_layout.tag_y,222);assert.equal(result.global_settings.voice_mode,'anonymous');assert.equal(result.scenes[0].category_tags,false);
-  await page.locator('#token').fill('test-only-token');await page.locator('#pbLoad').click();await page.waitForFunction(()=>document.getElementById('builderStatus').textContent.includes('読み込みました'));
+  await page.locator('#token').fill('test-only-token');await page.locator('#connect').click();await page.waitForFunction(()=>document.getElementById('connectionStatus').textContent==='接続できました');
+  await page.locator('#pbLoad').click();await page.waitForFunction(()=>document.getElementById('builderStatus').textContent.includes('読み込みました'));
   await page.locator('#pbSaveId').fill('male_layout');await page.locator('#pbSaveName').fill('人物レイアウト');await page.locator('#pbSaveLayout').click();
   await page.waitForFunction(()=>document.getElementById('builderStatus').textContent.includes('を保存しました'));
   assert.equal(registry.layout_presets[0].values.tag_y,222);assert.equal(await page.locator('#pbLayout').inputValue(),'male_layout');

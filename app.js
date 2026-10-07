@@ -8,7 +8,8 @@ function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.te
 async function api(path, method='GET', body) {
   token = $('token').value.trim(); if (!token) throw Error('GitHubトークンを入力してください');
   const controller = new AbortController(), timer = setTimeout(()=>controller.abort(),60000);
-  try { const r = await fetch(`https://api.github.com/repos/${repo()}/${path}`, { method, headers: { Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal:controller.signal });
+  const url = `https://api.github.com/repos/${repo()}${path ? `/${path}` : ''}`;
+  try { const r = await fetch(url, { method, headers: { Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal:controller.signal });
     if (!r.ok) { const error = Error(r.status===401 ? '認証期限切れ、またはトークンが無効です' : r.status===403 ? '権限不足、またはAPIの利用制限です' : `GitHubへの接続でエラー (${r.status})`); error.status=r.status; throw error; }
     return r.status===204 ? null : await r.json();
   } finally { clearTimeout(timer); }
