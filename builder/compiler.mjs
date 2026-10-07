@@ -28,7 +28,8 @@ export function fixedSettings(config) {
     // in the standard template. It is inert in old scripts.
     brand_layout:{tag_x:l.tag_x,tag_y:l.tag_y,hook_center_y:l.hook_center_y,
       caption_center_y:l.caption_center_y,hook_font_size:l.hook_font_size},
-    bgm:{...SYSTEM.bgm,enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
+    bgm:{...SYSTEM.bgm,volume_db:v.bgm_volume_db,ducking:v.bgm_ducking,
+      enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
   };
   if(branded) g.template='portrait_brand';
   if(v.background_mode!=='stock') g.background_image=config.background;

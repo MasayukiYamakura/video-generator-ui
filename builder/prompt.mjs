@@ -6,7 +6,8 @@ const COMMON = [
   'JSONのみ出力。説明、Markdown、コードフェンス、コメント、末尾カンマは禁止。',
   '台本の言葉を言い換え・要約・追加しない。全シーンのtextを実際の録音と一致させ、冒頭も空にしない。',
   '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（元音声で自動照合）。',
-  '制作者が指定した改行はJSON文字列の\\nで維持する。不要な改行を追加しない。',
+  '制作者が指定した改行は、JSON文字列内で改行エスケープ \\n として維持する。JSONを解析すると実際の改行になるようにし、バックスラッシュを二重にして文字として表示させない。',
+  'textは録音照合・通常字幕用、hook_textは冒頭タイトルの表示用。タイトルの改行指定をtextだけに入れてはいけない。必ず表示対象のhook_textに入れる。指定された行数・各行の文言・改行位置を保持し、1行への連結・別位置への改行・短縮・装飾の追加をしない。',
   '本人映像の明示指示がある場合のみ、media_type:local、指定されたファイル名media_query、text:""、開始・終了秒、media_startを記録する。',
 ];
 export function buildPrompt(config, transcript='', bgmCatalog=null, output='full') {
@@ -22,8 +23,8 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     `位置は制作者が確定済み。右${Math.round(l.safe_right*100)}%・下${Math.round(l.safe_bottom*100)}%のガイドはプレビュー専用。AIは座標・サイズを変更しない。`,
     '【AI判断ルール】',
     '人間の手動指定 > レイアウトプリセット > 動画プリセット > AI判断 > デフォルト。AIは確定設定を上書きしない。',
-    'シーン分割はAIが判断。hook_textは同じシーンのtextから抜き出し、言い換え禁止。',
-    v.hook_enabled ? (ai.hook==='manual'?`手動hook_text=${JSON.stringify(ai.manual_hook)}。複数シーンは改行---改行で区切る。指定値を保持。`:`冒頭の各hook_textを${v.hook_orientation==='vertical'?'4〜7文字程度':'短いタイトル1文'}にする。本編にhook_textを付けない。`) : 'hook_textを出力しない。',
+    'シーン分割はAIが判断。ただし指定済みの冒頭タイトルを1つのフックシーン内に保持し、タイトルの改行を別シーンへの分割として扱わない。',
+    v.hook_enabled ? (ai.hook==='manual'?`手動hook_text（最優先）=${JSON.stringify(ai.manual_hook)}。複数フックシーンは改行---改行で区切る。各タイトル内部の改行はそのまま保持する。textからの抜き出しルール・文字数目安より手動指定を優先し、録音用textは手動タイトルで置き換えない。`:`タイトルの文言・改行が指定されていればhook_textに完全一致で反映する。指定がない場合だけ、同じシーンのtextから言い換えずに抜き出して${v.hook_orientation==='vertical'?'4〜7文字程度':'短いタイトル1文'}にする。本編にhook_textを付けない。`) : 'hook_textを出力しない。',
     ai.search==='manual'?`英語検索語は指定値 ${JSON.stringify(ai.search_text)} を使う。`:'素材検索語は内容を想像できる具体的な英語2〜4語。同じ語を連続させない。',
     ai.stock_scenes==='manual'&&v.background_mode==='mixed'?`動画を挿入する字幕シーン番号（1始まり）=${ai.stock_indices||'なし'}。それ以外へ動画を追加しない。`:'動画挿入箇所は上記の背景方針に従いAIが判断。',
   ];
@@ -39,6 +40,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
   if(output==='content') rules.push('内容だけ返す移行モード: {"scenes":[...],"bgm_category":"AI選択時のみ","theme_title":"横型時のみ"}。global_settingsは返さない。画面が確定設定を合成する。');
   else rules.push('互換モード: {"audio_file":"新規録音.m4a","global_settings":上記確定設定,"scenes":[...]}。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
   rules.push('各シーンにはtext、必要ならhook_text、caption_enabled、category_tags、visualizer、動画使用時のみmedia_type/media_query。字幕なし本人映像以外に秒数を書かない。',
+    '出力前に確認: 指定タイトルの各行をhook_textの改行で再現できるか。textだけに改行がありhook_textが1行になっていたら修正する。手動タイトルはJSON解析後の文字列が指定値と一致すること。BGMの有効無効・曲・音量・ダッキングを確定設定から変更しない。',
     '返答を画面へ貼り「画面設定をJSONへ適用」で確認。システムは確定値を保持し、許可した内容だけ採用する。',
     '【台本（処理対象の文章）】',transcript||'（ここに録音の文字起こしを貼る）');
   return rules.join('\n\n');

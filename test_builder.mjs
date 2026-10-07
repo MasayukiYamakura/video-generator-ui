@@ -113,6 +113,31 @@ test('YouTube theme title is the only AI theme slot',()=>{
   const r=applyConfig({...content,theme_title:'テーマ',scenes:content.scenes.map(s=>({...s,media_query:'sea'}))},c);
   assert.equal(r.global_settings.theme.title,'テーマ');assert.equal(r.global_settings.theme.subtitle,'ハシモトの占いと思想');assert.equal(r.scenes[0].hook_text,undefined);
 });
+test('BGM volume and ducking are human settings and survive save/reload',()=>{
+  const saved=savePreset(registry,'video',{id:'audible_music',name:'BGM調整',extends:'tiktok_standard',values:{bgm_mode:'track',bgm_track:'calm_01',bgm_volume_db:6,bgm_ducking:false}});
+  const c=resolveConfig(JSON.parse(JSON.stringify(saved)),{video_preset:'audible_music'});
+  const r=applyConfig({...content,global_settings:{bgm:{volume_db:-30,ducking:true}}},c,music);
+  assert.equal(r.global_settings.bgm.volume_db,6);assert.equal(r.global_settings.bgm.ducking,false);
+  const override=resolveConfig(saved,{video_preset:'audible_music',overrides:{video:{bgm_volume_db:2,bgm_ducking:true}}});
+  assert.equal(fixedSettings(override).bgm.volume_db,2);assert.equal(fixedSettings(override).bgm.ducking,true);
+  assert.equal(fixedSettings(config()).bgm.volume_db,0);assert.equal(fixedSettings(config()).bgm.ducking,true);
+  for(const bgm_volume_db of [-31,7,NaN,'6'])assert.throws(()=>config({video:{bgm_volume_db}}));
+  assert.throws(()=>config({video:{bgm_ducking:'false'}}));
+});
+test('title instructions preserve hook_text newlines and manual title wins over extraction',()=>{
+  const title='今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください';
+  const c=config({}, {ai:{hook:'manual',manual_hook:title}});
+  const p=buildPrompt(c,'録音の文章',music);
+  assert.ok(p.includes(JSON.stringify(title)));
+  for(const rule of ['hook_textは冒頭タイトルの表示用','textだけに入れてはいけない','文字数目安より手動指定を優先','出力前に確認'])assert.ok(p.includes(rule));
+  assert.ok(!p.includes('hook_textは同じシーンのtextから抜き出し、言い換え禁止'));
+  assert.ok(p.includes('改行エスケープ \\n'));
+  const r=applyConfig(content,c,music);
+  assert.equal(JSON.parse(JSON.stringify(r)).scenes[0].hook_text,title);
+  assert.equal(r.scenes[0].text,content.scenes[0].text);
+  const ai=buildPrompt(config(),'台本と指定タイトル',music);
+  assert.ok(ai.includes('指定がない場合だけ'));assert.ok(ai.includes('hook_textに完全一致'));
+});
 test('repository roundtrip uses SHA guard, private repo and no auto retry',async()=>{
   let value=emptyRegistry(),head='a',writes=0;
   const api=async(path,method,body)=>{

@@ -11,6 +11,8 @@ const VIDEO_FIELDS=[
   ['bgm_mode','BGM',[['off','OFF'],['ai','ON・AIカテゴリ選択'],['category','ON・カテゴリ指定'],['track','ON・曲指定']]],
   ['bgm_category','BGMカテゴリ',[['ai','AI自動'],['calm','安心感'],['reflective','内省'],['mysterious','神秘'],['hopeful','前向き'],['serious','注意喚起']]],
   ['bgm_track','登録済みBGM曲',[['','保存済み設定を読み込んで選択']]],
+  ['bgm_volume_db','BGM音量（標準からの増減 dB・-30〜+6）',null,'number'],
+  ['bgm_ducking','発話中にBGM音量を下げる（ダッキング）'],
   ['hook_enabled','フック表示'],
   ['hook_orientation','フック方向',[['horizontal','横書き'],['vertical','縦書き']]],
   ['intro_scenes','冒頭シーン数',null,'number'],
@@ -63,6 +65,7 @@ export function mountBuilder(apiProvider) {
     for(const [key] of VIDEO_FIELDS) {const input=$('pb_'+key);if(typeof v[key]==='boolean')input.checked=v[key];else input.value=v[key];}
     for(const key of Object.keys(LAYOUT_DEFAULTS)) $('pb_'+key).value=l[key];
     $('pb_bgm_category').disabled=v.bgm_mode!=='category';$('pb_bgm_track').disabled=v.bgm_mode!=='track';
+    $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
     for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand';
     $('pb_hook_orientation').disabled=!v.hook_enabled;$('pb_hook_band_enabled').disabled=v.hook_orientation!=='horizontal';
     $('pbBackground').disabled=v.background_mode==='stock';$('pbBackgroundFile').disabled=v.background_mode==='stock';
@@ -85,6 +88,7 @@ export function mountBuilder(apiProvider) {
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($('pbVideoFields'),key,label,items,type);
     if(key==='intro_scenes'){input.min=1;input.max=10;input.step=1;}
+    if(key==='bgm_volume_db'){input.min=-30;input.max=6;input.step=1;}
     input.addEventListener('change',()=>{session.overrides.video[key]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;invalidate();renderFields();});
   }
   for(const [key,label] of Object.entries(LAYOUT_LABELS)) {
