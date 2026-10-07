@@ -1,5 +1,5 @@
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=bgm24-20261008';
 import {buildPrompt} from './prompt.mjs';
 import {applyConfig} from './compiler.mjs';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs';
