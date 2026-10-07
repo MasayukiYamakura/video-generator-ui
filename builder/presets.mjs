@@ -6,6 +6,7 @@ export const VIDEO_DEFAULTS = Object.freeze({
   body_caption:true, intro_tags:false, body_tags:false,
   intro_visualizer:false, body_visualizer:false, background_mode:'stock',
   stock_provider:'pexels', bgm_mode:'off', bgm_category:'ai', bgm_track:'',
+  bgm_volume_db:0, bgm_ducking:true,
   voice_mode:'original', hook_band_enabled:false,
 });
 export const VIDEO_PRESETS = [
@@ -52,7 +53,7 @@ export const SYSTEM = Object.freeze({
   anonymous:{pitch_semitones:-1.5, formant_mode:'preserved', low_gain_db:1,
     mid_gain_db:-0.5, high_gain_db:0.5, compressor_threshold_db:-18,
     compressor_ratio:2, output_gain_db:0.5},
-  bgm:{volume_db:0, ducking:true, start_seconds:0, loop:false,
+  bgm:{start_seconds:0, loop:false,
     fade_in_seconds:0.5, fade_out_seconds:1.5},
   visualizer:{style:'standard_bar', motion:'reactive', look:'studio', num_bars:40,
     bar_width_ratio:0.003, bar_gap_ratio:0.004, min_bar_height_ratio:0.005,
