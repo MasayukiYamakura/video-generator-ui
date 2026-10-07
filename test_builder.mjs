@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,existsSync} from 'node:fs';
 import {emptyRegistry,resolvePreset,resolveConfig,savePreset,validateRegistry} from './builder/model.mjs';
 import {VIDEO_PRESETS} from './builder/presets.mjs';
 import {applyConfig,fixedSettings} from './builder/compiler.mjs';
@@ -129,7 +129,10 @@ test('missing registry is supported but auth/network failures are surfaced',asyn
   assert.deepEqual((await readRegistry(async()=>{throw Object.assign(Error('not found'),{status:404});})).registry,emptyRegistry());
   await assert.rejects(()=>readRegistry(async()=>{throw Object.assign(Error('unauthorized'),{status:401});}),/unauthorized/);
 });
-test('the existing media/script.json remains byte-for-byte unchanged by compilation',()=>{
-  const path=new URL('../../media/script.json',import.meta.url),before=readFileSync(path,'utf8');const source=JSON.parse(before);
+const mediaPath=new URL('../../media/script.json',import.meta.url);
+// The public UI intentionally contains no private media fixture. Run this
+// compatibility assertion only from video-generator's tools/pages-ui copy.
+test('the existing media/script.json remains byte-for-byte unchanged by compilation',{skip:!existsSync(mediaPath)},()=>{
+  const path=mediaPath,before=readFileSync(path,'utf8');const source=JSON.parse(before);
   applyConfig(source,config());assert.equal(readFileSync(path,'utf8'),before);assert.deepEqual(JSON.parse(before),source);
 });
