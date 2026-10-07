@@ -57,7 +57,7 @@ function bgmSettings(script) {
  for(const k of Object.keys(b)) if(!Object.hasOwn(defaults,k) && !['track_id','category'].includes(k)) throw Error(`bgmの未対応項目: ${k}`);
  const c={...defaults,...b};
  for(const k of ['enabled','ducking','loop']) if(typeof c[k]!=='boolean') throw Error(`bgm.${k}はtrue/falseで指定してください`);
- for(const [k,lo,hi] of [['volume_db',-30,6],['start_seconds',0,86400],['fade_in_seconds',0,30],['fade_out_seconds',0,30]]) if(typeof c[k]!=='number'||!Number.isFinite(c[k])||c[k]<lo||c[k]>hi) throw Error(`bgm.${k}は${lo}〜${hi}の数値で指定してください`);
+ for(const [k,lo,hi] of [['volume_db',-30,24],['start_seconds',0,86400],['fade_in_seconds',0,30],['fade_out_seconds',0,30]]) if(typeof c[k]!=='number'||!Number.isFinite(c[k])||c[k]<lo||c[k]>hi) throw Error(`bgm.${k}は${lo}〜${hi}の数値で指定してください`);
  if(!['track','category'].includes(c.selection_mode)) throw Error('BGM選択方式はtrack/categoryにしてください');
  if(c.enabled && c.selection_mode==='category' && !['calm','reflective','mysterious','hopeful','serious'].includes(c.category)) throw Error('BGMカテゴリが不正です');
  if(c.enabled && c.selection_mode==='track' && (typeof c.track_id!=='string'||!c.track_id.trim())) throw Error('BGM曲IDを指定してください');
@@ -83,3 +83,4 @@ $('script').addEventListener('input',()=>{try{const b=bgmSettings(JSON.parse($('
 
 // The builder uses the existing authenticated API without storing credentials.
 window.videoStudioApi=api;
+

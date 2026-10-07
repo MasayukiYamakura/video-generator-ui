@@ -73,11 +73,12 @@ const http=require('node:http');
   conflict=true;await page.locator('#pbSaveId').fill('conflict_layout');await page.locator('#pbSaveName').fill('競合');await page.locator('#pbSaveLayout').click();
   await page.waitForFunction(()=>document.getElementById('builderStatus').textContent.includes('他の端末'));assert.equal(writes.length,2);conflict=false;
   await page.locator('#pb_bgm_mode').selectOption('ai');await page.locator('#pbBuild').click();assert.match(await page.locator('#pbPrompt').inputValue(),/calm_01/);
-  await page.locator('#pb_bgm_volume_db').fill('6');await page.locator('#pb_bgm_volume_db').dispatchEvent('change');await page.locator('#pb_bgm_ducking').uncheck();
+  assert.equal(await page.locator('#pb_bgm_volume_db').getAttribute('max'),'24');
+  await page.locator('#pb_bgm_volume_db').fill('18');await page.locator('#pb_bgm_volume_db').dispatchEvent('change');await page.locator('#pb_bgm_ducking').uncheck();
   await page.locator('#pb_bgm_mode').selectOption('track');await page.locator('#pb_bgm_track').selectOption('calm_01');
   await page.getByText('AI設定',{exact:true}).click();await page.locator('#pbHookMode').selectOption('manual');await page.locator('#pbHookText').fill('今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください');
   await page.locator('#pbBuild').click();await page.locator('#script').fill(JSON.stringify(ai));await page.locator('#pbApply').click();
-  result=JSON.parse(await page.locator('#script').inputValue());assert.equal(result.global_settings.bgm.volume_db,6);assert.equal(result.global_settings.bgm.ducking,false);assert.equal(result.scenes[0].hook_text,'今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください');
+  result=JSON.parse(await page.locator('#script').inputValue());assert.equal(result.global_settings.bgm.volume_db,18);assert.equal(result.global_settings.bgm.ducking,false);assert.equal(result.scenes[0].hook_text,'今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください');
   await page.locator('#pb_bgm_mode').selectOption('off');await page.locator('#pbBuild').click();
   // Verify actual submission goes through the compiler before isolated input
   // upload. These are mock API calls: no Actions run or real token is used.
@@ -85,7 +86,7 @@ const http=require('node:http');
   await page.locator('#audio').setInputFiles({name:'recording.m4a',mimeType:'audio/mp4',buffer:Buffer.from('fixture')});
   await page.locator('#generate').click();await page.waitForFunction(()=>document.getElementById('status').textContent.includes('実行受付完了'));
   result=JSON.parse(blobs.find(b=>b.encoding==='utf-8').content);
-  assert.equal(result.global_settings.bgm.volume_db,6);assert.equal(result.global_settings.bgm.ducking,false);assert.equal(result.global_settings.bgm.enabled,false);
+  assert.equal(result.global_settings.bgm.volume_db,18);assert.equal(result.global_settings.bgm.ducking,false);assert.equal(result.global_settings.bgm.enabled,false);
   assert.equal(result.scenes[0].hook_text,'今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください');
   assert.equal(result.audio_file,'input.m4a');assert.equal(result.global_settings.brand_layout.tag_y,222);assert.equal(result.global_settings.voice_mode,'anonymous');assert.ok(receipt);
   await page.locator('#pbApplyOnSend').uncheck();
@@ -96,3 +97,4 @@ const http=require('node:http');
   console.log('Mobile builder integration passed: prompt, protected submission, save/reload, SHA conflict, legacy bypass; no real API writes.');
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
