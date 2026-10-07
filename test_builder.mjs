@@ -121,8 +121,16 @@ test('BGM volume and ducking are human settings and survive save/reload',()=>{
   const override=resolveConfig(saved,{video_preset:'audible_music',overrides:{video:{bgm_volume_db:2,bgm_ducking:true}}});
   assert.equal(fixedSettings(override).bgm.volume_db,2);assert.equal(fixedSettings(override).bgm.ducking,true);
   assert.equal(fixedSettings(config()).bgm.volume_db,0);assert.equal(fixedSettings(config()).bgm.ducking,true);
-  for(const bgm_volume_db of [-31,7,NaN,'6'])assert.throws(()=>config({video:{bgm_volume_db}}));
+  for(const bgm_volume_db of [-31,25,NaN,'6'])assert.throws(()=>config({video:{bgm_volume_db}}));
   assert.throws(()=>config({video:{bgm_ducking:'false'}}));
+});
+test('extended BGM gains survive prompt, compilation and preset reload',()=>{
+  for(const level of [-30,6,12,18,24]){
+    const saved=savePreset(registry,'video',{id:'loud_music',name:'BGM音量',extends:'tiktok_standard',values:{bgm_mode:'track',bgm_track:'calm_01',bgm_volume_db:level,bgm_ducking:false}});
+    const c=resolveConfig(JSON.parse(JSON.stringify(saved)),{video_preset:'loud_music'});
+    assert.equal(applyConfig(content,c,music).global_settings.bgm.volume_db,level);
+    assert.ok(buildPrompt(c,'台本',music).includes(`"volume_db": ${level}`));
+  }
 });
 test('title instructions preserve hook_text newlines and manual title wins over extraction',()=>{
   const title='今幸せじゃないよって\n言う女性\n孤独を受け入れて\nみてください';
@@ -161,3 +169,4 @@ test('the existing media/script.json remains byte-for-byte unchanged by compilat
   const path=mediaPath,before=readFileSync(path,'utf8');const source=JSON.parse(before);
   applyConfig(source,config());assert.equal(readFileSync(path,'utf8'),before);assert.deepEqual(JSON.parse(before),source);
 });
+

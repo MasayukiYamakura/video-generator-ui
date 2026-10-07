@@ -11,7 +11,7 @@ const VIDEO_FIELDS=[
   ['bgm_mode','BGM',[['off','OFF'],['ai','ON・AIカテゴリ選択'],['category','ON・カテゴリ指定'],['track','ON・曲指定']]],
   ['bgm_category','BGMカテゴリ',[['ai','AI自動'],['calm','安心感'],['reflective','内省'],['mysterious','神秘'],['hopeful','前向き'],['serious','注意喚起']]],
   ['bgm_track','登録済みBGM曲',[['','保存済み設定を読み込んで選択']]],
-  ['bgm_volume_db','BGM音量（標準からの増減 dB・-30〜+6）',null,'number'],
+  ['bgm_volume_db','BGM音量（標準からの増減 dB・-30〜+24）',null,'number'],
   ['bgm_ducking','発話中にBGM音量を下げる（ダッキング）'],
   ['hook_enabled','フック表示'],
   ['hook_orientation','フック方向',[['horizontal','横書き'],['vertical','縦書き']]],
@@ -88,7 +88,12 @@ export function mountBuilder(apiProvider) {
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($('pbVideoFields'),key,label,items,type);
     if(key==='intro_scenes'){input.min=1;input.max=10;input.step=1;}
-    if(key==='bgm_volume_db'){input.min=-30;input.max=6;input.step=1;}
+    if(key==='bgm_volume_db'){
+      input.min=-30;input.max=24;input.step=1;
+      const hint=document.createElement('small');hint.id='pbBgmVolumeHelp';hint.className='muted';
+      hint.textContent='0 dB：従来の標準。+6で小さい場合は+12→+18の順に調整（最大+24）。ダッキングOFFで確認し、声が聞き取れる音量にしてください。';
+      input.setAttribute('aria-describedby',hint.id);input.parentElement.append(hint);
+    }
     input.addEventListener('change',()=>{session.overrides.video[key]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;invalidate();renderFields();});
   }
   for(const [key,label] of Object.entries(LAYOUT_LABELS)) {
@@ -160,3 +165,4 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare};
 }
+

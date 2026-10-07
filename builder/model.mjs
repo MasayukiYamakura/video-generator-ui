@@ -21,7 +21,7 @@ export function validateValues(values, kind) {
     for(const [key,options] of Object.entries(enums)) if(own(values,key)&&!options.includes(values[key])) throw Error(`${key}の値が不正です`);
     if(own(values,'intro_scenes')&&(!Number.isInteger(values.intro_scenes)||values.intro_scenes<1||values.intro_scenes>10)) throw Error('冒頭シーン数は1〜10です');
     if(own(values,'bgm_track')&&!/^[\w-]*$/.test(values.bgm_track)) throw Error('BGM曲IDが不正です');
-    if(own(values,'bgm_volume_db')&&(values.bgm_volume_db < -30 || values.bgm_volume_db > 6)) throw Error('BGM音量は-30〜+6 dBです');
+    if(own(values,'bgm_volume_db')&&(values.bgm_volume_db < -30 || values.bgm_volume_db > 24)) throw Error('BGM音量は-30〜+24 dBです');
   } else {
     for(const [key,value] of Object.entries(values)) {
       let range=[0,3840];
@@ -120,3 +120,4 @@ export function savePreset(registry, kind, entry) {
   next[key].push(clone(entry));
   return validateRegistry(next);
 }
+
