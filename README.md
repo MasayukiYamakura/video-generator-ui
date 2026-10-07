@@ -65,4 +65,4 @@ HTML / CSS / JavaScript / READMEのみ。音声・JSON・動画・トークン�
 
 ## BGM設定の確認
 
-台本JSONの `global_settings.bgm` をそのまま送信します。「BGM設定を確認」で非公開リポジトリの `media/bgm/catalog.json` を読み込み、予定曲と音量を表示します。生成後は履歴に実際の曲名と音量を表示し、ZIPの `bgm-report.json` に詳細を記録します。音源と利用条件の登録方法は動画生成リポジトリのREADME「登録済みBGMを動画に組み込む」を参照してください。初期状態は音源未登録です。BGM設定なしのJSONは従来どおり動作します。
+台本JSONの `global_settings.bgm` をそのまま送信します。「BGM設定を確認」で非公開リポジトリの `media/bgm/catalog.json` を読み込み、予定曲と音量を表示します。生成後は履歴に実際の曲名と音量を表示し、ZIPの `bgm-report.json` に詳細を記録します。音源と利用条件の登録方法は動画生成リポジトリのREADME「登録済みBGMを動画に組み込む」を参照してください。5カテゴリ各1曲のCC0音源を登録済みです。BGM設定なしのJSONは従来どおり動作します。
