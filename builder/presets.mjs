@@ -51,9 +51,9 @@ export const BACKGROUNDS = [
 export const CATEGORIES = ['calm','reflective','mysterious','hopeful','serious'];
 export const SYSTEM = Object.freeze({
   overlay:{portrait_brand:0.2, standard:0.35},
-  anonymous:{pitch_semitones:-1.5, formant_mode:'preserved', low_gain_db:1,
-    mid_gain_db:-0.5, high_gain_db:0.5, compressor_threshold_db:-18,
-    compressor_ratio:2, output_gain_db:0.5},
+  anonymous:{pitch_semitones:-3.0, formant_mode:'preserved', low_gain_db:1,
+    mid_gain_db:-1, high_gain_db:1, compressor_threshold_db:-18,
+    compressor_ratio:2.3, output_gain_db:0.5},
   bgm:{start_seconds:0, loop:false,
     fade_in_seconds:0.5, fade_out_seconds:1.5},
   visualizer:{style:'standard_bar', motion:'reactive', look:'studio', num_bars:40,
