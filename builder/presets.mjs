@@ -7,7 +7,7 @@ export const VIDEO_DEFAULTS = Object.freeze({
   intro_visualizer:false, body_visualizer:false, background_mode:'stock',
   stock_provider:'pexels', bgm_mode:'off', bgm_category:'ai', bgm_track:'',
   bgm_volume_db:0, bgm_ducking:true,
-  voice_mode:'original', hook_band_enabled:false,
+  voice_mode:'original', tts_voice:'hashimoto', tts_style:'natural', tts_pace:'normal', tts_custom_style:'', hook_band_enabled:false,
 });
 export const VIDEO_PRESETS = [
   {id:'tiktok_standard', name:'TikTok標準', default_layout:'portrait_standard', values:{
@@ -60,3 +60,4 @@ export const SYSTEM = Object.freeze({
     max_bar_height_ratio:0.08, visualizer_opacity:0.95,
     visualizer_glow_strength:0.4, update_fps:20, background:'video'},
 });
+

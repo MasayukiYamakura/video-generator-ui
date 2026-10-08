@@ -1,13 +1,17 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=bgm24-20261008';
-import {buildPrompt} from './prompt.mjs';
-import {applyConfig} from './compiler.mjs';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs';
-import {drawPreview} from './preview.mjs';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tts-20261008';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tts-20261008';
+import {buildPrompt} from './prompt.mjs?v=tts-20261008';
+import {applyConfig} from './compiler.mjs?v=tts-20261008';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tts-20261008';
+import {drawPreview} from './preview.mjs?v=tts-20261008';
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
-  ['voice_mode','音声',[['original','元音声'],['anonymous','匿名音声']]],
+  ['voice_mode','音声方式',[['original','録音音声'],['anonymous','匿名加工音声'],['tts','AI読み上げ']]],
+  ['tts_voice','声',[['hashimoto','ハシモト本人（Voice IDの登録が必要）'],['male_a','男性A'],['male_b','男性B']]],
+  ['tts_style','話し方',[['natural','自然'],['calm','落ち着いた'],['gentle','優しい'],['bright','明るい'],['serious','真剣'],['powerful','力強い']]],
+  ['tts_pace','話す速さ',[['slow','ゆっくり'],['normal','標準'],['fast','やや速い']]],
+  ['tts_custom_style','カスタム話し方（500文字以内）',null,'text'],
   ['bgm_mode','BGM',[['off','OFF'],['ai','ON・AIカテゴリ選択'],['category','ON・カテゴリ指定'],['track','ON・曲指定']]],
   ['bgm_category','BGMカテゴリ',[['ai','AI自動'],['calm','安心感'],['reflective','内省'],['mysterious','神秘'],['hopeful','前向き'],['serious','注意喚起']]],
   ['bgm_track','登録済みBGM曲',[['','保存済み設定を読み込んで選択']]],
@@ -73,6 +77,9 @@ export function mountBuilder(apiProvider) {
     $('pbSearchText').disabled=$('pbSearchMode').value!=='manual'||v.background_mode==='fixed';
     $('pbStockIndices').disabled=$('pbStockMode').value!=='manual'||v.background_mode!=='mixed';
     $('pbThemeTitle').disabled=$('pbThemeMode').value!=='manual'||v.format!=='landscape';
+    $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
+    $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
+    if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
     paint();
   }
   function lists() {
@@ -86,7 +93,7 @@ export function mountBuilder(apiProvider) {
     renderFields();
   }
   for(const [key,label,items,type] of VIDEO_FIELDS) {
-    const input=field($('pbVideoFields'),key,label,items,type);
+    const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key==='intro_scenes'){input.min=1;input.max=10;input.step=1;}
     if(key==='bgm_volume_db'){
       input.min=-30;input.max=24;input.step=1;
@@ -152,7 +159,7 @@ export function mountBuilder(apiProvider) {
     lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));$('pbSaveLayout').onclick=()=>run(()=>save('layout'));
-  $('pbBuild').onclick=()=>{try{const c=config();if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
+  $('pbBuild').onclick=()=>{try{const c=config();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
     if(!$('pbApplyOnSend').checked)return script;
@@ -165,4 +172,5 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare};
 }
+
 
