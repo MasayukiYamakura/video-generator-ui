@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=tts-20261008';
-import {clone, assertObject} from './model.mjs?v=tts-20261008';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=studio-20261009';
+import {clone, assertObject} from './model.mjs?v=studio-20261009';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -10,6 +10,8 @@ export function fixedSettings(config) {
     hook:{enabled:v.hook_enabled, orientation:v.hook_orientation, scenes:v.intro_scenes,
       sides:['right','left'], visualizer:true,
       band_opacity:v.hook_band_enabled?l.hook_band_opacity:0,
+      band_color:l.hook_band_color, band_width_ratio:l.hook_band_width_ratio,
+      band_padding_y:l.hook_band_padding_y, font_size_mode:l.hook_font_size_mode,
       text_style:{style:'outline',font:'serif',font_weight:'black',
         font_size:l.hook_font_size,max_width_ratio:l.hook_max_width_ratio,
         max_chars:7,line_pitch:0.95,column_gap:0.18,
@@ -28,7 +30,8 @@ export function fixedSettings(config) {
     // in the standard template. It is inert in old scripts.
     brand_layout:{tag_x:l.tag_x,tag_y:l.tag_y,hook_center_y:l.hook_center_y,
       caption_center_y:l.caption_center_y,hook_font_size:l.hook_font_size},
-    bgm:{...SYSTEM.bgm,volume_db:v.bgm_volume_db,ducking:v.bgm_ducking,
+    bgm:{...SYSTEM.bgm,start_seconds:v.bgm_start_seconds,delay_seconds:v.bgm_delay_seconds,
+      loop:v.bgm_loop,fade_in_seconds:v.bgm_fade_in_seconds,fade_out_seconds:v.bgm_fade_out_seconds,volume_db:v.bgm_volume_db,ducking:v.bgm_ducking,
       enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
   };
   if(branded) g.template='portrait_brand';
@@ -101,4 +104,5 @@ export function applyConfig(script, config, bgmCatalog) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes};
 }
+
 

@@ -1,4 +1,4 @@
-import {emptyRegistry, validateRegistry, clone} from './model.mjs?v=tts-20261008';
+import {emptyRegistry, validateRegistry, clone} from './model.mjs?v=studio-20261009';
 export const PRESET_PATH='config/prompt-builder.json';
 export const decodeContent=response=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(response.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
 export function encodeContent(value) {
@@ -24,4 +24,5 @@ export async function writeRegistry(api, registry, expectedSha) {
   });
   return {registry:clone(registry),sha:result.content.sha};
 }
+
 

@@ -2,8 +2,9 @@ const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
+let previewPin=saved.previewPin||null, previewUrls=[];
 $('repo').value = saved.repo || $('repo').value; $('token').value = token; $('remember').checked = Boolean(saved.token);
-function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history: history.slice(0,50), pending })); }
+function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history: history.slice(0,50), pending, previewPin })); }
 function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw Error('リポジトリは owner/name 形式で指定してください'); if (pending && pending.repo !== r) throw Error('未受付の処理とリポジトリが異なります'); return r; }
 async function api(path, method='GET', body) {
   token = $('token').value.trim(); if (!token) throw Error('GitHubトークンを入力してください');
@@ -15,14 +16,15 @@ async function api(path, method='GET', body) {
   } finally { clearTimeout(timer); }
 }
 const message = text => { $('status').textContent=text; };
-function controls() { $('generate').disabled = busy || Boolean(pending) || history.some(h=>h.repo===$('repo').value.trim() && h.status!=='completed'); $('recover').hidden=!pending; $('retry').hidden=!pending?.sha; $('discard').hidden=!pending || Boolean(pending.dispatched); }
+function controls() { for(const id of ['audioPreview','titlePreview'])$(id).disabled=busy||Boolean(pending)||history.some(h=>h.repo===$('repo').value.trim()&&h.status!=='completed'); $('generate').disabled = busy || Boolean(pending) || history.some(h=>h.repo===$('repo').value.trim() && h.status!=='completed'); $('recover').hidden=!pending; $('retry').hidden=!pending?.sha; $('discard').hidden=!pending || Boolean(pending.dispatched); }
 function node(tag,text) { const n=document.createElement(tag); n.textContent=text; return n; }
 function render() {
   $('history').replaceChildren();
   for (const h of history.filter(h=>h.repo===$('repo').value.trim())) { const box=node('article',''); box.className='item'; box.append(node('strong',h.audio),node('p',new Date(h.created).toLocaleString('ja-JP')));
     const label=h.status!=='completed' ? (h.status==='queued' || h.status==='waiting' || h.status==='pending' ? '待機中' : '処理中') : h.conclusion==='success' ? '完了' : h.conclusion==='cancelled' ? 'キャンセル' : '失敗'; box.append(node('p',label+(h.step ? ` · ${h.step}` : '')));
     const link=node('a','実行詳細'); link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}`; link.target='_blank'; link.rel='noopener noreferrer'; box.append(link); if(h.bgm) box.append(node('p',h.bgm));
-    if(h.status==='completed' && h.conclusion==='success') { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a','動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
+    if(h.status==='completed' && h.conclusion==='success') { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a',h.kind&&h.kind!=='video'?'確認結果をダウンロード（ZIP）':'動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
+    if(h.status==='completed'&&h.conclusion==='success'&&h.kind&&h.kind!=='video'){const play=node('button','画面で確認');play.className='secondary';play.onclick=()=>loadPreview(h);box.append(play);}
     $('history').append(box);
   }
   controls();
@@ -32,11 +34,11 @@ async function recover() {
   if(!pending) return true;
   const runs=(await listRuns()).filter(r=>r.display_title===`Pages ${pending.id}`).sort((a,b)=>a.id-b.id);
   if(!runs.length) { message('実行はまだ確認できません。少し後に「受付状況を確認」を押してください。再送も同じ受付IDを使います。'); return false; }
-  const r=runs[0]; if(!history.some(h=>h.runId===r.id)) history.unshift({repo:pending.repo,audio:pending.audio,created:pending.created,id:pending.id,runId:r.id,status:r.status,conclusion:r.conclusion,bgm:pending.bgm}); pending=null; persist(); render(); message('実行受付完了。画面を消したり、別アプリを開いたりしても生成が続きます。'); return true;
+  const r=runs[0]; if(!history.some(h=>h.runId===r.id)) history.unshift({repo:pending.repo,audio:pending.audio,created:pending.created,id:pending.id,runId:r.id,status:r.status,conclusion:r.conclusion,bgm:pending.bgm,kind:pending.kind||'video',sha:pending.sha}); pending=null; persist(); render(); message('実行受付完了。画面を消したり、別アプリを開いたりしても生成が続きます。'); return true;
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed') { const a=await api(`actions/runs/${h.runId}/artifacts`);h.artifacts=a.artifacts.filter(x=>x.name===`video-${h.id}`); } else { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
+ try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed') { const a=await api(`actions/runs/${h.runId}/artifacts`);h.artifacts=a.artifacts.filter(x=>x.name===`video-${h.id}`); if(h.kind&&h.kind!=='video'&&h.conclusion==='success'&&!h.previewLoaded){h.previewLoaded=true;await loadPreview(h);} } else { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -71,11 +73,16 @@ function validate(file,text) {
  return {script,ext,mode};
 }
 async function base64(file){const bytes=new Uint8Array(await file.arrayBuffer());let s='';for(let i=0;i<bytes.length;i+=32768)s+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(s);}
-async function dispatch(){message('実行依頼中。画面を開いたままお待ちください。');pending.dispatched=true;persist();await api(`actions/workflows/${WORKFLOW}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha}});await recover();}
+async function dispatch(){message('実行依頼中。画面を開いたままお待ちください。');pending.dispatched=true;persist();await api(`actions/workflows/${WORKFLOW}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha,job_kind:pending.kind||'video'}});await recover();}
 $('connect').onclick=async()=>{try{const r=await api('');if(!r.private)throw Error('接続先は非公開リポジトリにしてください');await api(`actions/workflows/${WORKFLOW}`);persist();$('connectionStatus').textContent='接続できました';await refresh();}catch(e){$('connectionStatus').textContent=e.message;}};
 $('forget').onclick=()=>{token='';$('token').value='';$('remember').checked=false;persist();$('connectionStatus').textContent='トークンを削除しました。履歴は保持しています。';};
 $('jsonFile').onchange=async()=>{const f=$('jsonFile').files[0];if(f){if(f.size>1024*1024)return message('JSONは1 MiBまでです');$('script').value=await f.text();$('script').dispatchEvent(new Event('input'));}};
-$('generate').onclick=async()=>{if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0],{script,ext,mode}=validate(file,$('script').value);const bgm=await previewBgm(script);const r=await api('');if(!r.private)throw Error('音声の保存先は非公開リポジトリにしてください');const active=(await listRuns()).find(r=>r.status!=='completed');if(active)throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();pending={id,repo:repo(),audio:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let a=null;if(mode!=='tts'){a=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const j=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(a?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:a.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:j.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(e){message(pending ? `${e.message}。受付IDを保持しました。受付状況を確認してから再操作してください。` : e.message);}finally{busy=false;render();}};
+async function submit(kind='video'){if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0];let script,ext,mode;
+if(kind==='title-preview'){if(new TextEncoder().encode($('script').value).length>1024*1024)throw Error('JSONは1 MiBまでです');script=JSON.parse($('script').value);if(window.videoConfigurator)script=window.videoConfigurator.prepareScript(script);if(!script.scenes?.length)throw Error('タイトルを含むJSONが必要です');mode='title-preview';}else{({script,ext,mode}=validate(file,$('script').value));if(kind==='audio-preview'&&mode==='tts')throw Error('試聴は添付録音・匿名加工音声に対応しています');}
+if(kind==='video'||kind==='audio-preview')await checkPreviewPin(script,file);const bgm=kind==='title-preview'?'タイトル確認':await previewBgm(script);const r=await api('');if(!r.private)throw Error('音声の保存先は非公開リポジトリにしてください');const active=(await listRuns()).find(r=>r.status!=='completed');if(active)throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();pending={id,repo:repo(),kind,audio:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let a=null;if(!['tts','title-preview'].includes(mode)){a=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const j=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(a?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:a.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:j.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(e){message(pending ? `${e.message}。受付IDを保持しました。受付状況を確認してから再操作してください。` : e.message);}finally{busy=false;render();}}
+$('generate').onclick=()=>submit('video');
+$('audioPreview').onclick=()=>submit('audio-preview');
+$('titlePreview').onclick=()=>submit('title-preview');
 $('recover').onclick=refresh;
 $('retry').onclick=async()=>{if(busy||!pending?.sha)return;busy=true;controls();try{if(await recover())return;try{const ref=await api(`git/ref/heads/ui-input/${pending.id}`);if(ref.object.sha!==pending.sha)throw Error('入力ブランチが変更されています');}catch(e){if(e.status!==404)throw e;await api('git/refs','POST',{ref:`refs/heads/ui-input/${pending.id}`,sha:pending.sha});}await dispatch();}catch(e){message(e.message);}finally{busy=false;render();}};
 $('discard').onclick=async()=>{if(busy||!pending||pending.dispatched)return;busy=true;try{if(await recover())return;if(pending.sha){try{const ref=await api(`git/ref/heads/ui-input/${pending.id}`);if(ref.object.sha!==pending.sha)throw Error('入力が変更されています');await api(`git/refs/heads/ui-input/${pending.id}`,'DELETE');}catch(e){if(e.status!==404)throw e;}}pending=null;persist();message('未受付の入力を取り消しました。音声を選び直して実行できます。');}catch(e){message(e.message);}finally{busy=false;render();}};
@@ -84,11 +91,12 @@ $('refresh').onclick=refresh;document.addEventListener('visibilitychange',()=>{i
 function bgmSettings(script) {
  const b=script.global_settings?.bgm ?? {};
  if(!b || typeof b!=='object' || Array.isArray(b)) throw Error('bgmはJSONオブジェクトにしてください');
- const defaults={enabled:false,selection_mode:'category',volume_db:0,ducking:true,start_seconds:0,loop:true,fade_in_seconds:0.5,fade_out_seconds:1.5};
- for(const k of Object.keys(b)) if(!Object.hasOwn(defaults,k) && !['track_id','category'].includes(k)) throw Error(`bgmの未対応項目: ${k}`);
+ const defaults={enabled:false,selection_mode:'category',volume_db:0,ducking:true,start_seconds:0,delay_seconds:0,loop:true,fade_in_seconds:0.5,fade_out_seconds:1.5};
+ for(const k of Object.keys(b)) if(!Object.hasOwn(defaults,k) && !['track_id','category','expected_sha256'].includes(k)) throw Error(`bgmの未対応項目: ${k}`);
+ if(b.expected_sha256!==undefined&&!/^[0-9a-f]{64}$/.test(b.expected_sha256))throw Error('試聴したBGMのハッシュが不正です');
  const c={...defaults,...b};
  for(const k of ['enabled','ducking','loop']) if(typeof c[k]!=='boolean') throw Error(`bgm.${k}はtrue/falseで指定してください`);
- for(const [k,lo,hi] of [['volume_db',-30,24],['start_seconds',0,86400],['fade_in_seconds',0,30],['fade_out_seconds',0,30]]) if(typeof c[k]!=='number'||!Number.isFinite(c[k])||c[k]<lo||c[k]>hi) throw Error(`bgm.${k}は${lo}〜${hi}の数値で指定してください`);
+ for(const [k,lo,hi] of [['volume_db',-30,24],['start_seconds',0,86400],['delay_seconds',0,86400],['fade_in_seconds',0,30],['fade_out_seconds',0,30]]) if(typeof c[k]!=='number'||!Number.isFinite(c[k])||c[k]<lo||c[k]>hi) throw Error(`bgm.${k}は${lo}〜${hi}の数値で指定してください`);
  if(!['track','category'].includes(c.selection_mode)) throw Error('BGM選択方式はtrack/categoryにしてください');
  if(c.enabled && c.selection_mode==='category' && !['calm','reflective','mysterious','hopeful','serious'].includes(c.category)) throw Error('BGMカテゴリが不正です');
  if(c.enabled && c.selection_mode==='track' && (typeof c.track_id!=='string'||!c.track_id.trim())) throw Error('BGM曲IDを指定してください');
@@ -105,7 +113,7 @@ async function previewBgm(script) {
  candidates.sort((a,b)=>(a.priority??100)-(b.priority??100)||(a.id<b.id?-1:a.id>b.id?1:0));
  const t=candidates[0];
  if(!t) throw Error('指定に合う登録済みBGMがありません。音源とcatalog.jsonを登録してください');
- const summary=`BGM予定: ${t.title} (${t.id}) / ${b.selection_mode==='category'?b.category:'曲指定'} / ${b.volume_db} dB / ダッキング${b.ducking?'あり':'なし'} / 開始${b.start_seconds}秒`;
+ const summary=`BGM予定: ${t.title} (${t.id}) / ${b.selection_mode==='category'?b.category:'曲指定'} / ${b.volume_db} dB / ダッキング${b.ducking?'あり':'なし'} / 曲の${b.start_seconds}秒から・動画の${b.delay_seconds}秒から`;
  $('bgmPreview').textContent=summary; return summary;
 }
 $('checkBgm').onclick=async()=>{try{await previewBgm(JSON.parse($('script').value));}catch(e){$('bgmPreview').textContent=e.message;}};
@@ -114,6 +122,8 @@ $('script').addEventListener('input',()=>{try{const b=bgmSettings(JSON.parse($('
 
 // The builder uses the existing authenticated API without storing credentials.
 window.videoStudioApi=api;
+import {mountBgmRegistration,decodeBlob} from './studio-features.mjs?v=studio-20261009';
+mountBgmRegistration(api,base64);
 
 
 
@@ -126,3 +136,46 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
+
+function effectiveScript(){let s=JSON.parse($('script').value);return window.videoConfigurator?window.videoConfigurator.prepareScript(s):s;}
+function audioSignature(script){const s=JSON.parse(JSON.stringify(script));delete s.audio_file;delete s.preview_pin;
+ if(s.global_settings?.bgm)delete s.global_settings.bgm.expected_sha256;
+ return JSON.stringify(s);
+}
+async function audioHash(file){if(!file)return '';const d=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());return [...new Uint8Array(d)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function checkPreviewPin(script,file){
+ if(!previewPin||previewPin.repo!==repo()||previewPin.signature!==audioSignature(script)||previewPin.audioHash!==await audioHash(file))return;
+ if(previewPin.track){script.global_settings.bgm={...script.global_settings.bgm,selection_mode:'track',track_id:previewPin.track.id,expected_sha256:previewPin.track.sha256};delete script.global_settings.bgm.category;}
+}
+async function previewFile(h,name){const r=await api(`contents/${name}?ref=ui-preview/${h.id}`);if(r.encoding==='base64'&&r.content)return decodeBlob(r);const blob=await api(`git/blobs/${r.sha}`);return decodeBlob(blob);}
+async function loadPreview(h){
+ if(h.repo!==repo())return;
+ $('previewStatus').textContent='確認結果を読み込み中';
+ try{
+   if(h.kind==='audio-preview'){
+     const [bytes,reportBytes,scriptBytes,metaBytes]=await Promise.all([previewFile(h,'audio-preview.m4a'),previewFile(h,'bgm-report.json'),previewFile(h,'preview-script.json'),previewFile(h,'preview-meta.json')]);
+     const report=JSON.parse(new TextDecoder().decode(reportBytes)),script=JSON.parse(new TextDecoder().decode(scriptBytes));
+     const url=URL.createObjectURL(new Blob([bytes],{type:'audio/mp4'}));previewUrls.push(url);$('mixedPlayer').src=url;$('mixedPlayer').hidden=false;
+     const file=$('audio').files[0];
+     // Only bind this preview to the attached file after checking its actual hash.
+     const resultHash=JSON.parse(new TextDecoder().decode(metaBytes)).audio_sha256;
+     let current;try{current=effectiveScript();}catch{}
+     if(file&&await audioHash(file)===resultHash&&current&&audioSignature(current)===audioSignature(script)){
+       previewPin={repo:h.repo,signature:audioSignature(current),audioHash:resultHash,track:report.track};persist();
+       $('previewStatus').textContent='試聴できます。この設定の本番生成では試聴した曲を固定します';
+     }else $('previewStatus').textContent='試聴できます。現在の添付音声・設定と一致しないため、本番への曲固定は適用しません';
+   }else{
+     const bytes=await previewFile(h,'title-preview.png');const url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));previewUrls.push(url);$('titleImage').src=url;$('titleImage').hidden=false;$('previewStatus').textContent='先頭シーンのタイトル描画です。背景映像・タグ・波形は含みません';
+   }
+ }catch(e){$('previewStatus').textContent=e.status===404?'確認結果は削除済みです。再生成してください':e.message;}
+}
+$('clearPreview').onclick=async()=>{
+ try{for(const h of history.filter(h=>h.repo===repo()&&h.kind&&h.kind!=='video'&&h.status==='completed')){try{await api(`git/refs/heads/ui-preview/${h.id}`,'DELETE');}catch(e){if(e.status!==404)throw e;}}
+ $('mixedPlayer').pause();$('mixedPlayer').removeAttribute('src');$('mixedPlayer').hidden=true;$('titleImage').removeAttribute('src');$('titleImage').hidden=true;
+ previewUrls.forEach(URL.revokeObjectURL);previewUrls=[];previewPin=null;persist();$('previewStatus').textContent='確認結果を削除しました。ZIP成果物は保存期間まで残ります';
+ }catch(e){$('previewStatus').textContent=e.message;}
+};
+function markPreviewStale(){if(!$('mixedPlayer').hidden||!$('titleImage').hidden)$('previewStatus').textContent='入力が変わりました。現在の設定を確認するには再生成してください';}
+$('audio').addEventListener('change',markPreviewStale);$('script').addEventListener('input',markPreviewStale);
+$('promptBuilder').addEventListener('input',markPreviewStale);$('promptBuilder').addEventListener('change',markPreviewStale);

@@ -26,7 +26,7 @@ const context=vm.createContext({window,document,localStorage:window.localStorage
     else throw Error('Unexpected API: '+path);
     return {ok:true,status:path.endsWith('dispatches')?204:200,json:async()=>data};
   }});
-vm.runInContext(fs.readFileSync(new URL('./app.js',import.meta.url),'utf8'),context);
+vm.runInContext(fs.readFileSync(new URL('./app.js',import.meta.url),'utf8').replace(/^import .*studio-features.*$/m,'').replace('mountBgmRegistration(api,base64);',''),context);
 globalThis.document=document;globalThis.window=window;
 const {mountBuilder}=await import('./builder/ui.mjs');
 window.videoConfigurator=mountBuilder(()=>window.videoStudioApi);
@@ -54,3 +54,4 @@ change('pb_voice_mode','original');assert.equal($('pbTtsFields').hidden,true);
 assert.equal($('audioUpload').hidden,false);assert.equal($('pbDspHelp').hidden,true);
 console.log('TTS DOM integration passed: three modes, prompt, settings, JSON-only submission.');
 await window.happyDOM.abort();
+

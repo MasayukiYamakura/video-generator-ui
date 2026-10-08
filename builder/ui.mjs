@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tts-20261008';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tts-20261008';
-import {buildPrompt} from './prompt.mjs?v=tts-20261008';
-import {applyConfig} from './compiler.mjs?v=tts-20261008';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tts-20261008';
-import {drawPreview} from './preview.mjs?v=tts-20261008';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=studio-20261009';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=studio-20261009';
+import {buildPrompt} from './prompt.mjs?v=studio-20261009';
+import {applyConfig} from './compiler.mjs?v=studio-20261009';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=studio-20261009';
+import {drawPreview} from './preview.mjs?v=studio-20261009';
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
@@ -12,11 +12,16 @@ const VIDEO_FIELDS=[
   ['tts_style','話し方',[['natural','自然'],['calm','落ち着いた'],['gentle','優しい'],['bright','明るい'],['serious','真剣'],['powerful','力強い']]],
   ['tts_pace','話す速さ',[['slow','ゆっくり'],['normal','標準'],['fast','やや速い']]],
   ['tts_custom_style','カスタム話し方（500文字以内）',null,'text'],
-  ['bgm_mode','BGM',[['off','OFF'],['ai','ON・AIカテゴリ選択'],['category','ON・カテゴリ指定'],['track','ON・曲指定']]],
+  ['bgm_mode','BGM',[['off','OFF'],['ai','原稿に合うカテゴリをAIが提案'],['category','雰囲気で選ぶ'],['track','曲を直接選ぶ']]],
   ['bgm_category','BGMカテゴリ',[['ai','AI自動'],['calm','安心感'],['reflective','内省'],['mysterious','神秘'],['hopeful','前向き'],['serious','注意喚起']]],
   ['bgm_track','登録済みBGM曲',[['','保存済み設定を読み込んで選択']]],
   ['bgm_volume_db','BGM音量（標準からの増減 dB・-30〜+24）',null,'number'],
   ['bgm_ducking','発話中にBGM音量を下げる（ダッキング）'],
+  ['bgm_start_seconds','曲のどこから使うか（秒）',null,'number'],
+  ['bgm_delay_seconds','動画の何秒目から流すか（秒）',null,'number'],
+  ['bgm_loop','曲が終わったら繰り返す'],
+  ['bgm_fade_in_seconds','BGMフェードイン（秒）',null,'number'],
+  ['bgm_fade_out_seconds','BGMフェードアウト（秒）',null,'number'],
   ['hook_enabled','フック表示'],
   ['hook_orientation','フック方向',[['horizontal','横書き'],['vertical','縦書き']]],
   ['intro_scenes','冒頭シーン数',null,'number'],
@@ -33,7 +38,7 @@ const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
   hook_top:'縦書きフック Y（上端）',hook_margin_x:'縦書きフック左右余白比率',
   caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
   max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
-  hook_band_opacity:'黒帯の不透明度',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
+  hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
 function el(tag,text) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function options(select,items,current) {select.replaceChildren();for(const [value,label] of items){const o=el('option',label);o.value=value;select.append(o);}if(current!==undefined)select.value=current;}
 function field(root,key,label,items,type='checkbox') {
@@ -60,7 +65,9 @@ export function mountBuilder(apiProvider) {
   function config() {return resolveConfig(registry,session);}
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
-    try {const c=config();drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked);$('pbPreviewError').textContent='';}
+    try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
+      if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
+      drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
   function renderFields() {
@@ -69,6 +76,7 @@ export function mountBuilder(apiProvider) {
     for(const [key] of VIDEO_FIELDS) {const input=$('pb_'+key);if(typeof v[key]==='boolean')input.checked=v[key];else input.value=v[key];}
     for(const key of Object.keys(LAYOUT_DEFAULTS)) $('pb_'+key).value=l[key];
     $('pb_bgm_category').disabled=v.bgm_mode!=='category';$('pb_bgm_track').disabled=v.bgm_mode!=='track';
+    for(const key of ['bgm_start_seconds','bgm_delay_seconds','bgm_loop','bgm_fade_in_seconds','bgm_fade_out_seconds']) $('pb_'+key).disabled=v.bgm_mode==='off';
     $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
     for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand';
     $('pb_hook_orientation').disabled=!v.hook_enabled;$('pb_hook_band_enabled').disabled=v.hook_orientation!=='horizontal';
@@ -94,6 +102,7 @@ export function mountBuilder(apiProvider) {
   }
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
+    if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
     if(key==='intro_scenes'){input.min=1;input.max=10;input.step=1;}
     if(key==='bgm_volume_db'){
       input.min=-30;input.max=24;input.step=1;
@@ -104,11 +113,11 @@ export function mountBuilder(apiProvider) {
     input.addEventListener('change',()=>{session.overrides.video[key]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;invalidate();renderFields();});
   }
   for(const [key,label] of Object.entries(LAYOUT_LABELS)) {
-    const input=field($('pbLayoutFields'),key,label,null,'number');
+    const input=field($('pbLayoutFields'),key,label,key==='hook_font_size_mode'?[['auto','自動調整（指定サイズが上限）'],['fixed','固定サイズ']]:null,key==='hook_band_color'?'color':'number');
     input.min=key.includes('font_size')?1:key==='visualizer_size'?16:0;
     input.max=key.includes('ratio')||key.includes('safe_')||key==='hook_margin_x'||key==='hook_band_opacity'?1:key.includes('font_size')?300:key==='visualizer_size'?2000:3840;
     input.step=Number(input.max)===1?0.01:1;
-    input.addEventListener('input',()=>{session.overrides.layout[key]=Number(input.value);invalidate();paint();});
+    input.addEventListener('input',()=>{session.overrides.layout[key]=input.type==='number'?Number(input.value):input.value;invalidate();paint();});
   }
   $('pbVideo').onchange=()=>{
     session.video_preset=$('pbVideo').value;session.overrides={video:{},layout:{}};
@@ -128,6 +137,7 @@ export function mountBuilder(apiProvider) {
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
     $(id).addEventListener('input',()=>{session.ai[key]=$(id).value;invalidate();renderFields();});
   }
+  $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
   $('pbPreviewIntro').onchange=paint;$('pbSafe').onchange=paint;
   $('pbBackgroundPreview').onclick=()=>run(async()=>{
@@ -170,7 +180,8 @@ export function mountBuilder(apiProvider) {
   $('pbApply').onclick=()=>{try{if(!$('pbApplyOnSend').checked)throw Error('「送信時に画面設定を適用」を有効にしてください');const result=prepare(JSON.parse($('script').value));$('script').value=JSON.stringify(result,null,2);$('script').dispatchEvent(new Event('input'));status('画面の確定設定をJSONへ適用しました。内容を確認して動画生成できます。');}catch(e){status(e.message);}};
   $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
   lists();
-  return {prepareScript:prepare};
+  return {prepareScript:prepare, previewConfig:config};
 }
+
 
 

@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tts-20261008';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=studio-20261009';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -23,9 +23,13 @@ export function validateValues(values, kind) {
     if(own(values,'intro_scenes')&&(!Number.isInteger(values.intro_scenes)||values.intro_scenes<1||values.intro_scenes>10)) throw Error('冒頭シーン数は1〜10です');
     if(own(values,'bgm_track')&&!/^[\w-]*$/.test(values.bgm_track)) throw Error('BGM曲IDが不正です');
     if(own(values,'bgm_volume_db')&&(values.bgm_volume_db < -30 || values.bgm_volume_db > 24)) throw Error('BGM音量は-30〜+24 dBです');
+    for(const key of ['bgm_start_seconds','bgm_delay_seconds','bgm_fade_in_seconds','bgm_fade_out_seconds']) if(own(values,key)&&(values[key]<0||values[key]>(key.includes('fade')?30:86400))) throw Error(`${key}が範囲外です`);
   } else {
     for(const [key,value] of Object.entries(values)) {
+      if(key==='hook_band_color') {if(!/^#[0-9a-fA-F]{6}$/.test(value)) throw Error('帯の色は#RRGGBBです');continue;}
+      if(key==='hook_font_size_mode') {if(!['auto','fixed'].includes(value)) throw Error('文字サイズ方式が不正です');continue;}
       let range=[0,3840];
+      if(key==='hook_band_padding_y') range=[0,300];
       if(key.includes('ratio')) range=[0.05,1];
       if(['safe_right','safe_bottom','hook_margin_x'].includes(key)) range=[0,0.45];
       if(key==='hook_band_opacity') range=[0,1];
@@ -121,5 +125,6 @@ export function savePreset(registry, kind, entry) {
   next[key].push(clone(entry));
   return validateRegistry(next);
 }
+
 
 

@@ -6,7 +6,7 @@ const element = () => ({value:'',textContent:'',files:[],append(){},replaceChild
 const document = {hidden:false, getElementById(id){if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);},createElement:element,addEventListener(){}};
 document.getElementById('repo').value='owner/private';
 const context = vm.createContext({document,window:{addEventListener(){}},localStorage:{getItem(){return null;},setItem(){}},setInterval(){},setTimeout,clearTimeout,TextEncoder,TextDecoder,Uint8Array,AbortController,atob,console});
-vm.runInContext(fs.readFileSync(__dirname+'/app.js','utf8'),context);
+vm.runInContext(fs.readFileSync(__dirname+'/app.js','utf8').replace(/^import .*studio-features.*$/m,'').replace('mountBgmRegistration(api,base64);',''),context);
 const settings = value => context.bgmSettings({global_settings:{bgm:value}});
 assert.equal(settings(undefined).enabled,false);
 for(const level of [-30,0,6,12,18,24]) assert.equal(settings({volume_db:level}).volume_db,level);
@@ -31,3 +31,4 @@ assert.equal(context.validate(null,JSON.stringify(ttsScript)).mode,'tts');
 assert.throws(()=>context.validate(null,JSON.stringify({...ttsScript,scenes:[{text:''}]})));
 assert.throws(()=>context.validate(null,JSON.stringify({...ttsScript,global_settings:{voice_mode:'tts',tts:{pace:'bad'}}})));
 assert.throws(()=>context.validate(null,JSON.stringify({scenes:[{text:'録音'}]})));
+
