@@ -1,11 +1,12 @@
-import {fixedSettings, availableCategories} from './compiler.mjs';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=tts-20261008';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
   '【共通ルール】',
+  'ナレーション原稿が読み上げ内容の唯一のマスター。意味のまとまりごとにsceneへ分割する。原稿内容は変更・要約・言い換えしない。字幕装飾[[ ]]のみ必要に応じ追加可能。speech_textは原則出力しない。字幕と読み上げを意図的に変える明示指示がある場合だけspeech_textを使う。',
   'JSONのみ出力。説明、Markdown、コードフェンス、コメント、末尾カンマは禁止。',
-  '台本の言葉を言い換え・要約・追加しない。全シーンのtextを実際の録音と一致させ、冒頭も空にしない。',
-  '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（元音声で自動照合）。',
+  '台本の言葉を言い換え・要約・追加しない。全シーンのtextを順番につなげると元のナレーション原稿と同じ内容になるようにし、冒頭も空にしない。',
+  '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（選択したナレーション音声で自動照合）。',
   '制作者が指定した改行は、JSON文字列内で改行エスケープ \\n として維持する。JSONを解析すると実際の改行になるようにし、バックスラッシュを二重にして文字として表示させない。',
   'textは録音照合・通常字幕用、hook_textは冒頭タイトルの表示用。タイトルの改行指定をtextだけに入れてはいけない。必ず表示対象のhook_textに入れる。指定された行数・各行の文言・改行位置を保持し、1行への連結・別位置への改行・短縮・装飾の追加をしない。',
   '本人映像の明示指示がある場合のみ、media_type:local、指定されたファイル名media_query、text:""、開始・終了秒、media_startを記録する。',
@@ -38,10 +39,12 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
   if(v.format==='landscape') rules.push(ai.theme==='manual'?`テーマタイトルは ${JSON.stringify(ai.theme_title)} を保持。`:'短いテーマtitleをAIが作成。subtitleは「ハシモトの占いと思想」で固定。');
   rules.push('【確定設定（変更禁止）】',JSON.stringify(settings,null,2),'【JSON出力ルール】');
   if(output==='content') rules.push('内容だけ返す移行モード: {"scenes":[...],"bgm_category":"AI選択時のみ","theme_title":"横型時のみ"}。global_settingsは返さない。画面が確定設定を合成する。');
+  else if(v.voice_mode==='tts') rules.push('互換モード: {"global_settings":上記確定設定,"scenes":[...]}。audio_fileは不要。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
   else rules.push('互換モード: {"audio_file":"新規録音.m4a","global_settings":上記確定設定,"scenes":[...]}。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
   rules.push('各シーンにはtext、必要ならhook_text、caption_enabled、category_tags、visualizer、動画使用時のみmedia_type/media_query。字幕なし本人映像以外に秒数を書かない。',
     '出力前に確認: 指定タイトルの各行をhook_textの改行で再現できるか。textだけに改行がありhook_textが1行になっていたら修正する。手動タイトルはJSON解析後の文字列が指定値と一致すること。BGMの有効無効・曲・音量・ダッキングを確定設定から変更しない。',
     '返答を画面へ貼り「画面設定をJSONへ適用」で確認。システムは確定値を保持し、許可した内容だけ採用する。',
-    '【台本（処理対象の文章）】',transcript||'（ここに録音の文字起こしを貼る）');
+    '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+

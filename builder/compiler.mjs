@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs';
-import {clone, assertObject} from './model.mjs';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tts-20261008';
+import {clone, assertObject} from './model.mjs?v=tts-20261008';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -35,6 +35,7 @@ export function fixedSettings(config) {
   if(v.background_mode!=='stock') g.background_image=config.background;
   // portrait_brand requires its fallback image even if all scenes use stock.
   if(branded&&!g.background_image) g.background_image=config.background;
+  if(v.voice_mode==='tts') g.tts={voice:v.tts_voice,style:v.tts_style,pace:v.tts_pace,...(v.tts_custom_style?{custom_style:v.tts_custom_style}:{})};
   if(v.voice_mode==='anonymous') g.voice_processing=clone(SYSTEM.anonymous);
   if(v.bgm_mode==='track') g.bgm.track_id=v.bgm_track;
   if(v.bgm_mode==='category') g.bgm.category=v.bgm_category;
@@ -70,9 +71,11 @@ export function applyConfig(script, config, bgmCatalog) {
       // Explicit local presenter clips remain an escape hatch for old prompts.
       if(source.media_type!=='local'||source.text!=='') throw Error(`シーン${index+1}のtextが必要です`);
     }
+    if(source.speech_text!==undefined&&typeof source.speech_text!=='string') throw Error('speech_textは文字列にしてください');
     const intro=index<v.intro_scenes;
     const scene={text:source.text,caption_enabled:intro?v.intro_caption:v.body_caption,
       category_tags:intro?v.intro_tags:v.body_tags, visualizer:intro?v.intro_visualizer:v.body_visualizer};
+    if(source.speech_text!==undefined) scene.speech_text=source.speech_text;
     if(v.hook_enabled&&intro&&!(source.media_type==='local'&&source.text==='')) {
       scene.hook_text=ai.hook==='manual'?(manualHooks[index]??manualHooks[0]):source.hook_text;
       if(typeof scene.hook_text!=='string'||!scene.hook_text.trim()) throw Error(`シーン${index+1}のhook_textが必要です`);
@@ -96,5 +99,6 @@ export function applyConfig(script, config, bgmCatalog) {
     // outside this opt-in compiler are sent unchanged by the existing UI.
     return scene;
   });
-  return {audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a',global_settings:g,scenes};
+  return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes};
 }
+

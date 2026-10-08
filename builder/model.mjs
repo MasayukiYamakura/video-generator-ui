@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tts-20261008';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -15,10 +15,11 @@ export function validateValues(values, kind) {
   }
   if(kind==='video') {
     const enums={format:['vertical','landscape'], template:['standard','portrait_brand'],
-      hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous'],
+      hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous','tts'], tts_voice:['hashimoto','male_a','male_b'], tts_style:['natural','calm','gentle','bright','serious','powerful'], tts_pace:['slow','normal','fast'],
       background_mode:['fixed','mixed','stock'], stock_provider:['pexels','pixabay'],
       bgm_mode:['off','ai','category','track'], bgm_category:['ai',...CATEGORIES]};
     for(const [key,options] of Object.entries(enums)) if(own(values,key)&&!options.includes(values[key])) throw Error(`${key}の値が不正です`);
+    if(own(values,'tts_custom_style')&&values.tts_custom_style.length>500) throw Error('カスタム話し方は500文字以内です');
     if(own(values,'intro_scenes')&&(!Number.isInteger(values.intro_scenes)||values.intro_scenes<1||values.intro_scenes>10)) throw Error('冒頭シーン数は1〜10です');
     if(own(values,'bgm_track')&&!/^[\w-]*$/.test(values.bgm_track)) throw Error('BGM曲IDが不正です');
     if(own(values,'bgm_volume_db')&&(values.bgm_volume_db < -30 || values.bgm_volume_db > 24)) throw Error('BGM音量は-30〜+24 dBです');
@@ -120,4 +121,5 @@ export function savePreset(registry, kind, entry) {
   next[key].push(clone(entry));
   return validateRegistry(next);
 }
+
 

@@ -81,7 +81,7 @@ test('legacy local presenter segment with explicit timing is retained',()=>{
   const r=applyConfig(source,config());assert.equal(r.scenes[0].end_time,2);assert.equal(r.scenes[0].caption_enabled,false);
 });
 test('invalid combinations, numeric values and schema keys fail explicitly',()=>{
-  for(const ov of [{video:{format:'landscape'}},{video:{voice_mode:'tts'}},{video:{intro_scenes:0}},
+  for(const ov of [{video:{format:'landscape'}},{video:{voice_mode:'invalid'}},{video:{intro_scenes:0}},
     {layout:{tag_x:1081}},{layout:{visualizer_size:-1}},{layout:{hook_band_opacity:2}},
     {video:{bgm_mode:'category',bgm_category:'ai'}},{layout:{unknown:1}},{video:{fps:60}}])assert.throws(()=>config(ov));
   assert.throws(()=>config({}, {layout_preset:'landscape_standard'}));
@@ -170,3 +170,17 @@ test('the existing media/script.json remains byte-for-byte unchanged by compilat
   applyConfig(source,config());assert.equal(readFileSync(path,'utf8'),before);assert.deepEqual(JSON.parse(before),source);
 });
 
+
+
+test('TTS config compiles without audio file and preserves exceptional speech_text',()=>{
+ const c=config({video:{voice_mode:'tts',tts_voice:'male_a',tts_style:'gentle',tts_pace:'slow'}});
+ const r=applyConfig({audio_file:'ignored.m4a',scenes:[{text:'選ぶ[[力]]',speech_text:'自分で選ぶ力',hook_text:'選ぶ力'}]},c);
+ assert.equal(Object.hasOwn(r,'audio_file'),false);
+ assert.deepEqual(r.global_settings.tts,{voice:'male_a',style:'gentle',pace:'slow'});
+ assert.equal(r.scenes[0].speech_text,'自分で選ぶ力');
+ const prompt=buildPrompt(c,'原稿そのもの');
+ assert.match(prompt,/原稿そのもの/);assert.match(prompt,/speech_textは原則出力しない/);assert.match(prompt,/audio_fileは不要/);
+ assert.throws(()=>config({video:{tts_voice:'unknown'}}));
+ assert.throws(()=>config({video:{tts_style:'unknown'}}));
+ assert.throws(()=>config({video:{tts_pace:'unknown'}}));
+});
