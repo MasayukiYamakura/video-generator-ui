@@ -6,7 +6,7 @@ export const VIDEO_DEFAULTS = Object.freeze({
   body_caption:true, intro_tags:false, body_tags:false,
   intro_visualizer:false, body_visualizer:false, background_mode:'stock',
   stock_provider:'pexels', bgm_mode:'off', bgm_category:'ai', bgm_track:'',
-  bgm_volume_db:0, bgm_ducking:true,
+  bgm_volume_db:0, bgm_ducking:true, bgm_start_seconds:0, bgm_delay_seconds:0, bgm_loop:false, bgm_fade_in_seconds:0.5, bgm_fade_out_seconds:1.5,
   voice_mode:'original', tts_voice:'hashimoto', tts_style:'natural', tts_pace:'normal', tts_custom_style:'', hook_band_enabled:false,
 });
 export const VIDEO_PRESETS = [
@@ -28,6 +28,7 @@ export const LAYOUT_DEFAULTS = Object.freeze({
   hook_center_y:540, hook_top:230, hook_margin_x:0.16,
   caption_center_y:860, hook_font_size:136, caption_font_size:72,
   max_width_ratio:0.75, hook_max_width_ratio:1, hook_band_opacity:0.58,
+  hook_band_color:"#000000", hook_band_width_ratio:1, hook_band_padding_y:16, hook_font_size_mode:"auto",
   safe_right:0.17, safe_bottom:0.18,
 });
 export const LAYOUT_PRESETS = [
@@ -60,4 +61,5 @@ export const SYSTEM = Object.freeze({
     max_bar_height_ratio:0.08, visualizer_opacity:0.95,
     visualizer_glow_strength:0.4, update_fps:20, background:'video'},
 });
+
 

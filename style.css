@@ -2,3 +2,6 @@
 
 
 select{display:block;width:100%;margin-top:9px;padding:14px;background:#101720;color:#edf4fa;border:1px solid #3b4b60;border-radius:10px;font-size:16px;min-height:48px}select:focus{outline:2px solid #8bd6bd;outline-offset:3px}.builder-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}#promptBuilder details{margin-top:18px;padding:14px}#pbCanvas{display:block;width:min(100%,360px);height:auto;margin:18px auto;border:1px solid #52617b;border-radius:8px}#builderStatus,#pbPreviewError{overflow-wrap:anywhere}#pbPrompt{font-size:13px}#promptBuilder .check{min-height:44px}input[type=checkbox]{width:20px;height:20px;flex-shrink:0}@media(max-width:540px){.builder-grid{grid-template-columns:1fr}}
+
+
+audio{width:100%;margin:12px 0}#titleImage{max-width:100%;max-height:700px;display:block;margin:12px auto}#titleImage[hidden]{display:none}input[type=color]{min-height:44px}

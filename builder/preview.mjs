@@ -1,6 +1,6 @@
 // Position guide only. MoviePy's Noto fonts, glyph fitting and audio motion
 // remain authoritative; no guide data is sent to the video renderer.
-export function drawPreview(canvas, config, image=null, intro=false, safe=true) {
+export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='') {
   const {width:w,height:h,video:v,layout:l}=config;
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
   const c=canvas.getContext('2d'); c.scale(scale,scale);
@@ -25,11 +25,19 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true) 
   }
   if(intro&&v.hook_enabled) {
     if(v.hook_orientation==='horizontal') {
-      if(v.hook_band_enabled) {c.fillStyle=`rgba(0,0,0,${l.hook_band_opacity})`;c.fillRect(0,l.hook_center_y-l.hook_font_size,w,l.hook_font_size*2);}
-      text('冒頭フック',w/2,l.hook_center_y+l.hook_font_size/3,l.hook_font_size);
+      const lines=(title||'タイトルを入力してください').replaceAll('[[','').replaceAll(']]','').split('\n');
+      const bandWidth=w*l.hook_band_width_ratio, limit=Math.min(bandWidth,w*l.hook_max_width_ratio);
+      let size=l.hook_font_size;
+      const height=()=>lines.length*size*1.3+2*l.hook_band_padding_y;
+      function fits(){c.font=`900 ${size}px serif`;return Math.max(...lines.map(line=>c.measureText(line).width))+size*0.15<=limit&&height()<=2*Math.min(l.hook_center_y,h-l.hook_center_y);}
+      if(l.hook_font_size_mode==='auto')while(size>1&&!fits())size--;
+      if(v.hook_band_enabled) {c.globalAlpha=l.hook_band_opacity;c.fillStyle=l.hook_band_color;c.fillRect((w-bandWidth)/2,l.hook_center_y-height()/2,bandWidth,height());c.globalAlpha=1;}
+      c.font=`900 ${size}px serif`;c.textAlign='center';c.textBaseline='middle';
+      lines.forEach((line,i)=>{const y=l.hook_center_y+(i-(lines.length-1)/2)*size*1.3;c.strokeStyle='black';c.lineWidth=6;c.strokeText(line,w/2,y);c.fillStyle='white';c.fillText(line,w/2,y);});
+      if(l.hook_font_size_mode==='fixed'&&!fits()){c.fillStyle='#ffad99';c.font='32px sans-serif';c.fillText('固定サイズが表示領域を超えています',w/2,l.hook_center_y+height()/2+45);}
     } else {
       c.fillStyle='white';c.font=`${l.hook_font_size}px serif`;c.textAlign='center';
-      [...'冒頭フック'].forEach((t,i)=>c.fillText(t,w*(1-l.hook_margin_x)-l.hook_font_size/2,l.hook_top+(i+1)*l.hook_font_size));
+      [...(title||'タイトル').replaceAll('[[','').replaceAll(']]','').replaceAll('\n','')].forEach((t,i)=>c.fillText(t,w*(1-l.hook_margin_x)-l.hook_font_size/2,l.hook_top+(i+1)*l.hook_font_size));
     }
   }
   if(intro?v.intro_caption:v.body_caption) text('通常字幕の位置',w/2,l.caption_center_y+l.caption_font_size/3,l.caption_font_size);
@@ -38,3 +46,4 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true) 
     c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
   }
 }
+
