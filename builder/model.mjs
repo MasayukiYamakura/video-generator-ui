@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-monthly-20261010';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-settings-20261010';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));

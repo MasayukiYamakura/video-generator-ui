@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-monthly-20261010';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-settings-20261010';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -20,9 +20,11 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       `対象: ${config.tarot.year}年${config.tarot.month}月 ${config.tarot.zodiac}。以下のカードと解釈は人間が確定した結果です。変更しないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。各役割には最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
-      '最初のintroには読み上げのtextと画面に出す短いhook_textを付ける。空のsceneは作らない。各sceneのtextを順に連結すると元の原稿と同じ内容になるようにする。',
-      '情景を差し込む箇所だけ tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
-      output==='content'?'出力形式: {"scenes":[...]}。カード・年月・星座・音声・BGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。`,
+      `空のsceneは作らない。各sceneのtextを順に連結すると元の原稿と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?(ai.hook==='manual'?`introのhook_textは手動指定 ${JSON.stringify(ai.manual_hook)} をそのまま使う。複数introシーンは改行---改行で区切る。`:'introには短いhook_textを付ける。'):'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
+      `冒頭の通常字幕=${v.intro_caption}、本編の通常字幕=${v.body_caption}、冒頭の波形=${v.intro_visualizer}、本編の波形=${v.body_visualizer}。字幕・フックの位置と文字サイズは画面の確定値を使う。`,
+      'introには情景映像を付けない。本編で情景を差し込む箇所だけ tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
+      ...(v.bgm_mode==='ai'?[`BGMカテゴリを登録済みの ${availableCategories(bgmCatalog).join(' / ')} から選び、bgm_categoryとして出力する。未登録のカテゴリや曲を作らない。`]:[]),
+      output==='content'?'出力形式: {"scenes":[...]}。BGMをAIが選ぶ場合のみbgm_categoryを追加。カード・年月・星座・音声・その他のBGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。BGMをAIが選ぶ場合はglobal_settings.bgm.categoryを選択したカテゴリで補完する。`,
       '【ナレーション原稿】', transcript,
     ].join('\n\n');
   }

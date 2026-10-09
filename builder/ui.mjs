@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-monthly-20261010';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-monthly-20261010';
-import {buildPrompt} from './prompt.mjs?v=tarot-monthly-20261010';
-import {applyConfig} from './compiler.mjs?v=tarot-monthly-20261010';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-monthly-20261010';
-import {drawPreview} from './preview.mjs?v=tarot-monthly-20261010';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-settings-20261010';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-settings-20261010';
+import {buildPrompt} from './prompt.mjs?v=tarot-settings-20261010';
+import {applyConfig} from './compiler.mjs?v=tarot-settings-20261010';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-settings-20261010';
+import {drawPreview} from './preview.mjs?v=tarot-settings-20261010';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
@@ -106,13 +106,16 @@ export function mountBuilder(apiProvider) {
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
     $('pbTarotArea').hidden=!tarot;
-    $('pbGeneralAiArea').hidden=tarot;
-    $('pbGeneralLayoutArea').hidden=tarot;
-    $('pbVideoFields').hidden=tarot;
     $('pbBackgroundFile').parentElement.hidden=tarot;
+    for(const key of ['background_mode','stock_provider','intro_tags','body_tags']) $('pb_'+key).parentElement.hidden=tarot;
+    for(const id of ['pbSearchMode','pbSearchText','pbStockMode','pbStockPercent','pbStockIndices']) $(id).parentElement.hidden=tarot;
+    for(const key of ['tag_x','tag_y']) $('pb_'+key).parentElement.hidden=tarot;
+    $('pbBackgroundPreview').hidden=tarot;
+    $('pb_intro_scenes').parentElement.hidden=tarot; // Tarot intro is delimited by tarot_phase.
+    $('pbThemeMode').parentElement.hidden=tarot;
+    $('pbThemeTitle').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
-    if(tarot) {$('pbPreviewError').textContent='タロット専用映像は動画生成時に描画します。';}
-    else { $('pbPreviewError').textContent=''; paint(); }
+    $('pbPreviewError').textContent=''; paint();
   }
   function lists() {
     options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),session.video_preset);
