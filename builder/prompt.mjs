@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=preset-save-20261009';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-monthly-20261010';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -13,6 +13,19 @@ const COMMON = [
 ];
 export function buildPrompt(config, transcript='', bgmCatalog=null, output='full') {
   const {video:v,layout:l,ai}=config, settings=fixedSettings(config);
+  if(v.template==='tarot_monthly') {
+    const phaseList='intro → overall → relationships → work → advice（任意で最後にsummary）';
+    return [
+      '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。',
+      `対象: ${config.tarot.year}年${config.tarot.month}月 ${config.tarot.zodiac}。以下のカードと解釈は人間が確定した結果です。変更しないこと。`,
+      JSON.stringify(config.tarot,null,2),
+      `scenes[].tarot_phase を ${phaseList} の順で付ける。各役割には最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
+      '最初のintroには読み上げのtextと画面に出す短いhook_textを付ける。空のsceneは作らない。各sceneのtextを順に連結すると元の原稿と同じ内容になるようにする。',
+      '情景を差し込む箇所だけ tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
+      output==='content'?'出力形式: {"scenes":[...]}。カード・年月・星座・音声・BGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。`,
+      '【ナレーション原稿】', transcript,
+    ].join('\n\n');
+  }
   const rules=[...COMMON,
     `【動画設定】\n${v.format} / ${v.template}。字幕は1シーン${v.format==='vertical'?'20〜24':'30'}文字程度。`,
     `冒頭は最初の${v.intro_scenes}シーン。フック${v.hook_enabled?'ON':'OFF'}・${v.hook_orientation==='horizontal'?'横書き':'縦書き'}。`,

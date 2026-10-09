@@ -1,9 +1,13 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=preset-save-20261009';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=preset-save-20261009';
-import {buildPrompt} from './prompt.mjs?v=preset-save-20261009';
-import {applyConfig} from './compiler.mjs?v=preset-save-20261009';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=preset-save-20261009';
-import {drawPreview} from './preview.mjs?v=preset-save-20261009';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-monthly-20261010';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-monthly-20261010';
+import {buildPrompt} from './prompt.mjs?v=tarot-monthly-20261010';
+import {applyConfig} from './compiler.mjs?v=tarot-monthly-20261010';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-monthly-20261010';
+import {drawPreview} from './preview.mjs?v=tarot-monthly-20261010';
+import {TAROT_CARDS} from './tarot-cards.mjs';
+
+const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
+const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
@@ -62,7 +66,19 @@ export function mountBuilder(apiProvider) {
     };
   };
   async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
+  function tarotData() {
+    const year=Number($('pbTarotYear').value),month=Number($('pbTarotMonth').value),zodiac=$('pbTarotZodiac').value;
+    if(!Number.isInteger(year)||year<2000||year>2100)throw Error('占う年は2000〜2100で入力してください');
+    if(!Number.isInteger(month)||month<1||month>12)throw Error('占う月を選択してください');
+    if(!TAROT_SIGNS.some(([id])=>id===zodiac))throw Error('星座を選択してください');
+    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value,reading:$(`pbTarotReading${i}`).value.trim()}));
+    if(cards.some(c=>!TAROT_CARDS.some(x=>x.id===c.card_id)))throw Error('4枚のカードを選択してください');
+    if(new Set(cards.map(c=>c.card_id)).size!==4)throw Error('同じカードを複数回選べません');
+    if(cards.some(c=>!c.reading||c.reading.length>500))throw Error('4枚それぞれの解釈を1〜500文字で入力してください');
+    return {year,month,zodiac,cards};
+  }
   function config() {return resolveConfig(registry,session);}
+  function configuredInput() {const c=config();if(c.video.template==='tarot_monthly')c.tarot=tarotData();return c;}
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
@@ -88,8 +104,15 @@ export function mountBuilder(apiProvider) {
     $('pbThemeTitle').disabled=$('pbThemeMode').value!=='manual'||v.format!=='landscape';
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
+    const tarot=v.template==='tarot_monthly';
+    $('pbTarotArea').hidden=!tarot;
+    $('pbGeneralAiArea').hidden=tarot;
+    $('pbGeneralLayoutArea').hidden=tarot;
+    $('pbVideoFields').hidden=tarot;
+    $('pbBackgroundFile').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
-    paint();
+    if(tarot) {$('pbPreviewError').textContent='タロット専用映像は動画生成時に描画します。';}
+    else { $('pbPreviewError').textContent=''; paint(); }
   }
   function lists() {
     options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),session.video_preset);
@@ -97,6 +120,19 @@ export function mountBuilder(apiProvider) {
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
   }
+  options($('pbTarotMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
+  options($('pbTarotZodiac'),TAROT_SIGNS,'sagittarius');
+  $('pbTarotYear').value=new Date().getFullYear();
+  for(const [i,[position,label]] of TAROT_POSITIONS.entries()) {
+    const box=el('div');box.className='tarot-card-input';
+    const title=el('h4',label), card=el('select'), reading=el('textarea');
+    card.id=`pbTarotCard${i}`;reading.id=`pbTarotReading${i}`;reading.rows=3;reading.maxLength=500;reading.placeholder='この位置でのカードの解釈（500文字以内）';
+    options(card,[['','カードを選択'],...TAROT_CARDS.map(x=>[x.id,x.name])]);
+    const cardLabel=el('label','引いたカード'),readingLabel=el('label','解釈');cardLabel.append(card);readingLabel.append(reading);
+    box.append(title,cardLabel,readingLabel);$('pbTarotCards').append(box);
+    card.addEventListener('change',invalidate);reading.addEventListener('input',invalidate);
+  }
+  for(const id of ['pbTarotYear','pbTarotMonth','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
@@ -159,7 +195,7 @@ export function mountBuilder(apiProvider) {
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
-  $('pbBuild').onclick=()=>{try{const c=config();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
+  $('pbBuild').onclick=()=>{try{const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
     if(!$('pbApplyOnSend').checked)return script;
