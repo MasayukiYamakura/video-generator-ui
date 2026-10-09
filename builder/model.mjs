@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=stock-percent-20261009';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=preset-save-20261009';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -40,7 +40,7 @@ export function validateValues(values, kind) {
   }
   return values;
 }
-function entries(registry, kind) { return [...(kind==='video' ? VIDEO_PRESETS : LAYOUT_PRESETS), ...registry[`${kind}_presets`]]; }
+function entries(registry, kind) { const saved=registry[`${kind}_presets`]; return [...(kind==='video' ? VIDEO_PRESETS : LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)), ...saved]; }
 export function resolvePreset(registry, kind, id, seen=new Set()) {
   const entry=entries(registry,kind).find(p=>p.id===id);
   if(!entry) throw Error(`プリセットが見つかりません: ${id}`);
@@ -55,7 +55,7 @@ export function validateRegistry(registry) {
   for(const kind of ['video','layout']) {
     const list=registry[`${kind}_presets`];
     if(!Array.isArray(list)||list.length>200) throw Error('プリセット一覧が不正です');
-    const ids=new Set((kind==='video'?VIDEO_PRESETS:LAYOUT_PRESETS).map(p=>p.id));
+    const ids=new Set((kind==='video'?[]:LAYOUT_PRESETS).map(p=>p.id));
     for(const p of list) {
       assertObject(p,'プリセット');
       if(typeof p.id!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(p.id)||ids.has(p.id)) throw Error('プリセットIDの重複・形式を確認してください');
@@ -120,12 +120,14 @@ export function resolveConfig(registry, session) {
   if(ai.stock_scenes==='manual'&&ai.stock_indices.trim()&&!/^\d+(\s*,\s*\d+)*$/.test(ai.stock_indices.trim())) throw Error('素材シーンは1から始まる番号をカンマで指定してください');
   return {video:v, layout:l, ai, background, width:w, height:h};
 }
-export function savePreset(registry, kind, entry) {
+export function savePreset(registry, kind, entry, overwrite=false) {
   const next=clone(registry), key=`${kind}_presets`;
   if(!['video','layout'].includes(kind)) throw Error('保存の種類が不正です');
   const existing=next[key].findIndex(p=>p.id===entry.id);
-  if(existing>=0) throw Error('同じIDが存在します。新しいIDで保存してください');
-  next[key].push(clone(entry));
+  const found=entries(registry,kind).some(p=>p.id===entry.id);
+  if(overwrite&&(!found||kind!=='video')) throw Error('上書き対象の動画プリセットが見つかりません');
+  if(!overwrite&&found) throw Error('同じIDが存在します。新しいIDで保存してください');
+  if(existing>=0) next[key][existing]=clone(entry); else next[key].push(clone(entry));
   return validateRegistry(next);
 }
 
