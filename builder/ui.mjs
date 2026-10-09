@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=studio-20261009';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=studio-20261009';
-import {buildPrompt} from './prompt.mjs?v=studio-20261009';
-import {applyConfig} from './compiler.mjs?v=studio-20261009';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=studio-20261009';
-import {drawPreview} from './preview.mjs?v=studio-20261009';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=simplified-20261009';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=simplified-20261009';
+import {buildPrompt} from './prompt.mjs?v=simplified-20261009';
+import {applyConfig} from './compiler.mjs?v=simplified-20261009';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=simplified-20261009';
+import {drawPreview} from './preview.mjs?v=simplified-20261009';
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
@@ -61,7 +61,7 @@ export function mountBuilder(apiProvider) {
       return r;
     };
   };
-  async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbSaveLayout','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbSaveLayout','pbBackgroundPreview'])$(id).disabled=false;}}
+  async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbBackgroundPreview'])$(id).disabled=false;}}
   function config() {return resolveConfig(registry,session);}
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
@@ -80,7 +80,7 @@ export function mountBuilder(apiProvider) {
     $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
     for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand';
     $('pb_hook_orientation').disabled=!v.hook_enabled;$('pb_hook_band_enabled').disabled=v.hook_orientation!=='horizontal';
-    $('pbBackground').disabled=v.background_mode==='stock';$('pbBackgroundFile').disabled=v.background_mode==='stock';
+    $('pbBackgroundFile').disabled=v.background_mode==='stock';
     $('pbHookText').disabled=$('pbHookMode').value!=='manual'||!v.hook_enabled;
     $('pbSearchText').disabled=$('pbSearchMode').value!=='manual'||v.background_mode==='fixed';
     $('pbStockIndices').disabled=$('pbStockMode').value!=='manual'||v.background_mode!=='mixed';
@@ -92,10 +92,6 @@ export function mountBuilder(apiProvider) {
   }
   function lists() {
     options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),session.video_preset);
-    const v=resolvePreset(registry,'video',session.video_preset), format={...VIDEO_DEFAULTS,...v.values,...session.overrides.video}.format;
-    options($('pbLayout'),catalog(registry,'layout').filter(p=>p.format===format).map(p=>[p.id,p.name]),session.layout_preset);
-    options($('pbBackground'),[...catalog(registry,'background').map(p=>[p.file,p.name]),['custom','ファイル名を指定']],session.background);
-    if(!$('pbBackground').value)$('pbBackground').value='custom';
     $('pbBackgroundFile').value=session.background;
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
@@ -122,17 +118,10 @@ export function mountBuilder(apiProvider) {
   $('pbVideo').onchange=()=>{
     session.video_preset=$('pbVideo').value;session.overrides={video:{},layout:{}};
     session.layout_preset=defaultLayout(registry,session.video_preset);
+    session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
     invalidate();lists();
   };
-  $('pbLayout').onchange=()=>{session.layout_preset=$('pbLayout').value;session.overrides.layout={};invalidate();renderFields();};
   $('pbReset').onclick=()=>{session.overrides={video:{},layout:{}};invalidate();renderFields();};
-  $('pbBackground').onchange=()=>{
-    if($('pbBackground').value!=='custom')session.background=$('pbBackground').value;
-    const recommendation=catalog(registry,'background').find(b=>b.file===session.background)?.recommended_layout;
-    $('pbRecommendation').textContent=recommendation?`推奨レイアウト: ${resolvePreset(registry,'layout',recommendation).name}（変更は「推奨を適用」）`:'';
-    image=null;invalidate();lists();
-  };
-  $('pbUseRecommendation').onclick=()=>{const id=catalog(registry,'background').find(b=>b.file===session.background)?.recommended_layout;if(id){const p=resolvePreset(registry,'layout',id);const v=resolvePreset(registry,'video',session.video_preset);if(p.format!==({...VIDEO_DEFAULTS,...v.values}).format)return status('推奨レイアウトの縦横が一致しません');session.layout_preset=id;session.overrides.layout={};invalidate();lists();}};
   $('pbBackgroundFile').onchange=()=>{session.background=$('pbBackgroundFile').value.trim();image=null;invalidate();lists();};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
     $(id).addEventListener('input',()=>{session.ai[key]=$(id).value;invalidate();renderFields();});
@@ -162,13 +151,13 @@ export function mountBuilder(apiProvider) {
     const parent=resolvePreset(registry,kind,kind==='video'?session.video_preset:session.layout_preset);
     const values=kind==='video'?c.video:c.layout, defaults=kind==='video'?VIDEO_DEFAULTS:LAYOUT_DEFAULTS;
     const base={...defaults,...parent.values}, delta=Object.fromEntries(Object.entries(values).filter(([k,value])=>value!==base[k]));
-    const entry={id,name,extends:parent.id,values:delta,...(kind==='layout'?{format:c.video.format}:{})};
+    const entry={id,name,extends:parent.id,values:delta,default_layout:session.layout_preset,layout:clone(c.layout),background:c.background};
     const next=savePreset(registry,kind,entry), written=await writeRegistry(connection(),next,sha);
     registry=written.registry;sha=written.sha;
     if(kind==='video'){session.video_preset=id;session.overrides.video={};}else{session.layout_preset=id;session.overrides.layout={};}
     lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
   }
-  $('pbSaveVideo').onclick=()=>run(()=>save('video'));$('pbSaveLayout').onclick=()=>run(()=>save('layout'));
+  $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbBuild').onclick=()=>{try{const c=config();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
@@ -182,6 +171,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config};
 }
+
 
 
 
