@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=studio-20261009';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=stock-percent-20261009';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -18,7 +18,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     `冒頭は最初の${v.intro_scenes}シーン。フック${v.hook_enabled?'ON':'OFF'}・${v.hook_orientation==='horizontal'?'横書き':'縦書き'}。`,
     `冒頭: 字幕=${v.intro_caption}, タグ=${v.intro_tags}, 波形=${v.intro_visualizer}。本編: 字幕=${v.body_caption}, タグ=${v.body_tags}, 波形=${v.body_visualizer}。`,
     'Pexels動画が取得できたシーンは波形非表示。portrait_brandのPexels/Pixabay動画ではタグ非表示（レンダラーの既存動作）。',
-    `背景=${v.background_mode}。${v.background_mode==='stock'?'全字幕シーンに動画素材。':v.background_mode==='mixed'?'人物画像を基本にシーン数の約10%だけ動画素材。連続させず、短い台本では0箇所でもよい。':'全字幕シーンに固定画像。素材検索は不要。'}`,
+    `背景=${v.background_mode}。${v.background_mode==='stock'?'全字幕シーンに動画素材。':v.background_mode==='mixed'?(ai.stock_scenes==='manual'?'人物画像を基本に手動指定のシーンだけ動画素材。':`人物画像を基本に全シーン数の約${ai.stock_percent}%を動画素材にする。目標シーン数は全シーン数×${ai.stock_percent}/100を四捨五入する。0%は動画なし、100%は全編動画。割合を優先し、可能な範囲で動画シーンを分散させる。`):'全字幕シーンに固定画像。素材検索は不要。'}`,
     `素材提供元=${v.stock_provider}。${v.format==='vertical'?'縦向き優先。':''}`,
     v.template==='portrait_brand'?'フック・字幕は明朝体、白文字・黒縁・影。[[ ]]の強調色を使わない。タグは占い／コーチング／引き寄せ。':'強調は最大1箇所・2〜8文字を[[ ]]で囲む。不要なら省略。',
     `位置は制作者が確定済み。右${Math.round(l.safe_right*100)}%・下${Math.round(l.safe_bottom*100)}%のガイドはプレビュー専用。AIは座標・サイズを変更しない。`,
