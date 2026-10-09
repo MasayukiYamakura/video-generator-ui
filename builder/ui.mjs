@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=simplified-20261009';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=simplified-20261009';
-import {buildPrompt} from './prompt.mjs?v=simplified-20261009';
-import {applyConfig} from './compiler.mjs?v=simplified-20261009';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=simplified-20261009';
-import {drawPreview} from './preview.mjs?v=simplified-20261009';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=hook-ratio-20261009';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=hook-ratio-20261009';
+import {buildPrompt} from './prompt.mjs?v=hook-ratio-20261009';
+import {applyConfig} from './compiler.mjs?v=hook-ratio-20261009';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=hook-ratio-20261009';
+import {drawPreview} from './preview.mjs?v=hook-ratio-20261009';
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
@@ -66,7 +66,7 @@ export function mountBuilder(apiProvider) {
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
-      if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
+      if(c.ai.manual_hook.trim())title=c.ai.manual_hook.split('\n---\n')[0];
       drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
@@ -83,6 +83,7 @@ export function mountBuilder(apiProvider) {
     $('pbBackgroundFile').disabled=v.background_mode==='stock';
     $('pbHookText').disabled=$('pbHookMode').value!=='manual'||!v.hook_enabled;
     $('pbSearchText').disabled=$('pbSearchMode').value!=='manual'||v.background_mode==='fixed';
+    $('pbStockPercent').disabled=$('pbStockMode').value!=='ai'||v.background_mode!=='mixed';
     $('pbStockIndices').disabled=$('pbStockMode').value!=='manual'||v.background_mode!=='mixed';
     $('pbThemeTitle').disabled=$('pbThemeMode').value!=='manual'||v.format!=='landscape';
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
@@ -123,8 +124,8 @@ export function mountBuilder(apiProvider) {
   };
   $('pbReset').onclick=()=>{session.overrides={video:{},layout:{}};invalidate();renderFields();};
   $('pbBackgroundFile').onchange=()=>{session.background=$('pbBackgroundFile').value.trim();image=null;invalidate();lists();};
-  for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
-    $(id).addEventListener('input',()=>{session.ai[key]=$(id).value;invalidate();renderFields();});
+  for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
+    $(id).addEventListener('input',()=>{session.ai[key]=key==='stock_percent'?Number($(id).value):$(id).value;if(key==='manual_hook'&&$(id).value.trim())$('pbPreviewIntro').checked=true;invalidate();renderFields();});
   }
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
