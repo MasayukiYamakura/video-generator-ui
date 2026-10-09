@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=stock-percent-20261009';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=preset-save-20261009';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',

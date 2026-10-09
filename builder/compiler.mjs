@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=studio-20261009';
-import {clone, assertObject} from './model.mjs?v=studio-20261009';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=preset-save-20261009';
+import {clone, assertObject} from './model.mjs?v=preset-save-20261009';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';

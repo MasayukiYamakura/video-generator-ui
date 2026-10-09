@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=stock-percent-20261009';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=stock-percent-20261009';
-import {buildPrompt} from './prompt.mjs?v=stock-percent-20261009';
-import {applyConfig} from './compiler.mjs?v=stock-percent-20261009';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=stock-percent-20261009';
-import {drawPreview} from './preview.mjs?v=stock-percent-20261009';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=preset-save-20261009';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=preset-save-20261009';
+import {buildPrompt} from './prompt.mjs?v=preset-save-20261009';
+import {applyConfig} from './compiler.mjs?v=preset-save-20261009';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=preset-save-20261009';
+import {drawPreview} from './preview.mjs?v=preset-save-20261009';
 
 const $=id=>document.getElementById(id);
 const VIDEO_FIELDS=[
@@ -61,7 +61,7 @@ export function mountBuilder(apiProvider) {
       return r;
     };
   };
-  async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbBackgroundPreview'])$(id).disabled=false;}}
+  async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
   function config() {return resolveConfig(registry,session);}
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
@@ -72,7 +72,7 @@ export function mountBuilder(apiProvider) {
   }
   function renderFields() {
     const p=resolvePreset(registry,'video',session.video_preset), v={...VIDEO_DEFAULTS,...p.values,...session.overrides.video};
-    const lp=resolvePreset(registry,'layout',session.layout_preset), l={...LAYOUT_DEFAULTS,...lp.values,...session.overrides.layout};
+    const lp=resolvePreset(registry,'layout',session.layout_preset), l={...LAYOUT_DEFAULTS,...lp.values,...p.layout,...session.overrides.layout};
     for(const [key] of VIDEO_FIELDS) {const input=$('pb_'+key);if(typeof v[key]==='boolean')input.checked=v[key];else input.value=v[key];}
     for(const key of Object.keys(LAYOUT_DEFAULTS)) $('pb_'+key).value=l[key];
     $('pb_bgm_category').disabled=v.bgm_mode!=='category';$('pb_bgm_track').disabled=v.bgm_mode!=='track';
@@ -122,7 +122,6 @@ export function mountBuilder(apiProvider) {
     session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
     invalidate();lists();
   };
-  $('pbReset').onclick=()=>{session.overrides={video:{},layout:{}};invalidate();renderFields();};
   $('pbBackgroundFile').onchange=()=>{session.background=$('pbBackgroundFile').value.trim();image=null;invalidate();lists();};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
     $(id).addEventListener('input',()=>{session.ai[key]=key==='stock_percent'?Number($(id).value):$(id).value;invalidate();renderFields();});
@@ -146,19 +145,20 @@ export function mountBuilder(apiProvider) {
     registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;
     invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');
   });
-  async function save(kind) {
+  async function save(kind, overwrite=false) {
     if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済み設定を読込」を押してください');
-    const c=config(), id=$('pbSaveId').value.trim(), name=$('pbSaveName').value.trim();
+    const c=config(), id=overwrite?session.video_preset:$('pbSaveId').value.trim(), name=overwrite?resolvePreset(registry,'video',session.video_preset).name:$('pbSaveName').value.trim();
     const parent=resolvePreset(registry,kind,kind==='video'?session.video_preset:session.layout_preset);
     const values=kind==='video'?c.video:c.layout, defaults=kind==='video'?VIDEO_DEFAULTS:LAYOUT_DEFAULTS;
     const base={...defaults,...parent.values}, delta=Object.fromEntries(Object.entries(values).filter(([k,value])=>value!==base[k]));
-    const entry={id,name,extends:parent.id,values:delta,default_layout:session.layout_preset,layout:clone(c.layout),background:c.background};
-    const next=savePreset(registry,kind,entry), written=await writeRegistry(connection(),next,sha);
+    const entry={id,name,...(overwrite?{}:{extends:parent.id}),values:overwrite?clone(values):delta,default_layout:session.layout_preset,layout:clone(c.layout),background:c.background};
+    const next=savePreset(registry,kind,entry,overwrite), written=await writeRegistry(connection(),next,sha);
     registry=written.registry;sha=written.sha;
     if(kind==='video'){session.video_preset=id;session.overrides.video={};}else{session.layout_preset=id;session.overrides.layout={};}
-    lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
+    invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
+  $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
   $('pbBuild').onclick=()=>{try{const c=config();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
@@ -167,7 +167,6 @@ export function mountBuilder(apiProvider) {
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
     return applyConfig(script,snapshot,bgmCatalog);
   }
-  $('pbApply').onclick=()=>{try{if(!$('pbApplyOnSend').checked)throw Error('「送信時に画面設定を適用」を有効にしてください');const result=prepare(JSON.parse($('script').value));$('script').value=JSON.stringify(result,null,2);$('script').dispatchEvent(new Event('input'));status('画面の確定設定をJSONへ適用しました。内容を確認して動画生成できます。');}catch(e){status(e.message);}};
   $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
   lists();
   return {prepareScript:prepare, previewConfig:config};

@@ -45,5 +45,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
     c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
   }
+  c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
+  c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
 }
 
