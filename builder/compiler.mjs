@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=preset-save-20261009';
-import {clone, assertObject} from './model.mjs?v=preset-save-20261009';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-monthly-20261010';
+import {clone, assertObject} from './model.mjs?v=tarot-monthly-20261010';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -35,6 +35,7 @@ export function fixedSettings(config) {
       enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
   };
   if(branded) g.template='portrait_brand';
+  if(v.template==='tarot_monthly') g.template='tarot_monthly';
   if(v.background_mode!=='stock') g.background_image=config.background;
   // portrait_brand requires its fallback image even if all scenes use stock.
   if(branded&&!g.background_image) g.background_image=config.background;
@@ -64,6 +65,28 @@ export function applyConfig(script, config, bgmCatalog) {
     const title=ai.theme==='manual' ? ai.theme_title : script.global_settings?.theme?.title ?? script.theme_title;
     if(typeof title!=='string'||!title.trim()) throw Error('横型動画のテーマタイトルが必要です');
     g.theme.title=title;
+  }
+  if(v.template==='tarot_monthly') {
+    if(!config.tarot) throw Error('占い設定がありません');
+    const order=['intro','overall','relationships','work','advice','summary'];
+    const phases=script.scenes.map((s,i)=>{
+      assertObject(s,`シーン${i+1}`);
+      if(typeof s.text!=='string'||!s.text.trim()) throw Error(`シーン${i+1}の読み上げtextが必要です`);
+      if(!order.includes(s.tarot_phase)) throw Error(`シーン${i+1}のtarot_phaseが不正です`);
+      return s.tarot_phase;
+    });
+    if([...new Set(phases)].filter(x=>x!=='summary').join(',')!==order.slice(0,5).join(',') || phases.some((x,i)=>i&&order.indexOf(x)<order.indexOf(phases[i-1]))) throw Error('intro→全体運→恋愛・対人→仕事・行動→アドバイスの順に分けてください');
+    const scenes=script.scenes.map(s=>{
+      const out={text:s.text,tarot_phase:s.tarot_phase};
+      if(s.speech_text!==undefined) {if(typeof s.speech_text!=='string')throw Error('speech_textが不正です');out.speech_text=s.speech_text;}
+      if(s.tarot_phase==='intro'&&typeof s.hook_text==='string'&&s.hook_text.trim())out.hook_text=s.hook_text;
+      if(s.tarot_visual==='scenery') {
+        if(!['pexels','pixabay'].includes(s.media_type)||typeof s.media_query!=='string'||!s.media_query.trim())throw Error('情景にはPexels/Pixabayの検索語が必要です');
+        Object.assign(out,{tarot_visual:'scenery',media_type:s.media_type,media_query:s.media_query});
+      }
+      return out;
+    });
+    return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,tarot:clone(config.tarot),scenes};
   }
   const manualIndices=new Set(ai.stock_indices.split(',').filter(x=>x.trim()).map(x=>Number(x.trim())-1));
   if(ai.stock_scenes==='manual'&&[...manualIndices].some(i=>i<0||i>=script.scenes.length)) throw Error('素材シーン番号がシーン数の範囲外です');

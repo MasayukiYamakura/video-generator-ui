@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {emptyRegistry,resolveConfig} from './builder/model.mjs';
+import {applyConfig} from './builder/compiler.mjs';
+import {buildPrompt} from './builder/prompt.mjs';
+import {TAROT_CARDS} from './builder/tarot-cards.mjs';
+
+assert.equal(TAROT_CARDS.length,78);
+const config=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}});
+config.tarot={year:2026,month:10,zodiac:'sagittarius',cards:['overall','relationships','work','advice'].map((position,i)=>({position,card_id:TAROT_CARDS[i].id,reading:`解釈${i+1}`}))};
+const scenes=['intro','overall','relationships','work','advice'].map(phase=>({text:`${phase}の原稿`,tarot_phase:phase}));
+const generated=applyConfig({tarot:{year:1900,cards:[]},scenes},config,null);
+assert.equal(generated.global_settings.template,'tarot_monthly');
+assert.equal(generated.global_settings.voice_mode,'tts');
+assert.equal(generated.tarot.year,2026);
+assert.deepEqual(generated.tarot.cards,config.tarot.cards);
+assert.equal(generated.scenes[1].tarot_phase,'overall');
+assert.ok(!('audio_file' in generated));
+assert.match(buildPrompt(config,scenes.map(s=>s.text).join('。'),null,'content'),/tarot_phase/);
+assert.throws(()=>applyConfig({scenes:[...scenes].reverse()},config,null),/順/);
+console.log('tarot preset, phase order, immutable reading results: OK');
