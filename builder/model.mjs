@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=studio-20261009';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=simplified-20261009';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -47,7 +47,7 @@ export function resolvePreset(registry, kind, id, seen=new Set()) {
   if(seen.has(id)) throw Error('プリセットの継承が循環しています');
   seen.add(id);
   const parent=entry.extends ? resolvePreset(registry,kind,entry.extends,seen) : {};
-  return {...parent,...entry,values:{...(parent.values||{}),...entry.values}};
+  return {...parent,...entry,layout:{...(parent.layout||{}),...(entry.layout||{})},values:{...(parent.values||{}),...entry.values}};
 }
 export function validateRegistry(registry) {
   assertObject(registry,'プリセット一覧');
@@ -62,7 +62,9 @@ export function validateRegistry(registry) {
       if(typeof p.name!=='string'||!p.name.trim()||p.name.length>100) throw Error('プリセット名が不正です');
       if(p.extends!==undefined&&typeof p.extends!=='string') throw Error('継承元が不正です');
       if(kind==='layout'&&!['vertical','landscape'].includes(p.format)) throw Error('レイアウトの画面形式が必要です');
-      validateValues(p.values,kind); ids.add(p.id);
+      validateValues(p.values,kind);
+      if(kind==='video'){if(p.layout!==undefined)validateValues(p.layout,'layout');if(p.background!==undefined)validateBackground(p.background);}
+      ids.add(p.id);
     }
     for(const p of list) {
       const resolved=resolvePreset(registry,kind,p.id);
@@ -94,7 +96,7 @@ export function resolveConfig(registry, session) {
   const ov=session.overrides || {};
   validateValues(ov.video || {},'video'); validateValues(ov.layout || {},'layout');
   const v={...VIDEO_DEFAULTS,...video.values,...ov.video};
-  const l={...LAYOUT_DEFAULTS,...layout.values,...ov.layout};
+  const l={...LAYOUT_DEFAULTS,...layout.values,...video.layout,...ov.layout};
   if(layout.format!==v.format) throw Error('動画とレイアウトの縦横が一致していません');
   if(v.template==='portrait_brand'&&v.format!=='vertical') throw Error('portrait_brandは縦型専用です');
   if(v.template==='portrait_brand'&&l.caption_font_size<72) throw Error('portrait_brandの字幕サイズは既存描画に合わせ72以上にしてください');
@@ -106,7 +108,7 @@ export function resolveConfig(registry, session) {
   for(const k of ['tag_x','visualizer_x']) if(l[k]>w) throw Error(`${k}が画面の外です`);
   for(const k of ['tag_y','visualizer_y','caption_center_y','hook_top']) if(l[k]>h) throw Error(`${k}が画面の外です`);
   if(l.hook_center_y<=0||l.hook_center_y>=h) throw Error('フック中心は画面内に配置してください');
-  const background=session.background || 'background.png';
+  const background=session.background || video.background || 'background.png';
   if(v.background_mode!=='stock'||v.template==='portrait_brand') validateBackground(background);
   const ai={hook:'ai', search:'ai', search_text:'', manual_hook:'', stock_scenes:'ai', stock_indices:'', theme:'ai', ...(session.ai||{})};
   for(const k of ['hook','search','stock_scenes','theme']) if(!['ai','manual'].includes(ai[k])) throw Error(`AI設定 ${k} が不正です`);
@@ -125,6 +127,7 @@ export function savePreset(registry, kind, entry) {
   next[key].push(clone(entry));
   return validateRegistry(next);
 }
+
 
 
 
