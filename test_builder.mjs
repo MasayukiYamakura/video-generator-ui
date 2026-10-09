@@ -184,3 +184,23 @@ test('TTS config compiles without audio file and preserves exceptional speech_te
  assert.throws(()=>config({video:{tts_style:'unknown'}}));
  assert.throws(()=>config({video:{tts_pace:'unknown'}}));
 });
+
+test('existing and built-in video presets overwrite without self inheritance and survive reload',()=>{
+  const original=JSON.stringify(VIDEO_PRESETS);
+  let r=savePreset(registry,'video',{id:'mine',name:'自分用',extends:'tiktok_standard',values:{voice_mode:'anonymous'}});
+  const full=config({video:{bgm_volume_db:18},layout:{tag_x:222}}, {background:'custom.png'});
+  const entry=id=>({id,name:'保存済み',values:full.video,layout:full.layout,background:full.background,default_layout:'portrait_standard'});
+  r=savePreset(r,'video',entry('mine'),true);
+  r=savePreset(r,'video',entry('tiktok_standard'),true);
+  r=decodeContent({content:encodeContent(r)});
+  for(const id of ['mine','tiktok_standard']){
+    const c=resolveConfig(r,{video_preset:id});
+    assert.equal(c.layout.tag_x,222);assert.equal(c.background,'custom.png');assert.equal(c.video.bgm_volume_db,18);
+    assert.equal(r.video_presets.find(p=>p.id===id).extends,undefined);
+  }
+  assert.equal(resolveConfig(r,{video_preset:'tiktok_anonymous'}).video.voice_mode,'anonymous');
+  assert.equal(JSON.stringify(VIDEO_PRESETS),original);
+  assert.equal(r.video_presets.filter(p=>p.id==='mine').length,1);
+  assert.throws(()=>savePreset(r,'video',entry('missing'),true));
+  assert.throws(()=>savePreset(r,'video',entry('mine')));
+});
