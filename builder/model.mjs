@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=simplified-20261009';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=stock-percent-20261009';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -110,7 +110,8 @@ export function resolveConfig(registry, session) {
   if(l.hook_center_y<=0||l.hook_center_y>=h) throw Error('フック中心は画面内に配置してください');
   const background=session.background || video.background || 'background.png';
   if(v.background_mode!=='stock'||v.template==='portrait_brand') validateBackground(background);
-  const ai={hook:'ai', search:'ai', search_text:'', manual_hook:'', stock_scenes:'ai', stock_indices:'', theme:'ai', ...(session.ai||{})};
+  const ai={hook:'ai', search:'ai', search_text:'', manual_hook:'', stock_scenes:'ai', stock_percent:10, stock_indices:'', theme:'ai', ...(session.ai||{})};
+  if(!Number.isInteger(ai.stock_percent)||ai.stock_percent<0||ai.stock_percent>100) throw Error('AI自動の動画シーン割合は0〜100%の整数です');
   for(const k of ['hook','search','stock_scenes','theme']) if(!['ai','manual'].includes(ai[k])) throw Error(`AI設定 ${k} が不正です`);
   for(const k of ['manual_hook','search_text','stock_indices']) if(typeof ai[k]!=='string') throw Error(`${k}は文字列にしてください`);
   if(v.format==='landscape'&&ai.theme==='manual'&&(typeof ai.theme_title!=='string'||!ai.theme_title.trim())) throw Error('手動テーマタイトルを入力してください');
