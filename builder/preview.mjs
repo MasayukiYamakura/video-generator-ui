@@ -4,8 +4,18 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   const {width:w,height:h,video:v,layout:l}=config;
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
   const c=canvas.getContext('2d'); c.scale(scale,scale);
-  c.fillStyle='#242e3d';c.fillRect(0,0,w,h);
-  if(image&&v.background_mode!=='stock') {
+  const tarot=v.template==='tarot_monthly';
+  c.fillStyle=tarot?'#141522':'#242e3d';c.fillRect(0,0,w,h);
+  if(tarot) {
+    c.fillStyle='#e3cd9c';
+    c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
+    for(let i=0;i<4;i++){
+      const x=120+i*220;
+      c.fillStyle='#1c2948';c.fillRect(x,420,170,290);
+      c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(x+4,424,162,282);
+    }
+  }
+  if(!tarot&&image&&v.background_mode!=='stock') {
     const zoom=Math.max(w/image.width,h/image.height), iw=image.width*zoom,ih=image.height*zoom;
     c.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);
     c.fillStyle='rgba(0,0,0,0.2)';c.fillRect(0,0,w,h);

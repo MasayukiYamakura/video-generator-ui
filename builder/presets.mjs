@@ -17,7 +17,7 @@ export const VIDEO_PRESETS = [
     hook_band_enabled:true,
   }},
   {id:'tiktok_anonymous', name:'TikTok匿名音声', extends:'tiktok_standard', values:{voice_mode:'anonymous'}},
-  {id:'tarot_monthly', name:'月間星座タロット（4枚引き）', default_layout:'portrait_standard', values:{
+  {id:'tarot_monthly', name:'月間星座タロット（4枚引き）', default_layout:'portrait_standard', layout:{hook_center_y:610,caption_center_y:1670,caption_font_size:66}, values:{
     format:'vertical', template:'tarot_monthly', voice_mode:'tts', hook_enabled:true,
     hook_orientation:'horizontal', intro_scenes:1, intro_caption:false,
     intro_tags:false, body_tags:false, intro_visualizer:false, body_visualizer:false,

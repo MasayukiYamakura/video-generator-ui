@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-monthly-20261010';
-import {clone, assertObject} from './model.mjs?v=tarot-monthly-20261010';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-settings-20261010';
+import {clone, assertObject} from './model.mjs?v=tarot-settings-20261010';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -76,11 +76,24 @@ export function applyConfig(script, config, bgmCatalog) {
       return s.tarot_phase;
     });
     if([...new Set(phases)].filter(x=>x!=='summary').join(',')!==order.slice(0,5).join(',') || phases.some((x,i)=>i&&order.indexOf(x)<order.indexOf(phases[i-1]))) throw Error('intro→全体運→恋愛・対人→仕事・行動→アドバイスの順に分けてください');
+    let introIndex=0;
+    const manualHooks=ai.manual_hook.split('\n---\n');
     const scenes=script.scenes.map(s=>{
-      const out={text:s.text,tarot_phase:s.tarot_phase};
+      const intro=s.tarot_phase==='intro';
+      const out={text:s.text,tarot_phase:s.tarot_phase,
+        caption_enabled:intro?v.intro_caption:v.body_caption,
+        visualizer:intro?v.intro_visualizer:v.body_visualizer};
       if(s.speech_text!==undefined) {if(typeof s.speech_text!=='string')throw Error('speech_textが不正です');out.speech_text=s.speech_text;}
-      if(s.tarot_phase==='intro'&&typeof s.hook_text==='string'&&s.hook_text.trim())out.hook_text=s.hook_text;
+      if(intro){
+        if(v.hook_enabled){
+          const hook=ai.hook==='manual'?(manualHooks[introIndex]??manualHooks[0]):s.hook_text;
+          if(typeof hook!=='string'||!hook.trim())throw Error(`冒頭シーン${introIndex+1}のフック文章が必要です`);
+          out.hook_text=hook;
+        }
+        introIndex++;
+      }
       if(s.tarot_visual==='scenery') {
+        if(intro)throw Error('冒頭の配札シーンには情景映像を指定できません');
         if(!['pexels','pixabay'].includes(s.media_type)||typeof s.media_query!=='string'||!s.media_query.trim())throw Error('情景にはPexels/Pixabayの検索語が必要です');
         Object.assign(out,{tarot_visual:'scenery',media_type:s.media_type,media_query:s.media_query});
       }
