@@ -1,5 +1,5 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-safe-layout-20261011';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-safe-layout-20261011';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-safe-layout-fields-20261011';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-safe-layout-fields-20261011';
 import {buildPrompt} from './prompt.mjs?v=tarot-no-reading-20261010';
 import {applyConfig} from './compiler.mjs?v=tarot-no-reading-20261010';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-no-reading-20261010';
@@ -104,11 +104,16 @@ export function mountBuilder(apiProvider) {
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
+    const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     $('pbTarotArea').hidden=!tarot;
     $('pbBackgroundFile').parentElement.hidden=tarot;
     for(const key of ['background_mode','stock_provider','intro_tags','body_tags']) $('pb_'+key).parentElement.hidden=tarot;
     for(const id of ['pbSearchMode','pbSearchText','pbStockMode','pbStockPercent','pbStockIndices']) $(id).parentElement.hidden=tarot;
     for(const key of ['tag_x','tag_y']) $('pb_'+key).parentElement.hidden=tarot;
+    for(const key of ['caption_center_y','caption_font_size','max_width_ratio']) $('pb_'+key).parentElement.hidden=fixedTarot;
+    $('pbGeneralLayoutArea').querySelector('p').textContent=fixedTarot
+      ? 'Remotion版タロットの見出し・カード・本編字幕は投稿画面向けの固定配置です。フックと波形は下の項目で調整できます。ガイドは動画に入りません。'
+      : '左上を原点とする動画のピクセル座標。入力値をそのままJSONへ反映します。縦書きフックは中心Yではなく上端Yを使用します。タグはportrait_brandで表示します。';
     $('pbBackgroundPreview').hidden=tarot;
     $('pb_intro_scenes').parentElement.hidden=tarot; // Tarot intro is delimited by tarot_phase.
     $('pbThemeMode').parentElement.hidden=tarot;
