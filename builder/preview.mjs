@@ -7,12 +7,27 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   c.fillStyle=tarot?'#141522':'#242e3d';c.fillRect(0,0,w,h);
   if(tarot) {
     c.fillStyle='#e3cd9c';
-    c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
-    if(v.tarot_renderer==='remotion') {c.font='32px sans-serif';c.fillText('シャッフル → 4枚配札 → カード公開',w/2,235);}
-    for(let i=0;i<4;i++){
-      const x=120+i*220;
-      c.fillStyle='#1c2948';c.fillRect(x,420,170,290);
-      c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(x+4,424,162,282);
+    if(v.tarot_renderer==='remotion') {
+      c.font='32px sans-serif';c.textAlign='center';c.fillText('2026年 10月 · 射手座',447,367);
+      if(!intro) {c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',447,430);}
+      for(let i=0;i<4;i++){
+        const x=58+i*202,y=intro?500:500;
+        c.fillStyle='#1c2948';c.fillRect(x,y,150,255);
+        c.strokeStyle='#c9aa6d';c.lineWidth=5;c.strokeRect(x+3,y+3,144,249);
+      }
+      if(!intro) {
+        c.fillStyle='#e3cd9c';c.fillRect(260,790,370,440);
+        c.fillStyle='#1c2948';c.fillRect(268,798,354,424);
+        c.fillStyle='#f1e2c0';c.font='38px sans-serif';c.fillText('カップの3',447,1283);
+        c.fillStyle='#fff9ec';c.font='52px sans-serif';c.fillText('本編字幕の表示位置',447,1430);
+      }
+    } else {
+      c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
+      for(let i=0;i<4;i++){
+        const x=120+i*220;
+        c.fillStyle='#1c2948';c.fillRect(x,420,170,290);
+        c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(x+4,424,162,282);
+      }
     }
   }
   if(!tarot&&image&&v.background_mode!=='stock') {
@@ -50,10 +65,10 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       [...(title||'タイトル').replaceAll('[[','').replaceAll(']]','').replaceAll('\n','')].forEach((t,i)=>c.fillText(t,w*(1-l.hook_margin_x)-l.hook_font_size/2,l.hook_top+(i+1)*l.hook_font_size));
     }
   }
-  if(intro?v.intro_caption:v.body_caption) text('通常字幕の位置',w/2,l.caption_center_y+l.caption_font_size/3,l.caption_font_size);
+  if((intro?v.intro_caption:v.body_caption)&&!(tarot&&v.tarot_renderer==='remotion')) text('通常字幕の位置',w/2,l.caption_center_y+l.caption_font_size/3,l.caption_font_size);
   if(safe&&v.format==='vertical') {
-    c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
-    c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
+    c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(0,0,w,h*l.safe_top);c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
+    c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(0,h*l.safe_top);c.lineTo(w,h*l.safe_top);c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
   }
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);

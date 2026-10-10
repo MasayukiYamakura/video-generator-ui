@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-no-reading-20261010';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-no-reading-20261010';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-safe-layout-20261011';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-safe-layout-20261011';
 import {buildPrompt} from './prompt.mjs?v=tarot-no-reading-20261010';
 import {applyConfig} from './compiler.mjs?v=tarot-no-reading-20261010';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-no-reading-20261010';
-import {drawPreview} from './preview.mjs?v=tarot-no-reading-20261010';
+import {drawPreview} from './preview.mjs?v=tarot-safe-layout-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
@@ -42,7 +42,7 @@ const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
   hook_top:'縦書きフック Y（上端）',hook_margin_x:'縦書きフック左右余白比率',
   caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
   max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
-  hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
+  hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_top:'上ガイド比率',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
 function el(tag,text) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function options(select,items,current) {select.replaceChildren();for(const [value,label] of items){const o=el('option',label);o.value=value;select.append(o);}if(current!==undefined)select.value=current;}
 function field(root,key,label,items,type='checkbox') {

@@ -36,7 +36,7 @@ export const LAYOUT_DEFAULTS = Object.freeze({
   caption_center_y:860, hook_font_size:136, caption_font_size:72,
   max_width_ratio:0.75, hook_max_width_ratio:1, hook_band_opacity:0.58,
   hook_band_color:"#000000", hook_band_width_ratio:1, hook_band_padding_y:16, hook_font_size_mode:"auto",
-  safe_right:0.17, safe_bottom:0.18,
+  safe_top:0.16, safe_right:0.17, safe_bottom:0.18,
 });
 export const LAYOUT_PRESETS = [
   {id:'portrait_standard', name:'人物画像・標準', format:'vertical', values:{

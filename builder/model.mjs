@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-no-reading-20261010';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-safe-layout-20261011';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -31,7 +31,7 @@ export function validateValues(values, kind) {
       let range=[0,3840];
       if(key==='hook_band_padding_y') range=[0,300];
       if(key.includes('ratio')) range=[0.05,1];
-      if(['safe_right','safe_bottom','hook_margin_x'].includes(key)) range=[0,0.45];
+       if(['safe_top','safe_right','safe_bottom','hook_margin_x'].includes(key)) range=[0,0.45];
       if(key==='hook_band_opacity') range=[0,1];
       if(key.includes('font_size')) range=[1,300];
       if(key==='visualizer_size') range=[16,2000];
