@@ -1,4 +1,4 @@
-import {emptyRegistry, validateRegistry, clone} from './model.mjs?v=tarot-settings-20261010';
+import {emptyRegistry, validateRegistry, clone} from './model.mjs?v=tarot-remotion-20261010';
 export const PRESET_PATH='config/prompt-builder.json';
 export const decodeContent=response=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(response.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
 export function encodeContent(value) {

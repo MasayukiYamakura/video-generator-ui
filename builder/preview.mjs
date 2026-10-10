@@ -1,5 +1,4 @@
-// Position guide only. MoviePy's Noto fonts, glyph fitting and audio motion
-// remain authoritative; no guide data is sent to the video renderer.
+// Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='') {
   const {width:w,height:h,video:v,layout:l}=config;
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
@@ -9,6 +8,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(tarot) {
     c.fillStyle='#e3cd9c';
     c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
+    if(v.tarot_renderer==='remotion') {c.font='32px sans-serif';c.fillText('シャッフル → 4枚配札 → カード公開',w/2,235);}
     for(let i=0;i<4;i++){
       const x=120+i*220;
       c.fillStyle='#1c2948';c.fillRect(x,420,170,290);

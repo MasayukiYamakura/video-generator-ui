@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-settings-20261010';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-settings-20261010';
-import {buildPrompt} from './prompt.mjs?v=tarot-settings-20261010';
-import {applyConfig} from './compiler.mjs?v=tarot-settings-20261010';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-settings-20261010';
-import {drawPreview} from './preview.mjs?v=tarot-settings-20261010';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-remotion-20261010';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-remotion-20261010';
+import {buildPrompt} from './prompt.mjs?v=tarot-remotion-20261010';
+import {applyConfig} from './compiler.mjs?v=tarot-remotion-20261010';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-remotion-20261010';
+import {drawPreview} from './preview.mjs?v=tarot-remotion-20261010';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];

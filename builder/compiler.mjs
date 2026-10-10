@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-settings-20261010';
-import {clone, assertObject} from './model.mjs?v=tarot-settings-20261010';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-remotion-20261010';
+import {clone, assertObject} from './model.mjs?v=tarot-remotion-20261010';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -35,7 +35,10 @@ export function fixedSettings(config) {
       enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
   };
   if(branded) g.template='portrait_brand';
-  if(v.template==='tarot_monthly') g.template='tarot_monthly';
+  if(v.template==='tarot_monthly') {
+    g.template='tarot_monthly';
+    if(v.tarot_renderer==='remotion') g.tarot_renderer='remotion';
+  }
   if(v.background_mode!=='stock') g.background_image=config.background;
   // portrait_brand requires its fallback image even if all scenes use stock.
   if(branded&&!g.background_image) g.background_image=config.background;

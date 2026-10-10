@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-settings-20261010';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-remotion-20261010';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -14,7 +14,7 @@ export function validateValues(values, kind) {
     if(typeof value!==typeof defaults[key] || (typeof value==='number' && !Number.isFinite(value))) throw Error(`${key}の型が不正です`);
   }
   if(kind==='video') {
-    const enums={format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'],
+    const enums={format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
       hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous','tts'], tts_voice:['hashimoto','male_a','male_b'], tts_style:['natural','calm','gentle','bright','serious','powerful'], tts_pace:['slow','normal','fast'],
       background_mode:['fixed','mixed','stock'], stock_provider:['pexels','pixabay'],
       bgm_mode:['off','ai','category','track'], bgm_category:['ai',...CATEGORIES]};
@@ -100,6 +100,7 @@ export function resolveConfig(registry, session) {
   if(layout.format!==v.format) throw Error('動画とレイアウトの縦横が一致していません');
   if(v.template==='portrait_brand'&&v.format!=='vertical') throw Error('portrait_brandは縦型専用です');
   if(v.template==='tarot_monthly'&&v.format!=='vertical') throw Error('月間星座タロットは縦型専用です');
+  if(v.tarot_renderer==='remotion'&&v.template!=='tarot_monthly') throw Error('Remotion版は月間星座タロット専用です');
   if(v.template==='portrait_brand'&&l.caption_font_size<72) throw Error('portrait_brandの字幕サイズは既存描画に合わせ72以上にしてください');
   if(v.template!=='portrait_brand'&&(v.intro_tags||v.body_tags)) throw Error('カテゴリタグはportrait_brand専用です');
   if(v.background_mode==='mixed'&&v.template!=='portrait_brand') throw Error('一部動画＋人物画像はportrait_brandで選択してください');
