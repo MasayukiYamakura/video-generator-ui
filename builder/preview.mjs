@@ -8,18 +8,23 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(tarot) {
     c.fillStyle='#e3cd9c';
     if(v.tarot_renderer==='remotion') {
-      c.font='32px sans-serif';c.textAlign='center';c.fillText('2026年 10月 · 射手座',447,367);
-      if(!intro) {c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',447,430);}
-      for(let i=0;i<4;i++){
-        const x=58+i*202,y=intro?500:500;
-        c.fillStyle='#1c2948';c.fillRect(x,y,150,255);
-        c.strokeStyle='#c9aa6d';c.lineWidth=5;c.strokeRect(x+3,y+3,144,249);
-      }
-      if(!intro) {
-        c.fillStyle='#e3cd9c';c.fillRect(260,790,370,440);
-        c.fillStyle='#1c2948';c.fillRect(268,798,354,424);
-        c.fillStyle='#f1e2c0';c.font='38px sans-serif';c.fillText('カップの3',447,1283);
-        c.fillStyle='#fff9ec';c.font='52px sans-serif';c.fillText('本編字幕の表示位置',447,1430);
+      c.textAlign='center';
+      if(intro) {
+        c.fillStyle='#1c2948';c.fillRect(430,1010,220,375);
+        c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(434,1014,212,367);
+      } else {
+        c.font='32px sans-serif';c.fillText('2026年 10月 · 射手座',w/2,365);
+        c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',w/2,427);
+        for(let i=0;i<4;i++){
+          const x=i%2?670:200,y=i<2?495:1105;
+          c.fillStyle='#1c2948';c.fillRect(x,y,210,360);
+          c.strokeStyle='#c9aa6d';c.lineWidth=5;c.strokeRect(x+3,y+3,204,354);
+          if(i<2) {
+            c.fillStyle='rgba(4,7,17,.74)';c.fillRect(x,y+308,210,52);
+            c.fillStyle='#fff8e9';c.font='25px sans-serif';c.fillText(i?'カップの3':'星',x+105,y+343);
+          }
+        }
+        c.fillStyle='#fff9ec';c.font='52px sans-serif';c.fillText('本編字幕の表示位置',w/2,995);
       }
     } else {
       c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
