@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-settings-20261010';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-remotion-20261010';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',

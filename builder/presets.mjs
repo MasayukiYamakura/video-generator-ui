@@ -1,7 +1,7 @@
 // Semantic presets contain no pixel coordinates. Layouts and renderer internals
 // have their own sources; anonymous is a one-field semantic override.
 export const VIDEO_DEFAULTS = Object.freeze({
-  format:'landscape', template:'standard', hook_enabled:false,
+  format:'landscape', template:'standard', tarot_renderer:'classic', hook_enabled:false,
   hook_orientation:'vertical', intro_scenes:2, intro_caption:true,
   body_caption:true, intro_tags:false, body_tags:false,
   intro_visualizer:false, body_visualizer:false, background_mode:'stock',
@@ -23,6 +23,7 @@ export const VIDEO_PRESETS = [
     intro_tags:false, body_tags:false, intro_visualizer:false, body_visualizer:false,
     background_mode:'fixed', bgm_mode:'off',
   }},
+  {id:'tarot_monthly_remotion', name:'月間星座タロット・Remotion版（4枚引き）', extends:'tarot_monthly', values:{tarot_renderer:'remotion'}},
   {id:'tiktok_vertical_hook', name:'TikTok縦書きフック', default_layout:'vertical_legacy', values:{
     format:'vertical', hook_enabled:true, intro_caption:false,
   }},
