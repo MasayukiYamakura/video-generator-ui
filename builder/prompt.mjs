@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-remotion-20261010';
+import {fixedSettings, availableCategories} from './compiler.mjs?v=tarot-no-reading-20261010';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -17,7 +17,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     const phaseList='intro → overall → relationships → work → advice（任意で最後にsummary）';
     return [
       '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。',
-      `対象: ${config.tarot.year}年${config.tarot.month}月 ${config.tarot.zodiac}。以下のカードと解釈は人間が確定した結果です。変更しないこと。`,
+      `対象: ${config.tarot.year}年${config.tarot.month}月 ${config.tarot.zodiac}。以下の4枚は人間が確定した結果です。カードを変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。各役割には最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
       `空のsceneは作らない。各sceneのtextを順に連結すると元の原稿と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?(ai.hook==='manual'?`introのhook_textは手動指定 ${JSON.stringify(ai.manual_hook)} をそのまま使う。複数introシーンは改行---改行で区切る。`:'introには短いhook_textを付ける。'):'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,

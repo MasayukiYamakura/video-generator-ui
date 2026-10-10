@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-remotion-20261010';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-remotion-20261010';
-import {buildPrompt} from './prompt.mjs?v=tarot-remotion-20261010';
-import {applyConfig} from './compiler.mjs?v=tarot-remotion-20261010';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-remotion-20261010';
-import {drawPreview} from './preview.mjs?v=tarot-remotion-20261010';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-no-reading-20261010';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-no-reading-20261010';
+import {buildPrompt} from './prompt.mjs?v=tarot-no-reading-20261010';
+import {applyConfig} from './compiler.mjs?v=tarot-no-reading-20261010';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-no-reading-20261010';
+import {drawPreview} from './preview.mjs?v=tarot-no-reading-20261010';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
@@ -71,10 +71,9 @@ export function mountBuilder(apiProvider) {
     if(!Number.isInteger(year)||year<2000||year>2100)throw Error('占う年は2000〜2100で入力してください');
     if(!Number.isInteger(month)||month<1||month>12)throw Error('占う月を選択してください');
     if(!TAROT_SIGNS.some(([id])=>id===zodiac))throw Error('星座を選択してください');
-    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value,reading:$(`pbTarotReading${i}`).value.trim()}));
+    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value}));
     if(cards.some(c=>!TAROT_CARDS.some(x=>x.id===c.card_id)))throw Error('4枚のカードを選択してください');
     if(new Set(cards.map(c=>c.card_id)).size!==4)throw Error('同じカードを複数回選べません');
-    if(cards.some(c=>!c.reading||c.reading.length>500))throw Error('4枚それぞれの解釈を1〜500文字で入力してください');
     return {year,month,zodiac,cards};
   }
   function config() {return resolveConfig(registry,session);}
@@ -128,12 +127,12 @@ export function mountBuilder(apiProvider) {
   $('pbTarotYear').value=new Date().getFullYear();
   for(const [i,[position,label]] of TAROT_POSITIONS.entries()) {
     const box=el('div');box.className='tarot-card-input';
-    const title=el('h4',label), card=el('select'), reading=el('textarea');
-    card.id=`pbTarotCard${i}`;reading.id=`pbTarotReading${i}`;reading.rows=3;reading.maxLength=500;reading.placeholder='この位置でのカードの解釈（500文字以内）';
+    const title=el('h4',label), card=el('select');
+    card.id=`pbTarotCard${i}`;
     options(card,[['','カードを選択'],...TAROT_CARDS.map(x=>[x.id,x.name])]);
-    const cardLabel=el('label','引いたカード'),readingLabel=el('label','解釈');cardLabel.append(card);readingLabel.append(reading);
-    box.append(title,cardLabel,readingLabel);$('pbTarotCards').append(box);
-    card.addEventListener('change',invalidate);reading.addEventListener('input',invalidate);
+    const cardLabel=el('label','引いたカード');cardLabel.append(card);
+    box.append(title,cardLabel);$('pbTarotCards').append(box);
+    card.addEventListener('change',invalidate);
   }
   for(const id of ['pbTarotYear','pbTarotMonth','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
   for(const [key,label,items,type] of VIDEO_FIELDS) {

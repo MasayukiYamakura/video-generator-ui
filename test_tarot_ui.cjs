@@ -31,14 +31,15 @@ const http=require('node:http');
     await page.locator('#pbTarotZodiac').selectOption('sagittarius');
     for(let i=0;i<4;i++){
       await page.locator(`#pbTarotCard${i}`).selectOption({index:i+1});
-      await page.locator(`#pbTarotReading${i}`).fill(`解釈${i+1}`);
     }
+    assert.equal(await page.locator('[id^="pbTarotReading"]').count(),0);
     await page.locator('#pbTranscript').fill('2026年10月、射手座の運勢です。');
     await page.locator('#pbBuild').click();
     const scenes=['intro','overall','relationships','work','advice'].map(p=>({tarot_phase:p,text:p,...(p==='intro'?{hook_text:'射手座の10月'}:{})}));
     const result=await page.evaluate(input=>window.videoConfigurator.prepareScript({scenes:input}),scenes);
     assert.equal(result.global_settings.tarot_renderer,'remotion');
     assert.equal(result.tarot.cards.length,4);
+    assert.ok(result.tarot.cards.every(card=>!('reading' in card)));
     assert.equal(result.tarot.year,2026);
     await page.locator('#pbVideo').selectOption('tarot_monthly');
     assert.equal(await page.locator('#pbTarotArea').isVisible(),true);
