@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {emptyRegistry, resolveConfig} from './builder/model.mjs';
 import {TAROT_CARDS} from './builder/tarot-cards.mjs';
-import {batchPrompt, compileBatch, importBatch} from './builder/batch.mjs';
+import {batchPrompt, batchConfig, compileBatch, importBatch} from './builder/batch.mjs';
 
 const shared=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_batch',overrides:{video:{},layout:{}},ai:{}});
 const phases=['intro','overall','relationships','work','advice'];
@@ -15,12 +15,16 @@ const make=(sign,offset)=>({
 });
 const aries=make('aries',0),taurus=make('taurus',4);
 const entries={aries:aries.entry,taurus:taurus.entry}, responses={aries:aries.response,taurus:taurus.response};
+for(const sign of Object.keys(responses))responses[sign].cards=batchConfig(shared,sign,entries[sign]).tarot.cards;
 const prompt=batchPrompt(shared,[['aries',aries.entry],['taurus',taurus.entry]],null);
 assert.match(prompt,/2026年10月後半/);
 assert.equal((prompt.match(/【全星座共通ルール】/g)||[]).length,1);
 assert.match(prompt,/残り|不足分/);
 assert.deepEqual(Object.keys(importBatch(JSON.stringify({videos:Object.values(responses)}),['aries','taurus'])),['aries','taurus']);
 assert.deepEqual(Object.keys(importBatch(JSON.stringify({videos:[aries.response]}),['aries','taurus'])),['aries']);
+assert.deepEqual(Object.keys(importBatch(JSON.stringify({videos:[aries.response]}),['aries','taurus'],entries)),['aries']);
+assert.throws(()=>importBatch(JSON.stringify({videos:[{...aries.response,cards:aries.response.cards.map((c,i)=>i===1?{...c,orientation:'upright'}:c)}]}),['aries'],entries),/正逆/);
+assert.throws(()=>importBatch(JSON.stringify({videos:[{...aries.response,cards:undefined}]}),['aries'],entries),/正逆/);
 const manifest=compileBatch(shared,entries,responses,['aries','taurus'],null);
 assert.equal(manifest.videos.length,2);
 assert.equal(manifest.videos[0].script.tarot.zodiac,'aries');
