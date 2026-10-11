@@ -98,7 +98,7 @@ function narrationWarnings(text, sign, period) {
   for (const [pattern, official] of aliases) if(pattern.test(text))
     warnings.push(`${sign}：原稿中に「${pattern.source}」があります。カード名の正式表記は「${official}」です（原稿は変更しません）。`);
   if(text.includes('恋人たちアカード')||text.includes('優しい優しさ')) warnings.push(`${sign}：原稿に不自然な表現があります。読み上げ前に確認してください。`);
-  const expected=`${period.year}${period.month}月${period.period==='full'?'':period.period==='first'?'前半':'後半'}`;
+  const expected=`${period.year}年${period.month}月${period.period==='full'?'':period.period==='first'?'前半':'後半'}`;
   if(!text.includes(expected)) warnings.push(`${sign}：原稿に対象期間「${expected}」が見つかりません。読み上げ内容を確認してください。`);
   return warnings;
 }
@@ -142,15 +142,24 @@ export function importBatchSource(text) {
   }
   return {year:data.year,month:data.month,period:data.period,entries:found,warnings};
 }
-export function batchSourcePrompt(year,month,period) {
+export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='') {
   if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12
     ||!['full','first','second'].includes(period))throw Error('占う年・月・対象期間を確認してください');
   return [
     '次の12星座の占い結果を、画面への一括入力用JSONとして作成してください。JSONのみ。Markdown・説明・省略は不要。',
     `共通設定: year=${year}, month=${month}, period=${period} (full=月全体, first=前半, second=後半)。`,
-    `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":"保存して月末に見返してね"}]}。`,
+    `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":""}]}。`,
     '上記は1星座分の形式例です。実際は12星座をvideosへ入れ、確定した占い結果を使用してください。カードIDとnameは必ず次の正式な一覧の同じ行を使い、正逆はuprightまたはreversed。各星座内でカードの重複は不可。',
     '星座IDは '+SIGNS.map(([id,name])=>`${id}=${name}`).join(', ')+' を各1件ずつ。カード位置はoverall, relationships, work, adviceの順。原稿の言葉は省略・要約せず全文をJSON文字列に入れ、CTA文を原稿に重複させない。個別CTAが不要なら空文字にする（画面の共通CTAを使用）。',
+    '各星座についてライダー版タロット78枚から全体運・恋愛／対人・仕事／行動・アドバイスに1枚ずつ引き、正位置か逆位置かも決める。各星座内の4枚は重複させない。カード名は一覧の正式名称を使い、原稿内でも同じ名称にする。',
+    `各星座のナレーションは${year}年${month}月${{full:'全体',first:'前半',second:'後半'}[period]}と星座名が冒頭で分かる自然な日本語にする。全体運を結論として、恋愛・対人、仕事・行動、最後のアドバイスへ進める。4枚のカード名を該当する話の中で自然に読み上げ、選んだカードと向きに矛盾させない。書かれていない出来事や結果を断定せず、「必ず」「絶対」を避け、聞き手が生活に置き換えられる具体的で温かい言葉にする。最後に対象期間中に試せる行動を一つ示す。見出し・秒数・演出指示・絵文字は原稿に入れない。`,
+    '本編とCTAを合わせて約60秒、合計約250〜300字を目安にする。字数より自然な読み上げを優先する。',
+    ctaEnabled
+      ? (sharedCta.trim()
+        ? `CTAはON。共通CTA文は「${sharedCta.trim()}」。各videoのctaは空文字にし、画面の共通CTAを使う。指定文を一字一句変えず本編の後に読み上げるため、narrationには含めない。`
+        : 'CTAはON。共通CTA文が空欄なので、各星座に短い個別CTA（読み上げ3〜5秒・40文字以内）を作り、各videoのctaに入れる。narrationには含めない。')
+      : 'CTAはOFF。各videoのctaは空文字にし、narrationにもCTAを入れない。',
     'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
-  ].join('\\n\\n');
+  ].join('\n\n');
 }
+
