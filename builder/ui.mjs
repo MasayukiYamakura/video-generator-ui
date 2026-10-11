@@ -225,7 +225,7 @@ export function mountBuilder(apiProvider) {
   for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};batchChanged();});
   $('pbBatchSourcePromptBuild').onclick=()=>{
     try {
-      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value);
+      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value,config().video.cta_enabled,$('pbBatchCta').value);
       status('占い結果を作るためのプロンプトを用意しました');
     }catch(e){status(e.message);}
   };
@@ -392,6 +392,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>session.video_preset==='tarot_monthly_batch',manifest}};
 }
+
 
 
 
