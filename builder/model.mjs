@@ -117,7 +117,7 @@ export function resolveConfig(registry, session) {
   for(const k of ['hook','search','stock_scenes','theme']) if(!['ai','manual'].includes(ai[k])) throw Error(`AI設定 ${k} が不正です`);
   for(const k of ['manual_hook','search_text','stock_indices']) if(typeof ai[k]!=='string') throw Error(`${k}は文字列にしてください`);
   if(v.format==='landscape'&&ai.theme==='manual'&&(typeof ai.theme_title!=='string'||!ai.theme_title.trim())) throw Error('手動テーマタイトルを入力してください');
-  if(v.hook_enabled&&ai.hook==='manual'&&!ai.manual_hook.trim()) throw Error('手動フック文章を入力してください');
+  if(v.template!=='tarot_monthly'&&v.hook_enabled&&ai.hook==='manual'&&!ai.manual_hook.trim()) throw Error('手動フック文章を入力してください');
   if(v.background_mode!=='fixed'&&ai.search==='manual'&&!ai.search_text.trim()) throw Error('手動の英語検索語を入力してください');
   if(ai.stock_scenes==='manual'&&ai.stock_indices.trim()&&!/^\d+(\s*,\s*\d+)*$/.test(ai.stock_indices.trim())) throw Error('素材シーンは1から始まる番号をカンマで指定してください');
   return {video:v, layout:l, ai, background, width:w, height:h};

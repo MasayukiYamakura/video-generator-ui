@@ -48,6 +48,14 @@ export function fixedSettings(config) {
   if(v.bgm_mode==='category') g.bgm.category=v.bgm_category;
   return g;
 }
+export const TAROT_SIGNS = {aries:'牡羊座',taurus:'牡牛座',gemini:'双子座',cancer:'蟹座',leo:'獅子座',virgo:'乙女座',libra:'天秤座',scorpio:'蠍座',sagittarius:'射手座',capricorn:'山羊座',aquarius:'水瓶座',pisces:'魚座'};
+export function tarotTitle(tarot) {
+  const period=tarot.period ?? 'full';
+  if(!['full','first','second'].includes(period)) throw Error('対象期間が不正です');
+  const sign=TAROT_SIGNS[tarot.zodiac];
+  if(!sign) throw Error('星座の指定が不正です');
+  return `${tarot.year}年${tarot.month}月${period==='first'?'前半':period==='second'?'後半':''}\n${sign}の運勢`;
+}
 export function availableCategories(bgmCatalog) {
   return CATEGORIES.filter(category=>bgmCatalog?.tracks?.some(t=>t.categories?.includes(category)));
 }
@@ -71,6 +79,7 @@ export function applyConfig(script, config, bgmCatalog) {
   }
   if(v.template==='tarot_monthly') {
     if(!config.tarot) throw Error('占い設定がありません');
+    const title=tarotTitle(config.tarot);
     const order=['intro','overall','relationships','work','advice','summary'];
     const phases=script.scenes.map((s,i)=>{
       assertObject(s,`シーン${i+1}`);
@@ -89,9 +98,7 @@ export function applyConfig(script, config, bgmCatalog) {
       if(s.speech_text!==undefined) {if(typeof s.speech_text!=='string')throw Error('speech_textが不正です');out.speech_text=s.speech_text;}
       if(intro){
         if(v.hook_enabled){
-          const hook=ai.hook==='manual'?(manualHooks[introIndex]??manualHooks[0]):s.hook_text;
-          if(typeof hook!=='string'||!hook.trim())throw Error(`冒頭シーン${introIndex+1}のフック文章が必要です`);
-          out.hook_text=hook;
+          out.hook_text=title;
         }
         introIndex++;
       }

@@ -1,3 +1,4 @@
+import {tarotTitle} from './compiler.mjs?v=tarot-period-20261011';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='') {
   const {width:w,height:h,video:v,layout:l}=config;
@@ -13,7 +14,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
         c.fillStyle='#1c2948';c.fillRect(430,1010,220,375);
         c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(434,1014,212,367);
       } else {
-        c.font='32px sans-serif';c.fillText('2026年 10月 · 射手座',w/2,365);
+        c.font='32px sans-serif';c.fillText(config.tarot ? tarotTitle(config.tarot).replace('\n',' · ') : '対象年月・星座の運勢',w/2,365);
         c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',w/2,427);
         for(let i=0;i<4;i++){
           const x=i%2?670:200,y=i<2?495:1105;

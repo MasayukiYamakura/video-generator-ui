@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {emptyRegistry,resolveConfig} from './builder/model.mjs';
-import {applyConfig} from './builder/compiler.mjs';
+import {applyConfig,tarotTitle} from './builder/compiler.mjs';
 import {buildPrompt} from './builder/prompt.mjs';
 import {TAROT_CARDS} from './builder/tarot-cards.mjs';
 
@@ -13,6 +13,8 @@ assert.equal(generated.global_settings.template,'tarot_monthly');
 assert.equal(generated.global_settings.tarot_renderer,undefined);
 assert.equal(generated.global_settings.voice_mode,'tts');
 assert.equal(generated.tarot.year,2026);
+assert.equal(tarotTitle(generated.tarot),'2026年10月\n射手座の運勢');
+assert.equal(generated.scenes[0].hook_text,tarotTitle(generated.tarot));
 assert.deepEqual(generated.tarot.cards,config.tarot.cards);
 assert.ok(generated.tarot.cards.every(card=>!('reading' in card)));
 assert.equal(generated.scenes[1].tarot_phase,'overall');
@@ -28,12 +30,12 @@ const withAudio=applyConfig({scenes},recorded,{tracks:[{id:'chill',categories:['
 assert.equal(withAudio.audio_file,'新規録音.m4a');
 assert.equal(withAudio.global_settings.voice_mode,'anonymous');
 assert.equal(withAudio.global_settings.bgm.track_id,'chill');
-assert.equal(withAudio.scenes[0].hook_text,'手動のタイトル');
+assert.equal(withAudio.scenes[0].hook_text,tarotTitle(recorded.tarot));
 assert.equal(withAudio.scenes[0].caption_enabled,true);
 assert.equal(withAudio.scenes[0].visualizer,true);
 assert.equal(withAudio.scenes[1].caption_enabled,false);
 assert.equal(withAudio.scenes[1].visualizer,false);
-assert.match(buildPrompt(recorded,'ナレーション',null,'content'),/手動のタイトル/);
+assert.match(buildPrompt(recorded,'ナレーション',null,'content'),/2026年10月/);
 const cinematic=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_remotion',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}});
 cinematic.tarot=structuredClone(config.tarot);
 assert.equal(cinematic.video.tarot_renderer,'remotion');
@@ -41,5 +43,16 @@ const remotion=applyConfig({scenes},cinematic,null);
 assert.equal(remotion.global_settings.tarot_renderer,'remotion');
 assert.deepEqual(remotion.tarot,generated.tarot);
 assert.deepEqual(remotion.scenes,generated.scenes);
+for(const [period,word] of [['first','前半'],['second','後半']]) {
+  const ranged=structuredClone(cinematic);ranged.tarot.period=period;
+  const output=applyConfig({scenes:scenes.map(s=>({...s,hook_text:'AIの別タイトル'})),tarot:{period:'full'}},ranged,null);
+  assert.equal(output.tarot.period,period);
+  assert.equal(output.scenes[0].hook_text,`2026年10月${word}\n射手座の運勢`);
+  assert.match(buildPrompt(ranged,'ナレーション',null,'content'),new RegExp(`2026年10月${word}`));
+}
+const old=applyConfig({scenes},cinematic,null);
+assert.equal(old.tarot.period,undefined);
+assert.equal(old.scenes[0].hook_text,'2026年10月\n射手座の運勢');
+assert.throws(()=>tarotTitle({...config.tarot,period:'invalid'}),/対象期間/);
 assert.throws(()=>resolveConfig(emptyRegistry(),{video_preset:'tiktok_standard',overrides:{video:{tarot_renderer:'remotion'}}}),/専用/);
 console.log('tarot preset, phase order, fixed card results without reading memos: OK');

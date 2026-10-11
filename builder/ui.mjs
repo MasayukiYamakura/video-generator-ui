@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-grid-20261011';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-grid-20261011';
-import {buildPrompt} from './prompt.mjs?v=tarot-no-reading-20261010';
-import {applyConfig} from './compiler.mjs?v=tarot-no-reading-20261010';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-no-reading-20261010';
-import {drawPreview} from './preview.mjs?v=tarot-grid-20261011';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-period-20261011';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-period-20261011';
+import {buildPrompt} from './prompt.mjs?v=tarot-period-20261011';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-period-20261011';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-period-20261011';
+import {drawPreview} from './preview.mjs?v=tarot-period-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
@@ -67,14 +67,15 @@ export function mountBuilder(apiProvider) {
   };
   async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
   function tarotData() {
-    const year=Number($('pbTarotYear').value),month=Number($('pbTarotMonth').value),zodiac=$('pbTarotZodiac').value;
+    const year=Number($('pbTarotYear').value),month=Number($('pbTarotMonth').value),period=$('pbTarotPeriod').value,zodiac=$('pbTarotZodiac').value;
+    if(!['full','first','second'].includes(period))throw Error('対象期間を選択してください');
     if(!Number.isInteger(year)||year<2000||year>2100)throw Error('占う年は2000〜2100で入力してください');
     if(!Number.isInteger(month)||month<1||month>12)throw Error('占う月を選択してください');
     if(!TAROT_SIGNS.some(([id])=>id===zodiac))throw Error('星座を選択してください');
     const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value}));
     if(cards.some(c=>!TAROT_CARDS.some(x=>x.id===c.card_id)))throw Error('4枚のカードを選択してください');
     if(new Set(cards.map(c=>c.card_id)).size!==4)throw Error('同じカードを複数回選べません');
-    return {year,month,zodiac,cards};
+    return {year,month,period,zodiac,cards};
   }
   function config() {return resolveConfig(registry,session);}
   function configuredInput() {const c=config();if(c.video.template==='tarot_monthly')c.tarot=tarotData();return c;}
@@ -82,6 +83,10 @@ export function mountBuilder(apiProvider) {
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
+      if(c.video.template==='tarot_monthly'){
+        c.tarot={year:Number($('pbTarotYear').value),month:Number($('pbTarotMonth').value),period:$('pbTarotPeriod').value,zodiac:$('pbTarotZodiac').value};
+        title=tarotTitle(c.tarot);
+      }
       drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
@@ -107,6 +112,8 @@ export function mountBuilder(apiProvider) {
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     $('pbTarotArea').hidden=!tarot;
     $('pbBackgroundFile').parentElement.hidden=tarot;
+    $('pbHookMode').parentElement.hidden=tarot;
+    $('pbHookText').parentElement.hidden=tarot;
     for(const key of ['background_mode','stock_provider','intro_tags','body_tags']) $('pb_'+key).parentElement.hidden=tarot;
     for(const id of ['pbSearchMode','pbSearchText','pbStockMode','pbStockPercent','pbStockIndices']) $(id).parentElement.hidden=tarot;
     for(const key of ['tag_x','tag_y']) $('pb_'+key).parentElement.hidden=tarot;
@@ -139,7 +146,7 @@ export function mountBuilder(apiProvider) {
     box.append(title,cardLabel);$('pbTarotCards').append(box);
     card.addEventListener('change',invalidate);
   }
-  for(const id of ['pbTarotYear','pbTarotMonth','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
+  for(const id of ['pbTarotYear','pbTarotMonth','pbTarotPeriod','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
