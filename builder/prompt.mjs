@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=tarot-period-20261011';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=tarot-cta-20261011';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -14,20 +14,23 @@ const COMMON = [
 export function buildPrompt(config, transcript='', bgmCatalog=null, output='full') {
   const {video:v,layout:l,ai}=config, settings=fixedSettings(config);
   if(v.template==='tarot_monthly') {
-    const phaseList='intro → overall → relationships → work → advice（任意で最後にsummary）';
+    const phaseList='intro → overall → relationships → work → advice'+(v.cta_enabled?' → （任意でsummary） → cta（最後に1scene）':' → （任意で最後にsummary）。ctaは作らない');
     const period=config.tarot.period ?? 'full';
     const title=tarotTitle(config.tarot);
+    if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     return [
       '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。',
       `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚は人間が確定した結果です。カードを変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。`,
       JSON.stringify(config.tarot,null,2),
-      `scenes[].tarot_phase を ${phaseList} の順で付ける。各役割には最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
-      `空のsceneは作らない。各sceneのtextを順に連結すると元の原稿と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?`introのhook_textは ${JSON.stringify(title)} にする。AIの別案や手動フック設定を使わず、改行位置も維持する。`:'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
+      `scenes[].tarot_phase を ${phaseList} の順で付ける。intro〜adviceは各役割に最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
+      ...(v.cta_enabled?[`CTAは最後の1sceneだけ。textは ${JSON.stringify(config.cta_text)} と完全一致させ、speech_textや[[ ]]装飾を付けない。CTA文を他のsceneへ重複させず、カード4枚を表示するため情景映像を指定しない。CTAの文言をAIが追加・変更しない。`]:[]),
+      `空のsceneは作らない。各sceneのtextを順に連結するとナレーション原稿${v.cta_enabled?'と最後のCTA文':'のみ'}と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?`introのhook_textは ${JSON.stringify(title)} にする。AIの別案や手動フック設定を使わず、改行位置も維持する。`:'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
       `冒頭の通常字幕=${v.intro_caption}、本編の通常字幕=${v.body_caption}、冒頭の波形=${v.intro_visualizer}、本編の波形=${v.body_visualizer}。字幕・フックの位置と文字サイズは画面の確定値を使う。`,
       'introには情景映像を付けない。本編で情景を差し込む箇所だけ tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
       ...(v.bgm_mode==='ai'?[`BGMカテゴリを登録済みの ${availableCategories(bgmCatalog).join(' / ')} から選び、bgm_categoryとして出力する。未登録のカテゴリや曲を作らない。`]:[]),
       output==='content'?'出力形式: {"scenes":[...]}。BGMをAIが選ぶ場合のみbgm_categoryを追加。カード・年月・星座・音声・その他のBGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。BGMをAIが選ぶ場合はglobal_settings.bgm.categoryを選択したカテゴリで補完する。`,
       '【ナレーション原稿】', transcript,
+      ...(v.cta_enabled?['【最後に読むCTA文（上の原稿の続き）】',config.cta_text]:[]),
     ].join('\n\n');
   }
   const rules=[...COMMON,
