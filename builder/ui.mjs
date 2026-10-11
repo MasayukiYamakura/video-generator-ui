@@ -93,7 +93,7 @@ export function mountBuilder(apiProvider) {
     }
     return c;
   }
-  function invalidate() {snapshot=null;$('pbPrompt').value='';batchChanged();status('設定が変わりました。プロンプトを生成し直してください。');}
+  function invalidate() {snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';batchChanged();status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
@@ -222,7 +222,7 @@ export function mountBuilder(apiProvider) {
     saveDraft();
     status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
   }
-  for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};batchChanged();});
+  for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};$('pbBatchSourcePrompt').value='';batchChanged();});
   $('pbBatchSourcePromptBuild').onclick=()=>{
     try {
       $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value,config().video.cta_enabled,$('pbBatchCta').value);
