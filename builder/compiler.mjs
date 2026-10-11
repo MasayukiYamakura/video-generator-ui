@@ -89,6 +89,12 @@ export function applyConfig(script, config, bgmCatalog) {
       return s.tarot_phase;
     });
     if([...new Set(phases)].filter(x=>x!=='summary'&&x!=='cta').join(',')!==order.slice(0,5).join(',') || phases.some((x,i)=>i&&order.indexOf(x)<order.indexOf(phases[i-1]))) throw Error('intro→全体運→恋愛・対人→仕事・行動→アドバイスの順に分けてください');
+    if(v.tarot_renderer==='remotion') {
+      for(const [phase,label] of [['overall','全体運'],['relationships','恋愛・対人'],['work','仕事・行動'],['advice','アドバイス']]) {
+        if(!script.scenes.some(s=>s.tarot_phase===phase&&s.tarot_visual==='scenery'))
+          throw Error(`${label}に情景映像がありません。tarot_visual:"scenery"と素材検索語を指定してください`);
+      }
+    }
     const ctaScenes=script.scenes.filter(s=>s.tarot_phase==='cta');
     if(v.cta_enabled) {
       if(ctaScenes.length!==1||phases.at(-1)!=='cta')throw Error('CTAをONにした場合は最後にctaシーンを1つ指定してください');
@@ -157,5 +163,6 @@ export function applyConfig(script, config, bgmCatalog) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes};
 }
+
 
 
