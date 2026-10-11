@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {emptyRegistry, resolveConfig} from './builder/model.mjs';
 import {TAROT_CARDS} from './builder/tarot-cards.mjs';
-import {batchPrompt, batchConfig, compileBatch, importBatch} from './builder/batch.mjs';
+import {batchPrompt, batchConfig, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './builder/batch.mjs';
 
 const shared=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_batch',overrides:{video:{},layout:{}},ai:{}});
 const phases=['intro','overall','relationships','work','advice'];
@@ -39,3 +39,15 @@ assert.throws(()=>importBatch(JSON.stringify({videos:[aries.response,aries.respo
 assert.throws(()=>compileBatch(shared,{aries:{...aries.entry,orientations:['sideways','upright','upright','upright']}},responses,['aries'],null),/向き/);
 assert.equal(compileBatch(shared,{aries:{...aries.entry,orientations:undefined}},responses,['aries'],null).videos[0].script.tarot.cards[1].orientation,'upright');
 console.log('batch compilation, titles, cards, retry subset: OK');
+
+const source={version:1,year:2026,month:10,period:'second',videos:[
+  'aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'
+].map((zodiac,i)=>({zodiac,cards:TAROT_CARDS.slice(i*4,i*4+4).map((c,j)=>({position:['overall','relationships','work','advice'][j],card_id:c.id,name:c.name,orientation:j===3?'reversed':'upright'})),
+  narration:`2026年10月後半の${zodiac}の原稿`,cta:'保存して見返してね'}))};
+const imported=importBatchSource(JSON.stringify(source));
+assert.equal(Object.keys(imported.entries).length,12);
+assert.equal(imported.entries.aries.orientations[3],'reversed');
+assert.match(batchSourcePrompt(2026,10,'second'),/major-06-lovers=恋人/);
+assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:source.videos.slice(1)})),/12星座/);
+assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:[source.videos[0],...source.videos.slice(1,11),source.videos[0]]})),/重複/);
+assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:source.videos.map((v,i)=>i? v:{...v,cards:v.cards.map((c,j)=>j?c:{...c,name:'恋人たち'})})})),/正式|ではなく/);
