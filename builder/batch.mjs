@@ -39,7 +39,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
     'introのhook_textには指定のtitleを改行を含めて完全一致で入れる。introの読み上げtextをtitleで置き換えない。',
     shared.video.cta_enabled?'ctaは最後の1sceneだけ。textは指定されたctaと完全一致させ、[[ ]]装飾、speech_text、情景映像を付けず、他のsceneと重複させない。':'CTAは作らない。',
-    'introに情景映像を付けない。本編に必要なら tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。',
+    'introとctaに情景映像を付けない。overall, relationships, work, adviceの各役割で少なくとも1sceneに tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:原稿に合う英語の具体的な検索語 を付ける。カードを表に返してから情景映像へ切り替える。1役割が1sceneだけでもよい。',
     aiBgm?'各星座のBGMカテゴリは登録済みの '+availableCategories(bgmCatalog).join(' / ')+' から選び、bgm_categoryに入れる。':'BGM設定は画面で確定するため出力不要。',
     '途中で全件を返せない場合は完成した星座のみを、必ず閉じた有効なJSONとして返す。不足分は別の依頼で作成する。',
     '【星座別の確定データ】',
