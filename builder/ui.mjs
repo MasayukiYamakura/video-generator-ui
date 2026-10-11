@@ -1,9 +1,9 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-period-20261011';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-period-20261011';
-import {buildPrompt} from './prompt.mjs?v=tarot-period-20261011';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-period-20261011';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-period-20261011';
-import {drawPreview} from './preview.mjs?v=tarot-period-20261011';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-cta-20261011';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-cta-20261011';
+import {buildPrompt} from './prompt.mjs?v=tarot-cta-20261011';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-cta-20261011';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-cta-20261011';
+import {drawPreview} from './preview.mjs?v=tarot-cta-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
@@ -27,6 +27,7 @@ const VIDEO_FIELDS=[
   ['bgm_fade_in_seconds','BGMフェードイン（秒）',null,'number'],
   ['bgm_fade_out_seconds','BGMフェードアウト（秒）',null,'number'],
   ['hook_enabled','フック表示'],
+  ['cta_enabled','タロットの最後にCTAシーンを追加'],
   ['hook_orientation','フック方向',[['horizontal','横書き'],['vertical','縦書き']]],
   ['intro_scenes','冒頭シーン数',null,'number'],
   ['intro_caption','冒頭の通常字幕'],['body_caption','本編の通常字幕'],
@@ -78,7 +79,15 @@ export function mountBuilder(apiProvider) {
     return {year,month,period,zodiac,cards};
   }
   function config() {return resolveConfig(registry,session);}
-  function configuredInput() {const c=config();if(c.video.template==='tarot_monthly')c.tarot=tarotData();return c;}
+  function configuredInput() {
+    const c=config();
+    if(c.video.template==='tarot_monthly') {
+      c.tarot=tarotData();
+      c.cta_text=$('pbTarotCtaText').value.trim();
+      if(c.video.cta_enabled&&(!c.cta_text||Array.from(c.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
+    }
+    return c;
+  }
   function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
@@ -111,6 +120,8 @@ export function mountBuilder(apiProvider) {
     const tarot=v.template==='tarot_monthly';
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     $('pbTarotArea').hidden=!tarot;
+    $('pb_cta_enabled').parentElement.hidden=!tarot;
+    $('pbTarotCtaText').parentElement.hidden=!tarot||!v.cta_enabled;
     $('pbBackgroundFile').parentElement.hidden=tarot;
     $('pbHookMode').parentElement.hidden=tarot;
     $('pbHookText').parentElement.hidden=tarot;
@@ -146,6 +157,7 @@ export function mountBuilder(apiProvider) {
     box.append(title,cardLabel);$('pbTarotCards').append(box);
     card.addEventListener('change',invalidate);
   }
+  $('pbTarotCtaText').addEventListener('input',invalidate);
   for(const id of ['pbTarotYear','pbTarotMonth','pbTarotPeriod','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
