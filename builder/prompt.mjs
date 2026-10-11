@@ -26,7 +26,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       ...(v.cta_enabled?[`CTAは最後の1sceneだけ。textは ${JSON.stringify(config.cta_text)} と完全一致させ、speech_textや[[ ]]装飾を付けない。CTA文を他のsceneへ重複させず、カード4枚を表示するため情景映像を指定しない。CTAの文言をAIが追加・変更しない。`]:[]),
       `空のsceneは作らない。各sceneのtextを順に連結するとナレーション原稿${v.cta_enabled?'と最後のCTA文':'のみ'}と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?`introのhook_textは ${JSON.stringify(title)} にする。AIの別案や手動フック設定を使わず、改行位置も維持する。`:'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
       `冒頭の通常字幕=${v.intro_caption}、本編の通常字幕=${v.body_caption}、冒頭の波形=${v.intro_visualizer}、本編の波形=${v.body_visualizer}。字幕・フックの位置と文字サイズは画面の確定値を使う。`,
-      'introには情景映像を付けない。本編で情景を差し込む箇所だけ tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:英語の具体的な検索語 を付ける。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
+      'introとctaには情景映像を付けない。overall, relationships, work, adviceの各役割で少なくとも1sceneに tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:原稿に合う英語の具体的な検索語 を付ける。カードを表に返してから情景映像へ切り替える。1役割が1sceneだけでもよい。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
       ...(v.bgm_mode==='ai'?[`BGMカテゴリを登録済みの ${availableCategories(bgmCatalog).join(' / ')} から選び、bgm_categoryとして出力する。未登録のカテゴリや曲を作らない。`]:[]),
       output==='content'?'出力形式: {"scenes":[...]}。BGMをAIが選ぶ場合のみbgm_categoryを追加。カード・年月・星座・音声・その他のBGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。BGMをAIが選ぶ場合はglobal_settings.bgm.categoryを選択したカテゴリで補完する。`,
       '【ナレーション原稿】', transcript,
@@ -67,5 +67,3 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
-
-
