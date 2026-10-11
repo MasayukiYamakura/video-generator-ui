@@ -83,7 +83,10 @@ export function mountBuilder(apiProvider) {
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
-      if(c.video.template==='tarot_monthly')title=tarotTitle({year:Number($('pbTarotYear').value),month:Number($('pbTarotMonth').value),period:$('pbTarotPeriod').value,zodiac:$('pbTarotZodiac').value});
+      if(c.video.template==='tarot_monthly'){
+        c.tarot={year:Number($('pbTarotYear').value),month:Number($('pbTarotMonth').value),period:$('pbTarotPeriod').value,zodiac:$('pbTarotZodiac').value};
+        title=tarotTitle(c.tarot);
+      }
       drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
