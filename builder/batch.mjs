@@ -4,6 +4,7 @@ import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compi
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
 const cardIds=new Set(TAROT_CARDS.map(card=>card.id));
+const cardNames=new Map(TAROT_CARDS.map(card=>[card.id,card.name]));
 export function batchConfig(shared, zodiac, entry) {
   if(!Number.isInteger(entry.year)||entry.year<2000||entry.year>2100
     ||!Number.isInteger(entry.month)||entry.month<1||entry.month>12
@@ -33,7 +34,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     '月間星座タロット動画のscene JSONを、次の各星座について独立して作成してください。',
     'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"...","orientation":"upright"},...],"scenes":[...]},...]}。cardsは確定データの4枚を順序・ID・orientationを変えずに写す。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
     '【全星座共通ルール】',
-    '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。カード情報は出力不要で、画面の選択値を映像に適用する。',
+    '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。cardsは出力形式どおり確定値を変更せず写す。映像には画面の選択値を適用する。',
     '各scenes[].tarot_phaseは intro→overall→relationships→work→advice→（任意でsummary）'+(shared.video.cta_enabled?'→cta（最後に1scene）':'。ctaは出力しない')+'。intro〜adviceにはそれぞれ1scene以上を割り当て、同じ役割は複数sceneでもよい。空sceneは出力しない。',
     'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
     'introのhook_textには指定のtitleを改行を含めて完全一致で入れる。introの読み上げtextをtitleで置き換えない。',
@@ -85,4 +86,69 @@ export function importBatch(text, requested, entries=null) {
     found[video.zodiac]=video;
   }
   return found;
+}
+
+const aliases = [
+  [/恋人たち/g,'恋人'],
+  [/ペンタクルス/g,'ペンタクル'],
+  [/のACE/g,'のエース'],
+];
+function narrationWarnings(text, sign, period) {
+  const warnings=[];
+  for (const [pattern, official] of aliases) if(pattern.test(text))
+    warnings.push(`${sign}：原稿中に「${pattern.source}」があります。カード名の正式表記は「${official}」です（原稿は変更しません）。`);
+  const expected=`${period.year}年${period.month}月${period.period==='full'?'':period.period==='first'?'前半':'後半'}`;
+  if(!text.includes(expected)) warnings.push(`${sign}：原稿に対象期間「${expected}」が見つかりません。読み上げ内容を確認してください。`);
+  return warnings;
+}
+// This is a source-data import. The existing importBatch handles the later scenes response.
+export function importBatchSource(text) {
+  if(new TextEncoder().encode(text).length>1024*1024)throw Error('占い結果JSONは1 MiBまでです');
+  let data;
+  try{data=JSON.parse(text);}
+  catch{throw Error('占い結果JSONが不正です。JSONのみを貼り付けてください');}
+  if(data?.version!==1||!Number.isInteger(data.year)||data.year<2000||data.year>2100
+    ||!Number.isInteger(data.month)||data.month<1||data.month>12
+    ||!['full','first','second'].includes(data.period)
+    ||!Array.isArray(data.videos)||data.videos.length!==SIGNS.length)
+    throw Error('年・月・対象期間、または12星座の件数が不正です');
+  const found={}, warnings=[];
+  for(const video of data.videos){
+    if(!video||!TAROT_SIGNS[video.zodiac]||found[video.zodiac])
+      throw Error('星座に重複または不明なIDがあります');
+    const sign=TAROT_SIGNS[video.zodiac];
+    if(!Array.isArray(video.cards)||video.cards.length!==4)
+      throw Error(`${sign}：カードは4枚必要です`);
+    const cards=[],orientations=[];
+    for(const [i,position] of POSITIONS.entries()){
+      const card=video.cards[i];
+      if(card?.position!==position)throw Error(`${sign}：${i+1}枚目の位置が不正です（${position}）`);
+      const official=cardNames.get(card.card_id);
+      if(!official)throw Error(`${sign}：${i+1}枚目のカードID「${card.card_id}」は一覧にありません`);
+      if(card.name!==official)throw Error(`${sign}：${i+1}枚目は「${card.name}」ではなく「${official}」を指定してください（${card.card_id}）`);
+      if(!['upright','reversed'].includes(card.orientation))
+        throw Error(`${sign}：${i+1}枚目の向きはuprightまたはreversedにしてください`);
+      cards.push(card.card_id); orientations.push(card.orientation);
+    }
+    if(new Set(cards).size!==4)throw Error(`${sign}：同じカードを複数回使えません`);
+    if(typeof video.narration!=='string'||!video.narration.trim())
+      throw Error(`${sign}：ナレーション原稿がありません`);
+    if(typeof video.cta!=='string'||Array.from(video.cta).length>40)
+      throw Error(`${sign}：個別CTAは空欄または40文字以内にしてください`);
+    found[video.zodiac]={cards,orientations,narration:video.narration,cta:video.cta};
+    warnings.push(...narrationWarnings(video.narration,sign,data));
+  }
+  return {year:data.year,month:data.month,period:data.period,entries:found,warnings};
+}
+export function batchSourcePrompt(year,month,period) {
+  if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12
+    ||!['full','first','second'].includes(period))throw Error('占う年・月・対象期間を確認してください');
+  return [
+    '次の12星座の占い結果を、画面への一括入力用JSONとして作成してください。JSONのみ。Markdown・説明・省略は不要。',
+    `共通設定: year=${year}, month=${month}, period=${period} (full=月全体, first=前半, second=後半)。`,
+    `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":"保存して月末に見返してね"}]}。`,
+    '上記は1星座分の形式例です。実際は12星座をvideosへ入れ、確定した占い結果を使用してください。カードIDとnameは必ず次の正式な一覧の同じ行を使い、正逆はuprightまたはreversed。各星座内でカードの重複は不可。',
+    '星座IDは '+SIGNS.map(([id,name])=>`${id}=${name}`).join(', ')+' を各1件ずつ。カード位置はoverall, relationships, work, adviceの順。原稿の言葉は省略・要約せず全文をJSON文字列に入れ、CTA文を原稿に重複させない。個別CTAが不要なら空文字にする（画面の共通CTAを使用）。',
+    'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
+  ].join('\\n\\n');
 }
