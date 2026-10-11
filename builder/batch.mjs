@@ -31,7 +31,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
   if(aiBgm&&!availableCategories(bgmCatalog).length)throw Error('AIでBGMを選ぶには登録一覧を読み込んでください');
   return [
     '月間星座タロット動画のscene JSONを、次の各星座について独立して作成してください。',
-    'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","scenes":[...]},...]}。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
+    'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"...","orientation":"upright"},...],"scenes":[...]},...]}。cardsは確定データの4枚を順序・ID・orientationを変えずに写す。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
     '【全星座共通ルール】',
     '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。カード情報は出力不要で、画面の選択値を映像に適用する。',
     '各scenes[].tarot_phaseは intro→overall→relationships→work→advice→（任意でsummary）'+(shared.video.cta_enabled?'→cta（最後に1scene）':'。ctaは出力しない')+'。intro〜adviceにはそれぞれ1scene以上を割り当て、同じ役割は複数sceneでもよい。空sceneは出力しない。',
@@ -66,7 +66,7 @@ export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
   if(size>1024*1024)throw Error('一括入力は1 MiBまでです');
   return {version:1,videos};
 }
-export function importBatch(text, requested) {
+export function importBatch(text, requested, entries=null) {
   if(new TextEncoder().encode(text).length>1024*1024)throw Error('AIの回答は1 MiBまでです');
   let data;
   try{data=JSON.parse(text);}
@@ -76,6 +76,12 @@ export function importBatch(text, requested) {
   for(const video of data.videos) {
     if(!video||!requested.includes(video.zodiac)||found[video.zodiac]||!Array.isArray(video.scenes))
       throw Error('AI回答の星座・scenesが不正です');
+    if(entries) {
+      const entry=entries[video.zodiac];
+      if(!entry||!Array.isArray(video.cards)||video.cards.length!==4||video.cards.some((card,i)=>
+        card?.position!==POSITIONS[i]||card.card_id!==entry.cards[i]||card.orientation!==(entry.orientations?.[i]??'upright')))
+        throw Error(`${TAROT_SIGNS[video.zodiac]}のAI回答のカード・正逆が画面設定と一致しません`);
+    }
     found[video.zodiac]=video;
   }
   return found;
