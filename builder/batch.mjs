@@ -89,15 +89,16 @@ export function importBatch(text, requested, entries=null) {
 }
 
 const aliases = [
-  [/恋人たち/g,'恋人'],
-  [/ペンタクルス/g,'ペンタクル'],
-  [/のACE/g,'のエース'],
+  [/恋人たち/,'恋人'],
+  [/ペンタクルス/,'ペンタクル'],
+  [/のACE/,'のエース'],
 ];
 function narrationWarnings(text, sign, period) {
   const warnings=[];
   for (const [pattern, official] of aliases) if(pattern.test(text))
     warnings.push(`${sign}：原稿中に「${pattern.source}」があります。カード名の正式表記は「${official}」です（原稿は変更しません）。`);
-  const expected=`${period.year}年${period.month}月${period.period==='full'?'':period.period==='first'?'前半':'後半'}`;
+  if(text.includes('恋人たちアカード')||text.includes('優しい優しさ')) warnings.push(`${sign}：原稿に不自然な表現があります。読み上げ前に確認してください。`);
+  const expected=`${period.year}${period.month}月${period.period==='full'?'':period.period==='first'?'前半':'後半'}`;
   if(!text.includes(expected)) warnings.push(`${sign}：原稿に対象期間「${expected}」が見つかりません。読み上げ内容を確認してください。`);
   return warnings;
 }
@@ -137,6 +138,7 @@ export function importBatchSource(text) {
       throw Error(`${sign}：個別CTAは空欄または40文字以内にしてください`);
     found[video.zodiac]={cards,orientations,narration:video.narration,cta:video.cta};
     warnings.push(...narrationWarnings(video.narration,sign,data));
+    if(video.cta.trim()&&video.narration.trim().endsWith(video.cta.trim())) warnings.push(`${sign}：CTA文が原稿末尾にもあります。二重読み上げにならないか確認してください。`);
   }
   return {year:data.year,month:data.month,period:data.period,entries:found,warnings};
 }
