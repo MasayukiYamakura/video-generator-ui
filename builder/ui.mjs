@@ -5,7 +5,7 @@ import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
 import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-batch-20261011';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-batch-all-20261011';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
@@ -215,18 +215,17 @@ export function mountBuilder(apiProvider) {
     status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
   }
   for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};batchChanged();});
-  $('pbBatchGroup').onchange=()=>{$('pbBatchPrompt').value='';batchRequested=[];};
   $('pbBatchBuild').onclick=()=>{
     try{
-      const c=config(), signs=batchSelection(), group=Number($('pbBatchGroup').value);
+      const c=config(), signs=batchSelection();
       if(!signs.length)throw Error('制作する星座を選択してください');
       if(c.video.voice_mode!=='tts')throw Error('一括制作ではAI読み上げを選択してください');
       if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGM登録一覧を読み込んでください');
-      batchRequested=signs.filter((_,i)=>Math.floor(i/3)===group);
-      if(!batchRequested.length)throw Error('この組に対象の星座がありません');
+      batchRequested=signs.filter(sign=>!batchResponses[sign]);
+      if(!batchRequested.length)throw Error('選択した星座はすべて取り込み済みです。作り直す星座の原稿を編集してください');
       const input=batchRequested.map(sign=>[sign,{...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()}]);
       $('pbBatchPrompt').value=batchPrompt(c,input,bgmCatalog);
-      status(`${batchRequested.length}星座分のプロンプトを生成しました`);
+      status(`${batchRequested.length}星座分をまとめたプロンプトを生成しました`);
     }catch(e){status(e.message);}
   };
   $('pbBatchCopy').onclick=async()=>{
@@ -235,17 +234,17 @@ export function mountBuilder(apiProvider) {
   };
   $('pbBatchImport').onclick=()=>{
     try{
-      if(!batchRequested.length)throw Error('先にこの組のプロンプトを生成してください');
+      if(!batchRequested.length)throw Error('先にプロンプトを生成してください');
       const parsed=importBatch($('pbBatchResponse').value,batchRequested), c=config();
-      for(const sign of batchRequested){
+      for(const sign of Object.keys(parsed)){
         const entry={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
         const conf=batchConfig(c,sign,entry);
         const result=compileBatch(c,{[sign]:entry},{[sign]:parsed[sign]},[sign],bgmCatalog);
         if(!result.videos.length||!conf.tarot)throw Error('入力に不備があります');
       }
-      const count=batchRequested.length;
+      const count=Object.keys(parsed).length, missing=batchRequested.length-count;
       Object.assign(batchResponses,parsed);$('pbBatchResponse').value='';batchChanged();
-      status(`${count}星座分を検証・取り込みました`);
+      status(`${count}星座分を検証・取り込みました。${missing?`残り${missing}星座は「未取込分のプロンプトを生成」から追加できます。`:'制作対象の全星座を取り込みました。'}`);
     }catch(e){status(e.message);}
   };
   function manifest(){
