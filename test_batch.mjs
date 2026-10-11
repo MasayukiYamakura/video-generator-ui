@@ -48,6 +48,14 @@ const imported=importBatchSource(JSON.stringify(source));
 assert.equal(Object.keys(imported.entries).length,12);
 assert.equal(imported.entries.aries.orientations[3],'reversed');
 assert.match(batchSourcePrompt(2026,10,'second'),/major-06-lovers=恋人/);
+const sourcePrompt=batchSourcePrompt(2026,10,'second',true,'いちばん気になったカード、コメントで教えてね。');
+assert.match(sourcePrompt,/ライダー版タロット78枚/);
+assert.match(sourcePrompt,/約250〜300字/);
+assert.match(sourcePrompt,/2026年10月後半/);
+assert.match(sourcePrompt,/共通CTA文は「いちばん気になったカード、コメントで教えてね。」/);
+assert.match(sourcePrompt,/各videoのctaは空文字/);
+assert.ok(sourcePrompt.includes('\n\n'));
 assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:source.videos.slice(1)})),/12星座/);
 assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:[source.videos[0],...source.videos.slice(1,11),source.videos[0]]})),/重複/);
 assert.throws(()=>importBatchSource(JSON.stringify({...source,videos:source.videos.map((v,i)=>i? v:{...v,cards:v.cards.map((c,j)=>j?c:{...c,name:'恋人たち'})})})),/正式|ではなく/);
+
