@@ -20,7 +20,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     return [
       '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。',
-      `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚は人間が確定した結果です。カードを変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。`,
+      `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚のカードIDと向き（upright=正位置、reversed=逆位置）は人間が確定した結果です。変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。原稿にない正逆の読み上げは追加しないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。intro〜adviceは各役割に最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
       ...(v.cta_enabled?[`CTAは最後の1sceneだけ。textは ${JSON.stringify(config.cta_text)} と完全一致させ、speech_textや[[ ]]装飾を付けない。CTA文を他のsceneへ重複させず、カード4枚を表示するため情景映像を指定しない。CTAの文言をAIが追加・変更しない。`]:[]),

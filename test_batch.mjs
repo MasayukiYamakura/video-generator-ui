@@ -7,6 +7,7 @@ const shared=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_batch',o
 const phases=['intro','overall','relationships','work','advice'];
 const make=(sign,offset)=>({
   entry:{cards:TAROT_CARDS.slice(offset,offset+4).map(c=>c.id),
+    orientations:['upright','reversed','upright','reversed'],
     year:2026,month:10,period:'second',cta:'',sharedCta:'保存して見返してね',
     narration:phases.map(phase=>sign+phase).join('')},
   response:{zodiac:sign,scenes:[...phases.map(phase=>({tarot_phase:phase,text:sign+phase})),
@@ -24,9 +25,13 @@ const manifest=compileBatch(shared,entries,responses,['aries','taurus'],null);
 assert.equal(manifest.videos.length,2);
 assert.equal(manifest.videos[0].script.tarot.zodiac,'aries');
 assert.equal(manifest.videos[1].script.tarot.cards[0].card_id,taurus.entry.cards[0]);
+assert.equal(manifest.videos[0].script.tarot.cards[1].orientation,'reversed');
+assert.match(prompt,/reversed=逆位置/);
 assert.equal(manifest.videos[0].script.scenes[0].hook_text,'2026年10月後半\n牡羊座の運勢');
 assert.equal(manifest.videos[0].script.scenes.at(-1).text,'保存して見返してね');
 assert.deepEqual(compileBatch(shared,entries,responses,['taurus'],null).videos.map(x=>x.zodiac),['taurus']);
 assert.throws(()=>compileBatch(shared,entries,{...responses,taurus:aries.response},['taurus'],null),/原稿/);
 assert.throws(()=>importBatch(JSON.stringify({videos:[aries.response,aries.response]}),['aries','taurus']),/星座/);
+assert.throws(()=>compileBatch(shared,{aries:{...aries.entry,orientations:['sideways','upright','upright','upright']}},responses,['aries'],null),/向き/);
+assert.equal(compileBatch(shared,{aries:{...aries.entry,orientations:undefined}},responses,['aries'],null).videos[0].script.tarot.cards[1].orientation,'upright');
 console.log('batch compilation, titles, cards, retry subset: OK');

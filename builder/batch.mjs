@@ -8,9 +8,11 @@ export function batchConfig(shared, zodiac, entry) {
   if(!Number.isInteger(entry.year)||entry.year<2000||entry.year>2100
     ||!Number.isInteger(entry.month)||entry.month<1||entry.month>12
     ||!['full','first','second'].includes(entry.period))throw Error('占う年・月・期間を確認してください');
-  const cards=POSITIONS.map((position,index)=>({position,card_id:entry.cards[index]}));
+  const cards=POSITIONS.map((position,index)=>({position,card_id:entry.cards[index],orientation:entry.orientations?.[index] ?? 'upright'}));
   if(cards.some(card=>!cardIds.has(card.card_id))||new Set(cards.map(card=>card.card_id)).size!==4)
     throw Error(`${TAROT_SIGNS[zodiac]}のカードを重複なく4枚選んでください`);
+  if(cards.some(card=>!['upright','reversed'].includes(card.orientation)))
+    throw Error(`${TAROT_SIGNS[zodiac]}のカードの向きを確認してください`);
   const c=structuredClone(shared);
   c.tarot={year:entry.year,month:entry.month,period:entry.period,zodiac,cards};
   c.cta_text=entry.cta || entry.sharedCta;
@@ -31,7 +33,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     '月間星座タロット動画のscene JSONを、次の各星座について独立して作成してください。',
     'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","scenes":[...]},...]}。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
     '【全星座共通ルール】',
-    '人間が確定したカード・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。',
+    '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。カード情報は出力不要で、画面の選択値を映像に適用する。',
     '各scenes[].tarot_phaseは intro→overall→relationships→work→advice→（任意でsummary）'+(shared.video.cta_enabled?'→cta（最後に1scene）':'。ctaは出力しない')+'。intro〜adviceにはそれぞれ1scene以上を割り当て、同じ役割は複数sceneでもよい。空sceneは出力しない。',
     'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
     'introのhook_textには指定のtitleを改行を含めて完全一致で入れる。introの読み上げtextをtitleで置き換えない。',

@@ -1,11 +1,11 @@
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-batch-20261011';
 import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-batch-20261011';
-import {buildPrompt} from './prompt.mjs?v=tarot-batch-20261011';
+import {buildPrompt} from './prompt.mjs?v=tarot-orientation-20261011';
 import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
 import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-batch-all-20261011';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-orientation-20261011';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
@@ -57,7 +57,7 @@ export function mountBuilder(apiProvider) {
   let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageRequest=0;
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
-  const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],narration:'',cta:''}]));
+  const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
   let batchResponses={}, batchRequested=[];
   const BATCH_DRAFT='tarot-batch-draft-v1';
   const status=text=>{$('builderStatus').textContent=text;};
@@ -77,9 +77,10 @@ export function mountBuilder(apiProvider) {
     if(!Number.isInteger(year)||year<2000||year>2100)throw Error('占う年は2000〜2100で入力してください');
     if(!Number.isInteger(month)||month<1||month>12)throw Error('占う月を選択してください');
     if(!TAROT_SIGNS.some(([id])=>id===zodiac))throw Error('星座を選択してください');
-    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value}));
+    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value,orientation:$(`pbTarotOrientation${i}`).value}));
     if(cards.some(c=>!TAROT_CARDS.some(x=>x.id===c.card_id)))throw Error('4枚のカードを選択してください');
     if(new Set(cards.map(c=>c.card_id)).size!==4)throw Error('同じカードを複数回選べません');
+    if(cards.some(c=>!['upright','reversed'].includes(c.orientation)))throw Error('カードの正逆を選択してください');
     return {year,month,period,zodiac,cards};
   }
   function config() {return resolveConfig(registry,session);}
@@ -173,8 +174,12 @@ export function mountBuilder(apiProvider) {
     card.id=`pbTarotCard${i}`;
     options(card,[['','カードを選択'],...TAROT_CARDS.map(x=>[x.id,x.name])]);
     const cardLabel=el('label','引いたカード');cardLabel.append(card);
-    box.append(title,cardLabel);$('pbTarotCards').append(box);
+    const orientation=el('select');orientation.id=`pbTarotOrientation${i}`;
+    options(orientation,[['upright','正位置'],['reversed','逆位置']]);
+    const orientationLabel=el('label','カードの向き');orientationLabel.append(orientation);
+    box.append(title,cardLabel,orientationLabel);$('pbTarotCards').append(box);
     card.addEventListener('change',invalidate);
+    orientation.addEventListener('change',invalidate);
   }
   const batchBox=$('pbBatchEntries');
   for(const [sign,name] of SIGNS) {
@@ -186,7 +191,10 @@ export function mountBuilder(apiProvider) {
       const label=el('label',TAROT_POSITIONS[index][1]), select=el('select');
       options(select,[['','カードを選択'],...TAROT_CARDS.map(card=>[card.id,card.name])]);
       select.addEventListener('change',()=>{batchEntries[sign].cards[index]=select.value;delete batchResponses[sign];batchChanged();});
-      label.append(select);grid.append(label);
+      const orientation=el('select');options(orientation,[['upright','正位置'],['reversed','逆位置']]);
+      orientation.addEventListener('change',()=>{batchEntries[sign].orientations[index]=orientation.value;delete batchResponses[sign];batchChanged();});
+      const orientationLabel=el('label','カードの向き');orientationLabel.append(orientation);
+      label.append(select);grid.append(label,orientationLabel);
     });
     const narration=el('textarea');narration.rows=7;narration.placeholder='この星座のナレーション原稿（CTAは含めない）';
     narration.addEventListener('input',()=>{batchEntries[sign].narration=narration.value;delete batchResponses[sign];batchChanged();});
@@ -265,8 +273,8 @@ export function mountBuilder(apiProvider) {
       batchResponses=draft.responses||{};
       for(const d of batchBox.querySelectorAll('details')){
         const sign=d.dataset.sign, e=draft.entries[sign];if(!e)continue;
-        batchEntries[sign]={cards:e.cards||['','','',''],narration:e.narration||'',cta:e.cta||''};
-        d.querySelectorAll('select').forEach((input,i)=>input.value=batchEntries[sign].cards[i]);
+        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||''};
+        d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?batchEntries[sign].orientations[(i-1)/2]:batchEntries[sign].cards[i/2]);
         d.querySelector('textarea').value=batchEntries[sign].narration;
         d.querySelector('input[maxlength]').value=batchEntries[sign].cta;
         d.querySelector('.batch-select').checked=draft.selected?.includes(sign)??true;
