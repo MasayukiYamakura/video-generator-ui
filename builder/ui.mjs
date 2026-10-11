@@ -5,7 +5,7 @@ import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
 import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-orientation-validated-20261011';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './batch.mjs?v=tarot-source-20261012';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
@@ -223,6 +223,40 @@ export function mountBuilder(apiProvider) {
     status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
   }
   for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};batchChanged();});
+  $('pbBatchSourcePromptBuild').onclick=()=>{
+    try {
+      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value);
+      status('占い結果を作るためのプロンプトを用意しました');
+    }catch(e){status(e.message);}
+  };
+  $('pbBatchSourcePromptCopy').onclick=async()=>{
+    try{if(!$('pbBatchSourcePrompt').value)throw Error('先に占い結果用プロンプトを生成してください');
+      await navigator.clipboard.writeText($('pbBatchSourcePrompt').value);status('占い結果用プロンプトをコピーしました');
+    }catch(e){$('pbBatchSourcePrompt').select();status(e.message);}
+  };
+  $('pbBatchSourceImport').onclick=()=>{
+    try {
+      const result=importBatchSource($('pbBatchSource').value);
+      if(config().video.cta_enabled && Object.values(result.entries).some(e=>!e.cta.trim())
+        && !$('pbBatchCta').value.trim())throw Error('個別CTAが空欄の星座があります。先に共通CTAを入力してください');
+      // Validation completes before any of the existing controls or saved draft are touched.
+      $('pbBatchYear').value=result.year;
+      $('pbBatchMonth').value=result.month;
+      $('pbBatchPeriod').value=result.period;
+      for(const d of batchBox.querySelectorAll('details')){
+        const sign=d.dataset.sign,e=result.entries[sign];
+        batchEntries[sign]={...e};
+        d.querySelectorAll('select').forEach((input,i)=>{input.value=i%2?e.orientations[(i-1)/2]:e.cards[i/2];});
+        d.querySelector('textarea').value=e.narration;
+        d.querySelector('input[maxlength]').value=e.cta;
+        delete batchResponses[sign];
+      }
+      batchChanged();
+      $('pbBatchSourceWarnings').textContent=result.warnings.length
+        ?'確認事項（原稿は変更していません）:\n'+result.warnings.join('\n'):'12星座のカード・向き・原稿・CTAを反映しました。内容を確認してください。';
+      status('12星座・48枚を反映しました。既存のシーン回答は無効です。内容を確認後、未取込分のプロンプトを生成してください。');
+    }catch(e){status(e.message);}
+  };
   $('pbBatchBuild').onclick=()=>{
     try{
       const c=config(), signs=batchSelection();
