@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {emptyRegistry, resolveConfig} from './builder/model.mjs';
 import {TAROT_CARDS} from './builder/tarot-cards.mjs';
 import {batchPrompt, batchConfig, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './builder/batch.mjs';
+import {buildPrompt} from './builder/prompt.mjs';
 
 const shared=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_batch',overrides:{video:{},layout:{}},ai:{}});
 const phases=['intro','overall','relationships','work','advice'];
@@ -10,7 +11,8 @@ const make=(sign,offset)=>({
     orientations:['upright','reversed','upright','reversed'],
     year:2026,month:10,period:'second',cta:'',sharedCta:'保存して見返してね',
     narration:phases.map(phase=>sign+phase).join('')},
-  response:{zodiac:sign,scenes:[...phases.map(phase=>({tarot_phase:phase,text:sign+phase})),
+  response:{zodiac:sign,scenes:[...phases.map(phase=>({tarot_phase:phase,text:sign+phase,
+    ...(['overall','relationships','work','advice'].includes(phase)?{tarot_visual:'scenery',media_type:'pexels',media_query:`${phase} nature`}:{} )})),
     {tarot_phase:'cta',text:'保存して見返してね'}]},
 });
 const aries=make('aries',0),taurus=make('taurus',4);
@@ -30,7 +32,11 @@ assert.equal(manifest.videos.length,2);
 assert.equal(manifest.videos[0].script.tarot.zodiac,'aries');
 assert.equal(manifest.videos[1].script.tarot.cards[0].card_id,taurus.entry.cards[0]);
 assert.equal(manifest.videos[0].script.tarot.cards[1].orientation,'reversed');
+assert.equal(manifest.videos[0].script.scenes.filter(s=>s.tarot_visual==='scenery').length,4);
+assert.throws(()=>compileBatch(shared,entries,{...responses,aries:{...aries.response,scenes:aries.response.scenes.map(s=>s.tarot_phase==='work'?{tarot_phase:'work',text:s.text}:s)}},['aries'],null),/仕事・行動に情景映像/);
 assert.match(prompt,/reversed=逆位置/);
+assert.match(prompt,/各役割で少なくとも1scene/);
+assert.match(buildPrompt(batchConfig(shared,'aries',aries.entry),aries.entry.narration),/各役割で少なくとも1scene/);
 assert.equal(manifest.videos[0].script.scenes[0].hook_text,'2026年10月後半\n牡羊座の運勢');
 assert.equal(manifest.videos[0].script.scenes.at(-1).text,'保存して見返してね');
 assert.deepEqual(compileBatch(shared,entries,responses,['taurus'],null).videos.map(x=>x.zodiac),['taurus']);
