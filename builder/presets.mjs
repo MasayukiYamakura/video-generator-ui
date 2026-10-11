@@ -24,6 +24,7 @@ export const VIDEO_PRESETS = [
     background_mode:'fixed', bgm_mode:'off',
   }},
   {id:'tarot_monthly_remotion', name:'月間星座タロット・Remotion版（4枚引き）', extends:'tarot_monthly', layout:{caption_center_y:980,caption_font_size:52}, values:{tarot_renderer:'remotion'}},
+  {id:'tarot_monthly_batch', name:'12星座一括制作・Remotion版（4枚引き）', extends:'tarot_monthly_remotion', values:{cta_enabled:true}},
   {id:'tiktok_vertical_hook', name:'TikTok縦書きフック', default_layout:'vertical_legacy', values:{
     format:'vertical', hook_enabled:true, intro_caption:false,
   }},

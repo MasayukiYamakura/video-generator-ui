@@ -1,10 +1,11 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-cta-20261011';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-cta-20261011';
-import {buildPrompt} from './prompt.mjs?v=tarot-cta-20261011';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-cta-20261011';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-cta-20261011';
-import {drawPreview} from './preview.mjs?v=tarot-cta-20261011';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-batch-20261011';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-batch-20261011';
+import {buildPrompt} from './prompt.mjs?v=tarot-batch-20261011';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
+import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-batch-20261011';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
@@ -56,6 +57,9 @@ export function mountBuilder(apiProvider) {
   let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageRequest=0;
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
+  const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],narration:'',cta:''}]));
+  let batchResponses={}, batchRequested=[];
+  const BATCH_DRAFT='tarot-batch-draft-v1';
   const status=text=>{$('builderStatus').textContent=text;};
   const connection=()=>{
     const expected=$('repo').value.trim();
@@ -88,12 +92,13 @@ export function mountBuilder(apiProvider) {
     }
     return c;
   }
-  function invalidate() {snapshot=null;$('pbPrompt').value='';status('設定が変わりました。プロンプトを生成し直してください。');}
+  function invalidate() {snapshot=null;$('pbPrompt').value='';batchChanged();status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
       if(c.video.template==='tarot_monthly'){
-        c.tarot={year:Number($('pbTarotYear').value),month:Number($('pbTarotMonth').value),period:$('pbTarotPeriod').value,zodiac:$('pbTarotZodiac').value};
+        const batch=session.video_preset==='tarot_monthly_batch';
+        c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
       drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
@@ -119,7 +124,18 @@ export function mountBuilder(apiProvider) {
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
-    $('pbTarotArea').hidden=!tarot;
+    const batch=session.video_preset==='tarot_monthly_batch';
+    $('pbTarotArea').hidden=!tarot||batch;
+    $('pbBatchArea').hidden=!batch;
+    $('pbSingleNarration').hidden=batch;
+    $('pbSingleScript').hidden=batch;
+    $('pbBatchRun').hidden=!batch;
+    $('generate').hidden=batch;
+    $('pbBuild').parentElement.hidden=batch;
+    $('pbPrompt').parentElement.hidden=batch;
+    $('pbOutputMode').parentElement.hidden=batch;
+    $('pbApplyOnSend').parentElement.hidden=batch;
+    $('pbApplyOnSend').checked=!batch&&$('pbApplyOnSend').checked;
     $('pb_cta_enabled').parentElement.hidden=!tarot;
     $('pbTarotCtaText').parentElement.hidden=!tarot||!v.cta_enabled;
     $('pbBackgroundFile').parentElement.hidden=tarot;
@@ -137,6 +153,7 @@ export function mountBuilder(apiProvider) {
     $('pbThemeMode').parentElement.hidden=tarot;
     $('pbThemeTitle').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
+    if(batch)$('audioUpload').hidden=true;
     $('pbPreviewError').textContent=''; paint();
   }
   function lists() {
@@ -146,8 +163,10 @@ export function mountBuilder(apiProvider) {
     renderFields();
   }
   options($('pbTarotMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
+  options($('pbBatchMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
   options($('pbTarotZodiac'),TAROT_SIGNS,'sagittarius');
   $('pbTarotYear').value=new Date().getFullYear();
+  $('pbBatchYear').value=new Date().getFullYear();
   for(const [i,[position,label]] of TAROT_POSITIONS.entries()) {
     const box=el('div');box.className='tarot-card-input';
     const title=el('h4',label), card=el('select');
@@ -157,6 +176,105 @@ export function mountBuilder(apiProvider) {
     box.append(title,cardLabel);$('pbTarotCards').append(box);
     card.addEventListener('change',invalidate);
   }
+  const batchBox=$('pbBatchEntries');
+  for(const [sign,name] of SIGNS) {
+    const details=el('details'), summary=el('summary',name+' · 未入力'), grid=el('div');
+    grid.className='builder-grid';
+    details.dataset.sign=sign;
+    details.append(summary,grid);
+    POSITIONS.forEach((position,index)=>{
+      const label=el('label',TAROT_POSITIONS[index][1]), select=el('select');
+      options(select,[['','カードを選択'],...TAROT_CARDS.map(card=>[card.id,card.name])]);
+      select.addEventListener('change',()=>{batchEntries[sign].cards[index]=select.value;delete batchResponses[sign];batchChanged();});
+      label.append(select);grid.append(label);
+    });
+    const narration=el('textarea');narration.rows=7;narration.placeholder='この星座のナレーション原稿（CTAは含めない）';
+    narration.addEventListener('input',()=>{batchEntries[sign].narration=narration.value;delete batchResponses[sign];batchChanged();});
+    const transcriptLabel=el('label','ナレーション原稿');transcriptLabel.append(narration);
+    const cta=el('input');cta.maxLength=40;cta.placeholder='空欄なら共通CTA';
+    cta.addEventListener('input',()=>{batchEntries[sign].cta=cta.value;delete batchResponses[sign];batchChanged();});
+    const ctaLabel=el('label','個別CTA（任意）');ctaLabel.append(cta);
+    const check=el('input');check.type='checkbox';check.checked=true;check.className='batch-select';
+    const checkLabel=el('label','この星座を制作する');checkLabel.className='check';checkLabel.prepend(check);
+    check.addEventListener('change',batchChanged);
+    details.append(transcriptLabel,ctaLabel,checkLabel);batchBox.append(details);
+  }
+  function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
+  function saveDraft(){
+    try{localStorage.setItem(BATCH_DRAFT,JSON.stringify({repo:$('repo').value.trim(),entries:batchEntries,responses:batchResponses,
+      year:$('pbBatchYear').value,month:$('pbBatchMonth').value,period:$('pbBatchPeriod').value,cta:$('pbBatchCta').value,
+      selected:batchSelection()}));}catch{status('端末の保存容量が不足しています。画面を閉じる前に入力を控えてください。');}
+  }
+  function batchChanged(){
+    batchRequested=[];$('pbBatchPrompt').value='';
+    for(const d of batchBox.querySelectorAll('details')){
+      const e=batchEntries[d.dataset.sign], ready=e.cards.every(Boolean)&&e.narration.trim();
+      d.querySelector('summary').textContent=TAROT_SIGNS.find(([s])=>s===d.dataset.sign)[1]+' · '+(batchResponses[d.dataset.sign]?'AI出力取込済':ready?'原稿入力済':'未入力');
+    }
+    saveDraft();
+    status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
+  }
+  for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};batchChanged();});
+  $('pbBatchGroup').onchange=()=>{$('pbBatchPrompt').value='';batchRequested=[];};
+  $('pbBatchBuild').onclick=()=>{
+    try{
+      const c=config(), signs=batchSelection(), group=Number($('pbBatchGroup').value);
+      if(!signs.length)throw Error('制作する星座を選択してください');
+      if(c.video.voice_mode!=='tts')throw Error('一括制作ではAI読み上げを選択してください');
+      if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGM登録一覧を読み込んでください');
+      batchRequested=signs.filter((_,i)=>Math.floor(i/3)===group);
+      if(!batchRequested.length)throw Error('この組に対象の星座がありません');
+      const input=batchRequested.map(sign=>[sign,{...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()}]);
+      $('pbBatchPrompt').value=batchPrompt(c,input,bgmCatalog);
+      status(`${batchRequested.length}星座分のプロンプトを生成しました`);
+    }catch(e){status(e.message);}
+  };
+  $('pbBatchCopy').onclick=async()=>{
+    try{await navigator.clipboard.writeText($('pbBatchPrompt').value);status('コピーしました');}
+    catch{$('pbBatchPrompt').select();status('選択しました。iPhoneの「コピー」を使ってください。');}
+  };
+  $('pbBatchImport').onclick=()=>{
+    try{
+      if(!batchRequested.length)throw Error('先にこの組のプロンプトを生成してください');
+      const parsed=importBatch($('pbBatchResponse').value,batchRequested), c=config();
+      for(const sign of batchRequested){
+        const entry={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
+        const conf=batchConfig(c,sign,entry);
+        const result=compileBatch(c,{[sign]:entry},{[sign]:parsed[sign]},[sign],bgmCatalog);
+        if(!result.videos.length||!conf.tarot)throw Error('入力に不備があります');
+      }
+      const count=batchRequested.length;
+      Object.assign(batchResponses,parsed);$('pbBatchResponse').value='';batchChanged();
+      status(`${count}星座分を検証・取り込みました`);
+    }catch(e){status(e.message);}
+  };
+  function manifest(){
+    const c=config(), entries={};
+    for(const [sign] of SIGNS) entries[sign]={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
+    return compileBatch(c,entries,batchResponses,batchSelection(),bgmCatalog);
+  }
+  $('pbBatchCheck').onclick=()=>{try{
+    const m=manifest(), minutes=Number($('pbBatchMinutes').value);
+    if($('pbBatchMinutes').value&&(minutes<1||!Number.isInteger(minutes)))throw Error('1本目の制作時間は1分以上の整数で入力してください');
+    status(`${m.videos.length}本を確認しました。AI読み上げは${m.videos.length}回実行されます。${minutes?`過去の実績から制作時間は約${minutes*m.videos.length}分＋準備時間です。`:''} 一括制作ボタンで開始します。`);
+  }catch(e){status(e.message);}};
+  $('pbBatchGenerate').onclick=()=>window.videoStudioSubmitBatch?.();
+  try{
+    const draft=JSON.parse(localStorage.getItem(BATCH_DRAFT)||'null');
+    if(draft?.repo===$('repo').value.trim()&&draft.entries){
+      for(const id of ['year','month','period','cta']) $('pbBatch'+id[0].toUpperCase()+id.slice(1)).value=draft[id]??'';
+      batchResponses=draft.responses||{};
+      for(const d of batchBox.querySelectorAll('details')){
+        const sign=d.dataset.sign, e=draft.entries[sign];if(!e)continue;
+        batchEntries[sign]={cards:e.cards||['','','',''],narration:e.narration||'',cta:e.cta||''};
+        d.querySelectorAll('select').forEach((input,i)=>input.value=batchEntries[sign].cards[i]);
+        d.querySelector('textarea').value=batchEntries[sign].narration;
+        d.querySelector('input[maxlength]').value=batchEntries[sign].cta;
+        d.querySelector('.batch-select').checked=draft.selected?.includes(sign)??true;
+      }
+      batchChanged();
+    }
+  }catch{}
   $('pbTarotCtaText').addEventListener('input',invalidate);
   for(const id of ['pbTarotYear','pbTarotMonth','pbTarotPeriod','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
   for(const [key,label,items,type] of VIDEO_FIELDS) {
@@ -231,7 +349,7 @@ export function mountBuilder(apiProvider) {
   }
   $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
   lists();
-  return {prepareScript:prepare, previewConfig:config};
+  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>session.video_preset==='tarot_monthly_batch',manifest}};
 }
 
 
