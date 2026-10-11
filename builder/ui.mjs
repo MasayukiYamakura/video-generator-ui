@@ -5,7 +5,7 @@ import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
 import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-orientation-20261011';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch} from './batch.mjs?v=tarot-orientation-validated-20261011';
 
 const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
@@ -243,7 +243,7 @@ export function mountBuilder(apiProvider) {
   $('pbBatchImport').onclick=()=>{
     try{
       if(!batchRequested.length)throw Error('先にプロンプトを生成してください');
-      const parsed=importBatch($('pbBatchResponse').value,batchRequested), c=config();
+      const parsed=importBatch($('pbBatchResponse').value,batchRequested,batchEntries), c=config();
       for(const sign of Object.keys(parsed)){
         const entry={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
         const conf=batchConfig(c,sign,entry);
