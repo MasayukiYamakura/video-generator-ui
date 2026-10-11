@@ -80,20 +80,26 @@ export function applyConfig(script, config, bgmCatalog) {
   if(v.template==='tarot_monthly') {
     if(!config.tarot) throw Error('占い設定がありません');
     const title=tarotTitle(config.tarot);
-    const order=['intro','overall','relationships','work','advice','summary'];
+    const order=['intro','overall','relationships','work','advice','summary','cta'];
+    if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     const phases=script.scenes.map((s,i)=>{
       assertObject(s,`シーン${i+1}`);
       if(typeof s.text!=='string'||!s.text.trim()) throw Error(`シーン${i+1}の読み上げtextが必要です`);
       if(!order.includes(s.tarot_phase)) throw Error(`シーン${i+1}のtarot_phaseが不正です`);
       return s.tarot_phase;
     });
-    if([...new Set(phases)].filter(x=>x!=='summary').join(',')!==order.slice(0,5).join(',') || phases.some((x,i)=>i&&order.indexOf(x)<order.indexOf(phases[i-1]))) throw Error('intro→全体運→恋愛・対人→仕事・行動→アドバイスの順に分けてください');
+    if([...new Set(phases)].filter(x=>x!=='summary'&&x!=='cta').join(',')!==order.slice(0,5).join(',') || phases.some((x,i)=>i&&order.indexOf(x)<order.indexOf(phases[i-1]))) throw Error('intro→全体運→恋愛・対人→仕事・行動→アドバイスの順に分けてください');
+    const ctaScenes=script.scenes.filter(s=>s.tarot_phase==='cta');
+    if(v.cta_enabled) {
+      if(ctaScenes.length!==1||phases.at(-1)!=='cta')throw Error('CTAをONにした場合は最後にctaシーンを1つ指定してください');
+      if(ctaScenes[0].text!==config.cta_text||ctaScenes[0].speech_text!==undefined)throw Error('CTAのtextは画面で指定した読み上げ文と完全一致させてください');
+    } else if(ctaScenes.length) throw Error('CTAがOFFの場合はctaシーンを含めないでください');
     let introIndex=0;
     const manualHooks=ai.manual_hook.split('\n---\n');
     const scenes=script.scenes.map(s=>{
       const intro=s.tarot_phase==='intro';
       const out={text:s.text,tarot_phase:s.tarot_phase,
-        caption_enabled:intro?v.intro_caption:v.body_caption,
+        caption_enabled:s.tarot_phase==='cta'?true:intro?v.intro_caption:v.body_caption,
         visualizer:intro?v.intro_visualizer:v.body_visualizer};
       if(s.speech_text!==undefined) {if(typeof s.speech_text!=='string')throw Error('speech_textが不正です');out.speech_text=s.speech_text;}
       if(intro){
@@ -103,6 +109,7 @@ export function applyConfig(script, config, bgmCatalog) {
         introIndex++;
       }
       if(s.tarot_visual==='scenery') {
+        if(s.tarot_phase==='cta')throw Error('CTAシーンに情景映像は指定できません');
         if(intro)throw Error('冒頭の配札シーンには情景映像を指定できません');
         if(!['pexels','pixabay'].includes(s.media_type)||typeof s.media_query!=='string'||!s.media_query.trim())throw Error('情景にはPexels/Pixabayの検索語が必要です');
         Object.assign(out,{tarot_visual:'scenery',media_type:s.media_type,media_query:s.media_query});
