@@ -1,5 +1,5 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-no-reading-20261010';
-import {clone, assertObject} from './model.mjs?v=tarot-no-reading-20261010';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-batch-20261011';
+import {clone, assertObject} from './model.mjs?v=tarot-batch-20261011';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
