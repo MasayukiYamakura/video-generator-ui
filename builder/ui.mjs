@@ -299,6 +299,27 @@ export function mountBuilder(apiProvider) {
     if($('pbBatchMinutes').value&&(minutes<1||!Number.isInteger(minutes)))throw Error('1本目の制作時間は1分以上の整数で入力してください');
     status(`${m.videos.length}本を確認しました。AI読み上げは${m.videos.length}回実行されます。${minutes?`過去の実績から制作時間は約${minutes*m.videos.length}分＋準備時間です。`:''} 一括制作ボタンで開始します。`);
   }catch(e){status(e.message);}};
+  $('pbBatchReset').onclick=()=>{
+    if(!window.confirm('12星座の入力内容と保存済みの下書きを消して、最初からやり直しますか？'))return;
+    batchResponses={};batchRequested=[];
+    $('pbBatchYear').value=new Date().getFullYear();
+    $('pbBatchMonth').value=String(new Date().getMonth()+1);
+    $('pbBatchPeriod').value='full';
+    for(const id of ['pbBatchCta','pbBatchSourcePrompt','pbBatchSource','pbBatchPrompt','pbBatchResponse','pbBatchMinutes'])$(id).value='';
+    $('pbBatchSourceWarnings').textContent='';
+    for(const d of batchBox.querySelectorAll('details')){
+      const sign=d.dataset.sign;
+      batchEntries[sign]={cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''};
+      d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?'upright':'');
+      d.querySelector('textarea').value='';
+      d.querySelector('input[maxlength]').value='';
+      d.querySelector('.batch-select').checked=true;
+      d.open=false;
+    }
+    batchChanged();
+    localStorage.removeItem(BATCH_DRAFT);
+    status('12星座の入力と保存済みの下書きを消しました。最初から入力できます。');
+  };
   $('pbBatchGenerate').onclick=()=>window.videoStudioSubmitBatch?.();
   try{
     const draft=JSON.parse(localStorage.getItem(BATCH_DRAFT)||'null');
