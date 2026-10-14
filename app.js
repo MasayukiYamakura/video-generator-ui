@@ -28,7 +28,7 @@ function render() {
     if(h.kind==='batch') {
       for(const [sign,label] of Object.entries(BATCH_SIGNS).filter(([sign])=>h.signs?.includes(sign))){
         const artifact=h.artifacts?.find(a=>a.name===`video-${h.id}-${sign}`);
-        const row=node('p',label+' · '+(artifact?'完了':h.status==='completed'?'失敗または成果物なし':h.step===`Render ${sign}`?'制作中':'制作待ち'));
+        const row=node('p',label+' · '+(artifact?'完了':h.status==='completed'?(h.conclusion==='success'?'成果物を確認中・更新してください':'失敗または成果物なし'):h.step===`Render ${sign}`?'制作中':'制作待ち'));
         box.append(row);
         if(artifact&&!artifact.expired&&Date.parse(artifact.expires_at)>Date.now()){
           const link=node('a',label+'をダウンロード（ZIP）');link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${artifact.id}`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
@@ -48,7 +48,7 @@ async function recover() {
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const a=await api(`actions/runs/${h.runId}/artifacts`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${h.id}-`):x.name===`video-${h.id}`);  } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
+ try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`):x.name===`video-${receipt}`); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -96,7 +96,7 @@ window.videoStudioSubmitBatch=()=>submit('batch');
 $('recover').onclick=refresh;
 $('retry').onclick=async()=>{if(busy||!pending?.sha)return;busy=true;controls();try{if(await recover())return;try{const ref=await api(`git/ref/heads/ui-input/${pending.id}`);if(ref.object.sha!==pending.sha)throw Error('入力ブランチが変更されています');}catch(e){if(e.status!==404)throw e;await api('git/refs','POST',{ref:`refs/heads/ui-input/${pending.id}`,sha:pending.sha});}await dispatch();}catch(e){message(e.message);}finally{busy=false;render();}};
 $('discard').onclick=async()=>{if(busy||!pending||pending.dispatched)return;busy=true;try{if(await recover())return;if(pending.sha){try{const ref=await api(`git/ref/heads/ui-input/${pending.id}`);if(ref.object.sha!==pending.sha)throw Error('入力が変更されています');await api(`git/refs/heads/ui-input/${pending.id}`,'DELETE');}catch(e){if(e.status!==404)throw e;}}pending=null;persist();message('未受付の入力を取り消しました。音声を選び直して実行できます。');}catch(e){message(e.message);}finally{busy=false;render();}};
-$('refresh').onclick=refresh;document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('pageshow',refresh);window.addEventListener('beforeunload',e=>{if(busy){e.preventDefault();e.returnValue='';}});setInterval(()=>{if(pending||history.some(h=>h.status!=='completed'))refresh();},15000);render();if(!token)$('connection').open=true;refresh();
+$('refresh').onclick=refresh;document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('pageshow',refresh);window.addEventListener('beforeunload',e=>{if(busy){e.preventDefault();e.returnValue='';}});setInterval(()=>{if(pending||history.some(h=>h.status!=='completed'||(h.kind==='batch'&&h.conclusion==='success'&&(h.artifacts?.length||0)<(h.signs?.length||0))))refresh();},15000);render();if(!token)$('connection').open=true;refresh();
 
 function bgmSettings(script) {
  const b=script.global_settings?.bgm ?? {};
