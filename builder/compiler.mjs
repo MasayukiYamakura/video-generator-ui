@@ -49,10 +49,14 @@ export function fixedSettings(config) {
   return g;
 }
 export const TAROT_SIGNS = {aries:'牡羊座',taurus:'牡牛座',gemini:'双子座',cancer:'蟹座',leo:'獅子座',virgo:'乙女座',libra:'天秤座',scorpio:'蠍座',sagittarius:'射手座',capricorn:'山羊座',aquarius:'水瓶座',pisces:'魚座'};
+export const TAROT_CAPTION_SIGNS = {aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',libra:'てんびん座',scorpio:'さそり座',sagittarius:'いて座',capricorn:'やぎ座',aquarius:'みずがめ座',pisces:'うお座'};
+export function captionZodiac(text) {
+  return Object.entries(TAROT_SIGNS).reduce((caption,[id,name])=>caption.replaceAll(name,TAROT_CAPTION_SIGNS[id]),text);
+}
 export function tarotTitle(tarot) {
   const period=tarot.period ?? 'full';
   if(!['full','first','second'].includes(period)) throw Error('対象期間が不正です');
-  const sign=TAROT_SIGNS[tarot.zodiac];
+  const sign=TAROT_CAPTION_SIGNS[tarot.zodiac];
   if(!sign) throw Error('星座の指定が不正です');
   return `${tarot.year}年${tarot.month}月${period==='first'?'前半':period==='second'?'後半':''}\n${sign}の運勢`;
 }
@@ -104,10 +108,12 @@ export function applyConfig(script, config, bgmCatalog) {
     const manualHooks=ai.manual_hook.split('\n---\n');
     const scenes=script.scenes.map(s=>{
       const intro=s.tarot_phase==='intro';
-      const out={text:s.text,tarot_phase:s.tarot_phase,
+      const captionText=captionZodiac(s.text);
+      const out={text:captionText,tarot_phase:s.tarot_phase,
         caption_enabled:s.tarot_phase==='cta'?true:intro?v.intro_caption:v.body_caption,
         visualizer:intro?v.intro_visualizer:v.body_visualizer};
       if(s.speech_text!==undefined) {if(typeof s.speech_text!=='string')throw Error('speech_textが不正です');out.speech_text=s.speech_text;}
+      else if(captionText!==s.text) out.speech_text=s.text;
       if(intro){
         if(v.hook_enabled){
           out.hook_text=title;
