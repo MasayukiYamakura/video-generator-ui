@@ -32,6 +32,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
   if(aiBgm&&!availableCategories(bgmCatalog).length)throw Error('AIでBGMを選ぶには登録一覧を読み込んでください');
   return [
     '月間星座タロット動画のscene JSONを、次の各星座について独立して作成してください。',
+    'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
     'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"...","orientation":"upright"},...],"scenes":[...]},...]}。cardsは確定データの4枚を順序・ID・orientationを変えずに写す。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
     '【全星座共通ルール】',
     '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。cardsは出力形式どおり確定値を変更せず写す。映像には画面の選択値を適用する。',
@@ -147,6 +148,7 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     ||!['full','first','second'].includes(period))throw Error('占う年・月・対象期間を確認してください');
   return [
     '次の12星座の占い結果を、画面への一括入力用JSONとして作成してください。JSONのみ。Markdown・説明・省略は不要。',
+    'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
     `共通設定: year=${year}, month=${month}, period=${period} (full=月全体, first=前半, second=後半)。`,
     `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":""}]}。`,
     '上記は1星座分の形式例です。実際は12星座をvideosへ入れ、確定した占い結果を使用してください。カードIDとnameは必ず次の正式な一覧の同じ行を使い、正逆はuprightまたはreversed。各星座内でカードの重複は不可。',

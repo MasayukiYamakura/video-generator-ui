@@ -5,6 +5,7 @@ const COMMON = [
   '【共通ルール】',
   'ナレーション原稿が読み上げ内容の唯一のマスター。意味のまとまりごとにsceneへ分割する。原稿内容は変更・要約・言い換えしない。字幕装飾[[ ]]のみ必要に応じ追加可能。speech_textは原則出力しない。字幕と読み上げを意図的に変える明示指示がある場合だけspeech_textを使う。',
   'JSONのみ出力。説明、Markdown、コードフェンス、コメント、末尾カンマは禁止。',
+  'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
   '台本の言葉を言い換え・要約・追加しない。全シーンのtextを順番につなげると元のナレーション原稿と同じ内容になるようにし、冒頭も空にしない。',
   '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（選択したナレーション音声で自動照合）。',
   '制作者が指定した改行は、JSON文字列内で改行エスケープ \\n として維持する。JSONを解析すると実際の改行になるようにし、バックスラッシュを二重にして文字として表示させない。',
@@ -20,6 +21,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     return [
       '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。星座名の字幕と冒頭タイトルはひらがな（例: おうし座、いて座）で表示する。読み上げ原稿は変更しない。',
+      'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
       `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚のカードIDと向き（upright=正位置、reversed=逆位置）は人間が確定した結果です。変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。原稿にない正逆の読み上げは追加しないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。intro〜adviceは各役割に最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
