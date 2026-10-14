@@ -1,3 +1,3 @@
-import {mountBuilder} from './builder/ui.mjs?v=zodiac-kana-20261014';
+import {mountBuilder} from './builder/ui.mjs?v=batch-reset-20261014';
 window.videoConfigurator=mountBuilder(()=>window.videoStudioApi);
 
