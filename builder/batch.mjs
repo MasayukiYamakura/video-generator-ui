@@ -1,5 +1,5 @@
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=zodiac-kana-20261014';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
@@ -36,7 +36,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     '【全星座共通ルール】',
     '人間が確定したカードIDと正逆（orientation: upright=正位置, reversed=逆位置）・原稿・CTA・タイトルは変更しない。星座間で内容を混ぜない。入力の順番で全件を1度ずつ出し、指定外の星座を追加しない。cardsは出力形式どおり確定値を変更せず写す。映像には画面の選択値を適用する。',
     '各scenes[].tarot_phaseは intro→overall→relationships→work→advice→（任意でsummary）'+(shared.video.cta_enabled?'→cta（最後に1scene）':'。ctaは出力しない')+'。intro〜adviceにはそれぞれ1scene以上を割り当て、同じ役割は複数sceneでもよい。空sceneは出力しない。',
-    'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
+    'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。画面で確定する字幕では星座名をひらがな（例: おうし座、いて座）で表示し、読み上げの言葉は変更しない。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
     'introのhook_textには指定のtitleを改行を含めて完全一致で入れる。introの読み上げtextをtitleで置き換えない。',
     shared.video.cta_enabled?'ctaは最後の1sceneだけ。textは指定されたctaと完全一致させ、[[ ]]装飾、speech_text、情景映像を付けず、他のsceneと重複させない。':'CTAは作らない。',
     'introとctaに情景映像を付けない。overall, relationships, work, adviceの各役割で少なくとも1sceneに tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:原稿に合う英語の具体的な検索語 を付ける。カードを表に返してから情景映像へ切り替える。1役割が1sceneだけでもよい。',
@@ -58,9 +58,9 @@ export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
     if(!response)throw Error(`${TAROT_SIGNS[zodiac]}のAI出力を取り込んでください`);
     const config=batchConfig(shared,zodiac,entry);
     const script=applyConfig(response,config,bgmCatalog);
-    const spoken=script.scenes.filter(s=>s.tarot_phase!=='cta').map(s=>s.text).join('');
+    const spoken=script.scenes.filter(s=>s.tarot_phase!=='cta').map(s=>s.speech_text??s.text).join('');
     if(plain(spoken)!==plain(entry.narration))throw Error(`${TAROT_SIGNS[zodiac]}の原稿とシーンの読み上げ文が一致しません`);
-    if(script.scenes.some(s=>s.speech_text!==undefined))throw Error(`${TAROT_SIGNS[zodiac]}のspeech_textは一括制作で使えません`);
+    if(response.scenes.some(s=>s.speech_text!==undefined))throw Error(`${TAROT_SIGNS[zodiac]}のAI回答にspeech_textは指定しないでください`);
     return {zodiac,script};
   });
   const size=new TextEncoder().encode(JSON.stringify({version:1,videos})).length;
@@ -152,7 +152,7 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     '上記は1星座分の形式例です。実際は12星座をvideosへ入れ、確定した占い結果を使用してください。カードIDとnameは必ず次の正式な一覧の同じ行を使い、正逆はuprightまたはreversed。各星座内でカードの重複は不可。',
     '星座IDは '+SIGNS.map(([id,name])=>`${id}=${name}`).join(', ')+' を各1件ずつ。カード位置はoverall, relationships, work, adviceの順。原稿の言葉は省略・要約せず全文をJSON文字列に入れ、CTA文を原稿に重複させない。個別CTAが不要なら空文字にする（画面の共通CTAを使用）。',
     '各星座についてライダー版タロット78枚から全体運・恋愛／対人・仕事／行動・アドバイスに1枚ずつ引き、正位置か逆位置かも決める。各星座内の4枚は重複させない。カード名は一覧の正式名称を使い、原稿内でも同じ名称にする。',
-    `各星座のナレーションは${year}年${month}月${{full:'全体',first:'前半',second:'後半'}[period]}と星座名が冒頭で分かる自然な日本語にする。全体運を結論として、恋愛・対人、仕事・行動、最後のアドバイスへ進める。4枚のカード名を該当する話の中で自然に読み上げ、選んだカードと向きに矛盾させない。書かれていない出来事や結果を断定せず、「必ず」「絶対」を避け、聞き手が生活に置き換えられる具体的で温かい言葉にする。最後に対象期間中に試せる行動を一つ示す。見出し・秒数・演出指示・絵文字は原稿に入れない。`,
+    `各星座のナレーションは${year}年${month}月${{full:'全体',first:'前半',second:'後半'}[period]}と星座名が冒頭で分かる自然な日本語にする。全体運を結論として、恋愛・対人、仕事・行動、最後のアドバイスへ進める。4枚のカード名を該当する話の中で自然に読み上げ、選んだカードと向きに矛盾させない。書かれていない出来事や結果を断定せず、「必ず」「絶対」を避け、聞き手が生活に置き換えられる具体的で温かい言葉にする。最後に対象期間中に試せる行動を一つ示す。星座名は字幕に使うため、ひらがな表記（おひつじ座、おうし座、ふたご座、かに座、しし座、おとめ座、てんびん座、さそり座、いて座、やぎ座、みずがめ座、うお座）で書く。見出し・秒数・演出指示・絵文字は原稿に入れない。`,
     '本編とCTAを合わせて約60秒、合計約250〜300字を目安にする。字数より自然な読み上げを優先する。',
     ctaEnabled
       ? (sharedCta.trim()

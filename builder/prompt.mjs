@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=tarot-batch-20261011';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=zodiac-kana-20261014';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -19,7 +19,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     const title=tarotTitle(config.tarot);
     if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     return [
-      '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。',
+      '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。星座名の字幕と冒頭タイトルはひらがな（例: おうし座、いて座）で表示する。読み上げ原稿は変更しない。',
       `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚のカードIDと向き（upright=正位置、reversed=逆位置）は人間が確定した結果です。変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。原稿にない正逆の読み上げは追加しないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。intro〜adviceは各役割に最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
