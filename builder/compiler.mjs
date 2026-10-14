@@ -108,7 +108,7 @@ export function applyConfig(script, config, bgmCatalog) {
     const manualHooks=ai.manual_hook.split('\n---\n');
     const scenes=script.scenes.map(s=>{
       const intro=s.tarot_phase==='intro';
-      const captionText=captionZodiac(s.text);
+      const captionText=s.tarot_phase==='cta'?s.text:captionZodiac(s.text);
       const out={text:captionText,tarot_phase:s.tarot_phase,
         caption_enabled:s.tarot_phase==='cta'?true:intro?v.intro_caption:v.body_caption,
         visualizer:intro?v.intro_visualizer:v.body_visualizer};
