@@ -1,5 +1,5 @@
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=zodiac-kana-20261014';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
