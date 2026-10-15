@@ -25,6 +25,15 @@ function expectedCards(detail){
   return [0,1,2,3].map(i=>({position:['overall','relationships','work','advice'][i],card_id:selects[i*2].value,orientation:selects[i*2+1].value}));
 }
 function batchCta(detail){return detail.querySelector('input[maxlength]')?.value.trim()||$('pbBatchCta')?.value.trim()||'';}
+function stableStringify(value){
+  if(Array.isArray(value))return `[${value.map(stableStringify).join(',')}]`;
+  if(value&&typeof value==='object')return `{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+  return JSON.stringify(value);
+}
+async function requestHash(request){
+  const digest=await crypto.subtle.digest('SHA-256',utf8(stableStringify(request)));
+  return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 
 export function buildSingleRequest(){
   if($('pbOutputMode')){$('pbOutputMode').value='content';$('pbOutputMode').dispatchEvent(new Event('change'));}
@@ -53,24 +62,45 @@ export function buildBatchSourceRequest(){
 async function submit(request){
   const api=window.videoStudioApi;if(typeof api!=='function')throw Error('GitHubへ接続してください');
   const raw=JSON.stringify(request);if(utf8(raw).length>1024*1024)throw Error('AI生成入力は1 MiBまでです');
-  const id=crypto.randomUUID();
+  const [id,resumeKey]=[crypto.randomUUID(),await requestHash(request)];
   const blob=await api('git/blobs','POST',{content:raw,encoding:'utf-8'});
   const tree=await api('git/trees','POST',{tree:[{path:'input/request.json',mode:'100644',type:'blob',sha:blob.sha}]});
   const commit=await api('git/commits','POST',{message:`Pages AI input ${id}`,tree:tree.sha,parents:[]});
   await api('git/refs','POST',{ref:`refs/heads/ui-ai-input/${id}`,sha:commit.sha});
   await api(`actions/workflows/${WORKFLOW}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:id,input_sha:commit.sha}});
-  return id;
+  return {id,resumeKey};
 }
-async function waitForRun(id){
+async function progressCount(resumeKey){
   const api=window.videoStudioApi;
-  for(let attempt=0;attempt<180;attempt++){
+  try{
+    const ref=await api(`git/ref/heads/ui-ai-progress/${resumeKey}`);
+    const tree=await api(`git/trees/${ref.object.sha}?recursive=1`);
+    const entry=tree.tree?.find(x=>x.path==='progress.json'&&x.type==='blob');
+    if(!entry)return 0;
+    const blob=await api(`git/blobs/${entry.sha}`);
+    const parsed=JSON.parse(decodeBlob(blob.content));
+    return Object.keys(parsed.items||{}).length;
+  }catch{return 0;}
+}
+async function waitForRun(id,resumeKey,kind){
+  const api=window.videoStudioApi;
+  const isBatch=kind==='batch-source'||kind==='batch-scenes';
+  for(let attempt=0;attempt<900;attempt++){
     const data=await api(`actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=30`);
     const run=data.workflow_runs?.find(r=>r.display_title===`AI JSON ${id}`);
     if(run?.status==='completed'){
-      if(run.conclusion!=='success')throw Error(`Gemini生成に失敗しました。GitHub Actions #${run.id} を確認してください`);
+      if(run.conclusion!=='success'){
+        const saved=isBatch?await progressCount(resumeKey):0;
+        const suffix=saved?` ${saved}件の途中結果は保存済みです。同じ条件で再実行すると続きから再開します。`:' 同じ条件で再実行すると、保存済みの途中結果があれば続きから再開します。';
+        throw Error(`Gemini生成に失敗しました。GitHub Actions #${run.id} を確認してください。${suffix}`);
+      }
       return run;
     }
     if(attempt===0)status('Gemini生成を受け付けました。Structured Outputsで生成中です。');
+    if(isBatch&&attempt>0&&attempt%3===0){
+      const saved=await progressCount(resumeKey);
+      if(saved)status(`Geminiで順次生成中です。${saved}件を保存済みです。失敗しても次回は続きから再開します。`);
+    }
     await sleep(4000);
   }
   throw Error('Gemini生成の完了確認がタイムアウトしました。GitHub Actionsを確認してください');
@@ -92,10 +122,10 @@ function apply(kind,data){
     status('Gemini Structured Outputsの結果をscript.jsonへ反映しました。内容を確認して動画生成できます。');return;
   }
   if(kind==='batch-source'){
-    $('pbBatchSource').value=JSON.stringify(data,null,2);$('pbBatchSourceImport').click();return;
+    $('pbBatchSource').value=JSON.stringify(data,null,2);$('pbBatchSourceImport').click();status('12星座の占い結果を取り込みました。内容を確認してください。');return;
   }
   if(kind==='batch-scenes'){
-    $('pbBatchResponse').value=JSON.stringify(data,null,2);$('pbBatchImport').click();return;
+    $('pbBatchResponse').value=JSON.stringify(data,null,2);$('pbBatchImport').click();status('Gemini生成シーンを取り込みました。内容を確認してください。');return;
   }
   throw Error('未対応のAI生成結果です');
 }
@@ -106,7 +136,7 @@ async function generate(kind){
     if(button)button.disabled=true;
     const request=kind==='single'?buildSingleRequest():kind==='source'?buildBatchSourceRequest():buildBatchScenesRequest();
     status('Gemini Structured Outputsの生成依頼を送信しています。');
-    const id=await submit(request);await waitForRun(id);const data=await result(id);apply(request.kind,data);
+    const {id,resumeKey}=await submit(request);await waitForRun(id,resumeKey,request.kind);const data=await result(id);apply(request.kind,data);
   }catch(e){status(e.message);}finally{if(button)button.disabled=false;}
 }
 function addButton(id,label,target,handler){
