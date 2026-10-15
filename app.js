@@ -36,6 +36,7 @@ function render() {
         }
       }
     } else if(h.status==='completed' && h.conclusion==='success') { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a',h.kind&&h.kind!=='video'?'確認結果をダウンロード（ZIP）':'動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
+    if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'){const prepare=node('button','投稿を準備する');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
     $('history').append(box);
   }
   controls();
@@ -142,3 +143,4 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
