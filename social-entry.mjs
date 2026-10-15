@@ -1,3 +1,4 @@
-import {mountSocial} from './social.mjs?v=filename-title-20261015';
+import {mountSocial} from './social.mjs?v=posting-options-20261016';
 mountSocial();
+
 

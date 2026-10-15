@@ -14,6 +14,16 @@ export function composeRows(videos,channels,body,start,interval){
  return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body,due_at:new Date(base+i*interval*60000).toISOString()})));
 }
 
+export function reviewRows(rows, posts){
+ return rows.flatMap(row=>{
+  const old=Object.values(posts).find(p=>p.video_id===row.video_id&&p.channel_id===row.channel_id);
+  if(!old)return [row];
+  if(['failed','expired'].includes(old.status)&&old.buffer_id)return [{...row,retry_buffer_id:old.buffer_id}];
+  if(!old.buffer_id&&['ready','waiting','failed','expired'].includes(old.status))return [row];
+  return [];
+ });
+}
+
 export function mountSocial(){
  const panel=$('socialPanel');if(!panel)return;
  let state={videos:{},posts:{},channels:[],settings:{}},rows=[],busy=false,pending=null,poll=null;
@@ -39,6 +49,7 @@ export function mountSocial(){
   const previous=new Set(selectedChannels().map(c=>c?.id));$('socialChannels').replaceChildren();
   for(const c of state.channels){const l=el('label'),input=el('input');input.type='checkbox';input.value=c.id;input.checked=previous.size?previous.has(c.id):false;input.disabled=c.isDisconnected||c.isLocked||c.isQueuePaused;l.className='check';l.append(input,el('span',`${MEDIA[c.service]}：${c.name}${input.disabled?'（接続・停止状態を確認）':''}`));$('socialChannels').append(l);}
   if(!state.channels.length)$('socialChannels').append(el('p','Secrets登録後、「投稿先を取得」を押してください。'));
+  $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：大阪市（初回取得が必要）';
   $('socialVideos').replaceChildren();
   for(const v of Object.values(state.videos).reverse()){
    const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;input.disabled=v.cloud.status!=='uploaded';input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
@@ -52,7 +63,7 @@ export function mountSocial(){
    const box=el('article');box.className='item';box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
    const c=state.channels.find(c=>c.id===p.channel_id);if(c)box.append(el('p',c.name));
    if(p.error&&['failed','unknown','waiting','expired'].includes(p.status))box.append(el('p',p.error));
-   if(['ready','waiting','failed','expired'].includes(p.status)&&!p.buffer_id){const retry=el('button','日時・投稿文を確認して追加予約');retry.className='secondary';retry.onclick=()=>{rows=[{...p}];renderRows();$('socialReview').scrollIntoView({behavior:'smooth'});};box.append(retry);}
+   if((['failed','expired'].includes(p.status)||(['ready','waiting'].includes(p.status)&&!p.buffer_id))&&state.videos[p.video_id]?.cloud.status==='uploaded'){const retry=el('button',p.buffer_id?'この投稿先だけ再予約':'日時・投稿文を確認して追加予約');retry.className='secondary';retry.dataset.socialAction='retry';retry.onclick=()=>{if(busy||pending)return;rows=[{...p,...(p.buffer_id?{retry_buffer_id:p.buffer_id}:{})}];renderRows();$('socialReview').scrollIntoView({behavior:'smooth'});};box.append(retry);}
    if(p.buffer_id){const a=el('a','Bufferで確認・変更');a.href='https://publish.buffer.com/';a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
    $('socialPosts').append(box);
   }
@@ -63,6 +74,8 @@ export function mountSocial(){
   rows.forEach((r,i)=>{
    const video=state.videos[r.video_id];if(video?.filename)r.title=filenameTitle(video.filename);
    const box=el('details');box.open=rows.length===1;box.className='item';const c=state.channels.find(c=>c.id===r.channel_id);box.append(el('summary',`${i+1}. ${r.title} ／ ${MEDIA[r.service]}・${c?.name||r.channel_id}`));
+   box.append(el('p',r.service==='youtube'?'場所・0秒カバー：Buffer経由では非対応':`カバー：開始0秒${r.service==='instagram'?` ／ 場所：${state.settings?.instagram_location?.text||'大阪市（初回取得が必要）'}`:''}`));
+   if(r.retry_buffer_id)box.append(el('p','失敗したBuffer投稿を同じIDで再予約します。成功済みの投稿先には再送しません。'));
    const time=field(box,'投稿日時（日本時間）',jstInput(r.due_at),'datetime-local');time.onchange=()=>{try{r.due_at=utcFromJst(time.value);}catch(e){say(e.message);}};
    const title=field(box,'タイトル（動画ファイル名・拡張子なし）',r.title);title.readOnly=true;
    const body=field(box,r.service==='youtube'?'説明文':'本文（冒頭にタイトルを自動追加）',r.body,'textarea');body.rows=4;body.oninput=()=>r.body=body.value;
@@ -97,6 +110,7 @@ export function mountSocial(){
   }catch(e){say(e.message+'。受付情報を保持しました。確認後に同じ受付IDで再依頼できます。');}
   finally{busy=false;control();renderRows();if(pending&&!poll)poll=setInterval(()=>{if(!document.hidden)refresh().catch(e=>say(e.message));},15000);}
  }
+ $('socialLocationImport').onclick=()=>run({action:'location'});
  $('socialConnect').onclick=()=>run({action:'connect'});
  $('socialSync').onclick=()=>run({action:'sync'});
  $('socialRefresh').onclick=()=>refresh().catch(e=>say(e.message));
@@ -104,12 +118,13 @@ export function mountSocial(){
  $('socialSaveBody').onclick=()=>run({action:'settings',body:$('socialBody').value});
  $('socialLoadBody').onclick=()=>{$('socialBody').value=state.settings?.body||'';say('保存済み定型文を読み込みました');};
  $('socialSelectAll').onclick=()=>{for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=!input.disabled;};
- $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');rows=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));renderRows();say('各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。');}catch(e){say(e.message);}};
- $('socialSubmit').onclick=()=>{if(rows.length)run({action:'submit',posts:rows.map(({video_id,channel_id,title,body,due_at})=>({video_id,channel_id,title,body,due_at}))});};
+ $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all,state.posts);const skipped=all.length-rows.length;renderRows();say(`各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
+ $('socialSubmit').onclick=()=>{if(rows.length)run({action:'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id})=>({video_id,channel_id,title,body,due_at,retry_buffer_id}))});};
  $('socialStart').value=jstInput(new Date(Date.now()+3600000).toISOString());
  window.addEventListener('social-prepare',e=>{navigate('social');run({action:'import',run_id:e.detail.runId});});
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];loadPending();render();renderRows();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
 
