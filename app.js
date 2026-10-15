@@ -1,3 +1,4 @@
+import {syncHistory} from './history.mjs';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
@@ -7,7 +8,7 @@ let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch 
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
 $('repo').value = saved.repo || $('repo').value; $('token').value = token; $('remember').checked = Boolean(saved.token);
-function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history: history.slice(0,50), pending })); }
+function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history, pending })); }
 function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw Error('リポジトリは owner/name 形式で指定してください'); if (pending && pending.repo !== r) throw Error('未受付の処理とリポジトリが異なります'); return r; }
 async function api(path, method='GET', body) {
   token = $('token').value.trim(); if (!token) throw Error('GitHubトークンを入力してください');
@@ -50,7 +51,7 @@ async function recover() {
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
+ try { if(pending) await recover(); $('historySyncStatus').textContent='共通履歴を同期中…'; const repository=repo(); const shared=await syncHistory(api,repository,history.filter(h=>h.repo===repository)); history=[...shared,...history.filter(h=>h.repo!==repository)]; persist(); render(); $('historySyncStatus').textContent='共通履歴に同期しました。端末の既存履歴も保持しています。'; for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { let r; try { r=await api(`actions/runs/${h.runId}`); } catch(e) { if(e.status!==404) throw e; h.status='completed'; h.conclusion='unavailable'; h.step='実行記録が削除済み、または参照できません'; continue; } h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){$('historySyncStatus').textContent='履歴の同期・更新に失敗しました。端末の履歴を保持しています。更新ボタンで再試行できます。';message(e.message);} finally{persist();render();polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -143,4 +144,5 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
 
