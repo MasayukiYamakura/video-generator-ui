@@ -1,6 +1,6 @@
 import {tarotTitle} from './compiler.mjs?v=tarot-period-20261011';
 // Position guide only. Actual video is rendered by Python or Remotion.
-export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='') {
+export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='') {
   const {width:w,height:h,video:v,layout:l}=config;
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
   const c=canvas.getContext('2d'); c.scale(scale,scale);
@@ -57,6 +57,17 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(intro&&v.hook_enabled) {
     if(v.hook_orientation==='horizontal') {
       const lines=(title||'タイトルを入力してください').replaceAll('[[','').replaceAll(']]','').split('\n');
+      if(tarot&&v.tarot_renderer==='remotion') {
+        // Match tarot-remotion/src/tarot.jsx: Intro has a fixed size (at most
+        // 140px), 1.25 line height, and is centered 15px above hook_center_y.
+        // The Python hook's auto-fit setting does not apply to this renderer.
+        const size=Math.min(l.hook_font_size||130,140);
+        c.font=`900 ${size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;
+        c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff8e9';
+        c.shadowColor='#070a11';c.shadowBlur=27;c.shadowOffsetY=5;
+        lines.forEach((line,i)=>c.fillText(line,w/2,l.hook_center_y-15+(i-(lines.length-1)/2)*size*1.25));
+        c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
+      } else {
       const bandWidth=w*l.hook_band_width_ratio, limit=Math.min(bandWidth,w*l.hook_max_width_ratio);
       let size=l.hook_font_size;
       const height=()=>lines.length*size*1.3+2*l.hook_band_padding_y;
@@ -66,6 +77,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       c.font=`900 ${size}px serif`;c.textAlign='center';c.textBaseline='middle';
       lines.forEach((line,i)=>{const y=l.hook_center_y+(i-(lines.length-1)/2)*size*1.3;c.strokeStyle='black';c.lineWidth=6;c.strokeText(line,w/2,y);c.fillStyle='white';c.fillText(line,w/2,y);});
       if(l.hook_font_size_mode==='fixed'&&!fits()){c.fillStyle='#ffad99';c.font='32px sans-serif';c.fillText('固定サイズが表示領域を超えています',w/2,l.hook_center_y+height()/2+45);}
+      }
     } else {
       c.fillStyle='white';c.font=`${l.hook_font_size}px serif`;c.textAlign='center';
       [...(title||'タイトル').replaceAll('[[','').replaceAll(']]','').replaceAll('\n','')].forEach((t,i)=>c.fillText(t,w*(1-l.hook_margin_x)-l.hook_font_size/2,l.hook_top+(i+1)*l.hook_font_size));
@@ -75,6 +87,15 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(safe&&v.format==='vertical') {
     c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(0,0,w,h*l.safe_top);c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
     c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(0,h*l.safe_top);c.lineTo(w,h*l.safe_top);c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
+  }
+  if(safe&&intro&&v.format==='vertical'&&
+      ((tarot&&v.tarot_renderer==='remotion')||presetId==='tiktok_standard')) {
+    // Keep the symmetric title guide separate from the red TikTok UI guide.
+    c.strokeStyle='#ffe073';c.lineWidth=4;c.setLineDash([16,10]);
+    c.beginPath();c.moveTo(w*.1,0);c.lineTo(w*.1,h);
+    c.moveTo(w*.9,0);c.lineTo(w*.9,h);c.stroke();c.setLineDash([]);
+    c.fillStyle='#ffe073';c.font='bold 30px sans-serif';c.textAlign='center';c.textBaseline='top';
+    c.fillText('タイトル用・左右10%',w/2,34);
   }
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
