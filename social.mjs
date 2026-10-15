@@ -25,7 +25,7 @@ export function mountSocial(){
  const say=t=>$('socialStatus').textContent=t;
  const savePending=()=>{if(pending)localStorage.setItem(key(),JSON.stringify(pending));else localStorage.removeItem(key());};
  const loadPending=()=>{try{pending=JSON.parse(localStorage.getItem(key())||'null');}catch{pending=null;}};
- const control=()=>{for(const b of panel.querySelectorAll('button[data-social-action]'))b.disabled=busy||Boolean(pending);$('socialResume').hidden=!pending;$('socialResume').disabled=busy;};
+ const control=()=>{for(const b of panel.querySelectorAll('button[data-social-action]'))b.disabled=busy||Boolean(pending);$('socialSubmit').disabled=!rows.length||busy||Boolean(pending);$('socialResume').hidden=!pending;$('socialResume').disabled=busy;};
  const navigate=target=>{
   $('productionPanel').hidden=target!=='production';panel.hidden=target!=='social';$('connection').hidden=target!=='settings';
   for(const b of document.querySelectorAll('[data-studio-tab]'))b.setAttribute('aria-pressed',String(b.dataset.studioTab===target));
