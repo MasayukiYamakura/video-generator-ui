@@ -8,13 +8,10 @@ const el=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.
 function decode(content){return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\s/g,'')),c=>c.charCodeAt(0))));}
 export function jstInput(iso){return new Date(new Date(iso).getTime()+9*3600000).toISOString().slice(0,16);}
 export function utcFromJst(value){if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))throw Error('日本時間の投稿日時を指定してください');const d=new Date(value+':00+09:00');if(!Number.isFinite(d.getTime()))throw Error('投稿日時が不正です');return d.toISOString();}
-export function suggestedTitle(tarot){
- const names={aries:['牡羊座','おひつじ座'],taurus:['牡牛座','おうし座'],gemini:['双子座','ふたご座'],cancer:['蟹座','かに座'],leo:['獅子座','しし座'],virgo:['乙女座','おとめ座'],libra:['天秤座','てんびん座'],scorpio:['蠍座','さそり座'],sagittarius:['射手座','いて座'],capricorn:['山羊座','やぎ座'],aquarius:['水瓶座','みずがめ座'],pisces:['魚座','うお座']};
- const n=names[tarot.zodiac];if(!n)throw Error('星座が不正です');return `【${n[0]}】${tarot.year}年${tarot.month}月${{full:'',first:'前半',second:'後半'}[tarot.period||'full']}「${n[1]}の運勢」`;
-}
+export function filenameTitle(filename){if(typeof filename!=='string'||!filename.toLowerCase().endsWith('.mp4')||filename.length<=4||/[\\/]/.test(filename))throw Error('動画ファイル名が不正です');return filename.slice(0,-4);}
 export function composeRows(videos,channels,body,start,interval){
  const base=new Date(utcFromJst(start)).getTime();if(!Number.isFinite(interval)||interval<1||interval>10080)throw Error('投稿間隔は1〜10080分にしてください');
- return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:v.title,body,due_at:new Date(base+i*interval*60000).toISOString()})));
+ return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body,due_at:new Date(base+i*interval*60000).toISOString()})));
 }
 
 export function mountSocial(){
@@ -64,16 +61,17 @@ export function mountSocial(){
  function renderRows(){
   $('socialReview').replaceChildren();$('socialCount').textContent=`${new Set(rows.map(r=>r.video_id)).size}動画・${rows.length}投稿を確認中。予約枠不足の分は待機します。`;
   rows.forEach((r,i)=>{
+   const video=state.videos[r.video_id];if(video?.filename)r.title=filenameTitle(video.filename);
    const box=el('details');box.open=rows.length===1;box.className='item';const c=state.channels.find(c=>c.id===r.channel_id);box.append(el('summary',`${i+1}. ${r.title} ／ ${MEDIA[r.service]}・${c?.name||r.channel_id}`));
    const time=field(box,'投稿日時（日本時間）',jstInput(r.due_at),'datetime-local');time.onchange=()=>{try{r.due_at=utcFromJst(time.value);}catch(e){say(e.message);}};
-   const title=field(box,'タイトル',r.title);title.maxLength=100;title.oninput=()=>r.title=title.value;
+   const title=field(box,'タイトル（動画ファイル名・拡張子なし）',r.title);title.readOnly=true;
    const body=field(box,r.service==='youtube'?'説明文':'本文（冒頭にタイトルを自動追加）',r.body,'textarea');body.rows=4;body.oninput=()=>r.body=body.value;
    const remove=el('button','この投稿を対象から外す');remove.className='secondary';remove.onclick=()=>{rows.splice(i,1);renderRows();};box.append(remove);$('socialReview').append(box);
   });
   $('socialSubmit').disabled=!rows.length||busy||Boolean(pending);
  }
  async function refresh(){
-  try{state=decode((await api(STATE)).content);}catch(e){if(e.status!==404)throw e;}
+  try{state=decode((await api(STATE)).content);for(const v of Object.values(state.videos))v.title=filenameTitle(v.filename);}catch(e){if(e.status!==404)throw e;}
   if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
    if(['completed','failed'].includes(result.status)){pending=null;savePending();}
@@ -114,3 +112,4 @@ export function mountSocial(){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
