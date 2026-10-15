@@ -3,6 +3,7 @@ import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compi
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
+export const CTA_PHRASES=['コメントで感想教えてね','見返せるように保存しておいてね','動画がいいなと思った方はフォローしてね'];
 const cardIds=new Set(TAROT_CARDS.map(card=>card.id));
 const cardNames=new Map(TAROT_CARDS.map(card=>[card.id,card.name]));
 export function batchConfig(shared, zodiac, entry) {
@@ -159,7 +160,7 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     ctaEnabled
       ? (sharedCta.trim()
         ? `CTAはON。共通CTA文は「${sharedCta.trim()}」。各videoのctaは空文字にし、画面の共通CTAを使う。指定文を一字一句変えず本編の後に読み上げるため、narrationには含めない。`
-        : 'CTAはON。共通CTA文が空欄なので、各星座に短い個別CTA（読み上げ3〜5秒・40文字以内）を作り、各videoのctaに入れる。narrationには含めない。')
+        : `CTAはON。共通CTA文が空欄なので、各videoのctaには次の定型文から1つだけ一字一句そのまま入れる。新しい文や星座名を足さない。narrationには含めない。星座の入力順に3文を繰り返す: ${CTA_PHRASES.map((phrase,index)=>`${index+1}.「${phrase}」`).join(' / ')}。`)
       : 'CTAはOFF。各videoのctaは空文字にし、narrationにもCTAを入れない。',
     'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
   ].join('\n\n');
