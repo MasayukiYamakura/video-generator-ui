@@ -3,7 +3,7 @@ import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defau
 import {buildPrompt} from './prompt.mjs?v=json-quotes-20261014';
 import {applyConfig,tarotTitle} from './compiler.mjs?v=zodiac-kana-20261014';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
-import {drawPreview} from './preview.mjs?v=tarot-batch-20261011';
+import {drawPreview} from './preview.mjs?v=title-guide-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './batch.mjs?v=tarot-motion-cta-20261015';
 
@@ -102,7 +102,7 @@ export function mountBuilder(apiProvider) {
         c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
-      drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title);$('pbPreviewError').textContent='';}
+      drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
   function renderFields() {
