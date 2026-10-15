@@ -1,7 +1,8 @@
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
-const BATCH_SIGNS={aries:'牡羊座',taurus:'牡牛座',gemini:'双子座',cancer:'蟹座',leo:'獅子座',virgo:'乙女座',
-  libra:'天秤座',scorpio:'蠍座',sagittarius:'射手座',capricorn:'山羊座',aquarius:'水瓶座',pisces:'魚座'};
+const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
+  libra:'てんびん座',scorpio:'さそり座',sagittarius:'いて座',capricorn:'やぎ座',aquarius:'みずがめ座',pisces:'うお座'};
+const isZodiacArtifact=name=>Object.values(BATCH_SIGNS).some(label=>name?.endsWith(label));
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
@@ -27,7 +28,7 @@ function render() {
     const link=node('a','実行詳細'); link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}`; link.target='_blank'; link.rel='noopener noreferrer'; box.append(link); if(h.bgm) box.append(node('p',h.bgm));
     if(h.kind==='batch') {
       for(const [sign,label] of Object.entries(BATCH_SIGNS).filter(([sign])=>h.signs?.includes(sign))){
-        const artifact=h.artifacts?.find(a=>a.name===`video-${h.id}-${sign}`);
+        const artifact=h.artifacts?.find(a=>a.name===`video-${h.id}-${sign}`||a.name?.endsWith(label));
         const row=node('p',label+' · '+(artifact?'完了':h.status==='completed'?(h.conclusion==='success'?'成果物を確認中・更新してください':'失敗または成果物なし'):h.step===`Render ${sign}`?'制作中':'制作待ち'));
         box.append(row);
         if(artifact&&!artifact.expired&&Date.parse(artifact.expires_at)>Date.now()){
@@ -48,7 +49,7 @@ async function recover() {
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`):x.name===`video-${receipt}`); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
+ try { if(pending) await recover(); for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { const r=await api(`actions/runs/${h.runId}`); h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){message(e.message);} finally{polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -129,12 +130,8 @@ async function previewBgm(script) {
 $('checkBgm').onclick=async()=>{try{await previewBgm(JSON.parse($('script').value));}catch(e){$('bgmPreview').textContent=e.message;}};
 $('script').addEventListener('input',()=>{try{const b=bgmSettings(JSON.parse($('script').value));$('bgmPreview').textContent=b.enabled?`BGM: ${b.selection_mode==='track'?b.track_id:b.category} / ${b.volume_db} dB（曲名は「BGM設定を確認」で取得）`:'BGM: なし';}catch(e){$('bgmPreview').textContent=e.message;}});
 
-
 // The builder uses the existing authenticated API without storing credentials.
 window.videoStudioApi=api;
-
-
-
 
 function syncAudioUpload() {
  if($('pbApplyOnSend').checked) {
@@ -145,5 +142,3 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
-
-
