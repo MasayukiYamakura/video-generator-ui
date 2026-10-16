@@ -6,7 +6,7 @@ const ZODIAC_LABELS={
 const replace=text=>Object.entries(ZODIAC_LABELS).reduce((value,[from,to])=>value.replaceAll(from,to),text);
 function relabelNode(root){
   if(!root)return;
-  if((root.nodeType===Node.TEXT_NODE?root.parentElement:root).closest?.('[data-preserve-zodiac]'))return;
+  if((root.nodeType===Node.TEXT_NODE?root.parentElement:root)?.closest?.('[data-preserve-zodiac]'))return;
   if(root.nodeType===Node.TEXT_NODE){
     const parent=root.parentElement;
     if(parent?.closest('[data-preserve-zodiac]'))return;
