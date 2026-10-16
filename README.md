@@ -39,10 +39,9 @@ JSONの引用符はASCIIの半角ダブルクォートです。設定を変更�
 
 初回Secretsは`CLOUDINARY_CLOUD_NAME`、`CLOUDINARY_API_KEY`、`CLOUDINARY_API_SECRET`、`BUFFER_API_KEY`です。Instagramの大阪市設定、カバー開始0秒、失敗投稿先だけの再予約などは非公開生成リポジトリの`docs/SNS_PUBLISHING.md`を参照してください。
 
-## 初回公開・開発
+## 開発・公開
 
-公開側にはHTML／CSS／JavaScriptとREADMEだけを配置します。認証情報、設定JSON、録音・動画・素材は公開しません。GitHub Pagesはmainのルートから配信します。公開UIと生成側の共通ソースは非公開リポジトリの`tools/pages-ui/`です。生成側を先に、公開UIを後に反映します。
-
-トークンは非公開生成リポジトリのContents読書・Actions読書権限を使用します。「この端末に保存」は任意です。旧JSONの生成経路を維持するため内部に旧IDと旧Python描画が残りますが、新規のタロット選択はRemotionです。共通のカード検証は`video_generator/tarot_data.py`です。
-
-検証：`node --test tools/pages-ui/test_consolidation.mjs tools/pages-ui/test_builder.mjs tools/pages-ui/test_batch.mjs tools/pages-ui/test_tarot.mjs tools/pages-ui/test_history.mjs`。モバイルChromiumの結合テストは`node tools/pages-ui/test_consolidation_ui.cjs`です（Playwrightが必要）。GitHub APIはモック化し、実SNS投稿やTTS課金は発生させません。
+この画面は非公開の生成リポジトリから、検証済みのファイルだけを自動反映します。
+開発の正本は[生成側の文書索引](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/INDEX.md)、手順は[開発手順](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/DEVELOPMENT.md)と[公開手順](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/DEPLOYMENT.md)です。
+`source-version.json`には公開物の元コミットとハッシュが記録されています。認証情報や非公開設定は含みません。
+公開リポジトリ内のファイルを直接修正する運用は行いません。

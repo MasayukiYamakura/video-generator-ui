@@ -1,4 +1,4 @@
-import {tarotTitle} from './compiler.mjs?v=presets-20261016';
+import {tarotTitle} from './compiler.mjs?v=maintenance-20261016';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='') {
   const {width:w,height:h,video:v,layout:l}=config;

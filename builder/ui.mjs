@@ -1,66 +1,22 @@
-import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=presets-20261016';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=presets-20261016';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=presets-20261016';
-import {buildPrompt} from './prompt.mjs?v=presets-20261016';
-import {applyConfig,tarotTitle,TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=presets-20261016';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=presets-20261016';
-import {drawPreview} from './preview.mjs?v=presets-20261016';
-import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './batch.mjs?v=presets-20261016';
-
-const TAROT_SIGNS=Object.entries(SIGN_NAMES);
-const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=maintenance-20261016';
+import {el,options,field} from './dom.mjs?v=maintenance-20261016';
+import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
+import {mountBatchEditor} from './batch-editor.mjs?v=maintenance-20261016';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
+import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=maintenance-20261016';
+import {buildPrompt} from './prompt.mjs?v=maintenance-20261016';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=maintenance-20261016';
+import {decodeContent} from './storage.mjs?v=maintenance-20261016';
+import {drawPreview} from './preview.mjs?v=maintenance-20261016';
 
 const $=id=>document.getElementById(id);
-const VIDEO_FIELDS=[
-  ['voice_mode','音声方式',[['original','録音音声'],['anonymous','匿名加工音声'],['tts','AI読み上げ']]],
-  ['tts_voice','声',[['hashimoto','ハシモト本人（Voice IDの登録が必要）'],['male_a','男性A'],['male_b','男性B']]],
-  ['tts_style','話し方',[['natural','自然'],['calm','落ち着いた'],['gentle','優しい'],['bright','明るい'],['serious','真剣'],['powerful','力強い']]],
-  ['tts_pace','話す速さ',[['slow','ゆっくり'],['normal','標準'],['fast','やや速い']]],
-  ['tts_custom_style','カスタム話し方（500文字以内）',null,'text'],
-  ['bgm_mode','BGM',[['off','OFF'],['ai','原稿に合うカテゴリをAIが提案'],['category','雰囲気で選ぶ'],['track','曲を直接選ぶ']]],
-  ['bgm_category','BGMカテゴリ',[['ai','AI自動'],['calm','安心感'],['reflective','内省'],['mysterious','神秘'],['hopeful','前向き'],['serious','注意喚起']]],
-  ['bgm_track','登録済みBGM曲',[['','保存済み設定を読み込んで選択']]],
-  ['bgm_volume_db','BGM音量（標準からの増減 dB・-30〜+24）',null,'number'],
-  ['bgm_ducking','発話中にBGM音量を下げる（ダッキング）'],
-  ['bgm_start_seconds','曲のどこから使うか（秒）',null,'number'],
-  ['bgm_delay_seconds','動画の何秒目から流すか（秒）',null,'number'],
-  ['bgm_loop','曲が終わったら繰り返す'],
-  ['bgm_fade_in_seconds','BGMフェードイン（秒）',null,'number'],
-  ['bgm_fade_out_seconds','BGMフェードアウト（秒）',null,'number'],
-  ['hook_enabled','フック表示'],
-  ['cta_enabled','タロットの最後にCTAシーンを追加'],
-  ['hook_orientation','フック方向',[['horizontal','横書き'],['vertical','縦書き']]],
-  ['intro_scenes','冒頭シーン数',null,'number'],
-  ['intro_caption','冒頭の通常字幕'],['body_caption','本編の通常字幕'],
-  ['intro_tags','冒頭のタグ'],['body_tags','本編のタグ'],
-  ['intro_visualizer','冒頭の波形'],['body_visualizer','本編の波形'],
-  ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','人物画像＋一部動画'],['stock','全編AI動画素材']]],
-  ['stock_provider','動画素材提供元',[['pexels','Pexels'],['pixabay','Pixabay']]],
-  ['hook_band_enabled','横書きフックの黒帯'],
-];
-const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
-  visualizer_x:'波形 X（中心）',visualizer_y:'波形 Y（中心）',visualizer_size:'波形 size（キャンバス）',
-  visualizer_width_ratio:'バー波形の表示幅比率',hook_center_y:'横書きフック Y（中心）',
-  hook_top:'縦書きフック Y（上端）',hook_margin_x:'縦書きフック左右余白比率',
-  caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
-  max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
-  hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_top:'上ガイド比率',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
-function el(tag,text) {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
-function options(select,items,current) {select.replaceChildren();for(const [value,label] of items){const o=el('option',label);o.value=value;select.append(o);}if(current!==undefined)select.value=current;}
-function field(root,key,label,items,type='checkbox') {
-  const wrapper=el('label',label), input=el(items?'select':'input');input.id='pb_'+key;
-  if(items) options(input,items);else input.type=type;
-  if(type==='checkbox'&&!items)wrapper.className='check';
-  wrapper.append(input);root.append(wrapper);return input;
-}
 export function mountBuilder(apiProvider) {
   let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageRequest=0;
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
-  const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
-  let batchResponses={}, batchRequested=[];
-  const BATCH_DRAFT='tarot-batch-draft-v1';
+  let batchEditor;
   const status=text=>{$('builderStatus').textContent=text;};
   const connection=()=>{
     const expected=$('repo').value.trim();
@@ -72,29 +28,9 @@ export function mountBuilder(apiProvider) {
     };
   };
   async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
-  function tarotData() {
-    const year=Number($('pbTarotYear').value),month=Number($('pbTarotMonth').value),period=$('pbTarotPeriod').value,zodiac=$('pbTarotZodiac').value;
-    if(!['full','first','second'].includes(period))throw Error('対象期間を選択してください');
-    if(!Number.isInteger(year)||year<2000||year>2100)throw Error('占う年は2000〜2100で入力してください');
-    if(!Number.isInteger(month)||month<1||month>12)throw Error('占う月を選択してください');
-    if(!TAROT_SIGNS.some(([id])=>id===zodiac))throw Error('星座を選択してください');
-    const cards=TAROT_POSITIONS.map(([position],i)=>({position,card_id:$(`pbTarotCard${i}`).value,orientation:$(`pbTarotOrientation${i}`).value}));
-    if(cards.some(c=>!TAROT_CARDS.some(x=>x.id===c.card_id)))throw Error('4枚のカードを選択してください');
-    if(new Set(cards.map(c=>c.card_id)).size!==4)throw Error('同じカードを複数回選べません');
-    if(cards.some(c=>!['upright','reversed'].includes(c.orientation)))throw Error('カードの正逆を選択してください');
-    return {year,month,period,zodiac,cards};
-  }
   function config() {return resolveConfig(registry,session);}
-  function configuredInput() {
-    const c=config();
-    if(c.video.template==='tarot_monthly') {
-      c.tarot=tarotData();
-      c.cta_text=$('pbTarotCtaText').value.trim();
-      if(c.video.cta_enabled&&(!c.cta_text||Array.from(c.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
-    }
-    return c;
-  }
-  function invalidate() {snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';batchChanged();status('設定が変わりました。プロンプトを生成し直してください。');}
+  const configuredInput=()=>singleTarot.configured(config());
+  function invalidate() {snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';batchEditor.changed();status('設定が変わりました。プロンプトを生成し直してください。');}
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
@@ -170,182 +106,8 @@ export function mountBuilder(apiProvider) {
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
   }
-  options($('pbTarotMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
-  options($('pbBatchMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
-  options($('pbTarotZodiac'),TAROT_SIGNS,'sagittarius');
-  $('pbTarotYear').value=new Date().getFullYear();
-  $('pbBatchYear').value=new Date().getFullYear();
-  for(const [i,[position,label]] of TAROT_POSITIONS.entries()) {
-    const box=el('div');box.className='tarot-card-input';
-    const title=el('h4',label), card=el('select');
-    card.id=`pbTarotCard${i}`;
-    options(card,[['','カードを選択'],...TAROT_CARDS.map(x=>[x.id,x.name])]);
-    const cardLabel=el('label','引いたカード');cardLabel.append(card);
-    const orientation=el('select');orientation.id=`pbTarotOrientation${i}`;
-    options(orientation,[['upright','正位置'],['reversed','逆位置']]);
-    const orientationLabel=el('label','カードの向き');orientationLabel.append(orientation);
-    box.append(title,cardLabel,orientationLabel);$('pbTarotCards').append(box);
-    card.addEventListener('change',invalidate);
-    orientation.addEventListener('change',invalidate);
-  }
-  const batchBox=$('pbBatchEntries');
-  for(const [sign,name] of SIGNS) {
-    const details=el('details'), summary=el('summary',name+' · 未入力'), grid=el('div');
-    grid.className='builder-grid';
-    details.dataset.sign=sign;
-    details.append(summary,grid);
-    POSITIONS.forEach((position,index)=>{
-      const label=el('label',TAROT_POSITIONS[index][1]), select=el('select');
-      options(select,[['','カードを選択'],...TAROT_CARDS.map(card=>[card.id,card.name])]);
-      select.addEventListener('change',()=>{batchEntries[sign].cards[index]=select.value;delete batchResponses[sign];batchChanged();});
-      const orientation=el('select');options(orientation,[['upright','正位置'],['reversed','逆位置']]);
-      orientation.addEventListener('change',()=>{batchEntries[sign].orientations[index]=orientation.value;delete batchResponses[sign];batchChanged();});
-      const orientationLabel=el('label','カードの向き');orientationLabel.append(orientation);
-      label.append(select);grid.append(label,orientationLabel);
-    });
-    const narration=el('textarea');narration.rows=7;narration.placeholder='この星座のナレーション原稿（CTAは含めない）';
-    narration.addEventListener('input',()=>{batchEntries[sign].narration=narration.value;delete batchResponses[sign];batchChanged();});
-    const transcriptLabel=el('label','ナレーション原稿');transcriptLabel.append(narration);
-    const cta=el('input');cta.maxLength=40;cta.placeholder='空欄なら共通CTA';
-    cta.addEventListener('input',()=>{batchEntries[sign].cta=cta.value;delete batchResponses[sign];batchChanged();});
-    const ctaLabel=el('label','個別CTA（任意）');ctaLabel.append(cta);
-    const check=el('input');check.type='checkbox';check.checked=true;check.className='batch-select';
-    const checkLabel=el('label','この星座を制作する');checkLabel.className='check';checkLabel.prepend(check);
-    check.addEventListener('change',batchChanged);
-    details.append(transcriptLabel,ctaLabel,checkLabel);batchBox.append(details);
-  }
-  function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
-  function saveDraft(){
-    try{localStorage.setItem(BATCH_DRAFT,JSON.stringify({repo:$('repo').value.trim(),entries:batchEntries,responses:batchResponses,
-      year:$('pbBatchYear').value,month:$('pbBatchMonth').value,period:$('pbBatchPeriod').value,cta:$('pbBatchCta').value,
-      selected:batchSelection()}));}catch{status('端末の保存容量が不足しています。画面を閉じる前に入力を控えてください。');}
-  }
-  function batchChanged(){
-    batchRequested=[];$('pbBatchPrompt').value='';
-    for(const d of batchBox.querySelectorAll('details')){
-      const e=batchEntries[d.dataset.sign], ready=e.cards.every(Boolean)&&e.narration.trim();
-      d.querySelector('summary').textContent=TAROT_SIGNS.find(([s])=>s===d.dataset.sign)[1]+' · '+(batchResponses[d.dataset.sign]?'AI出力取込済':ready?'原稿入力済':'未入力');
-    }
-    saveDraft();
-    status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
-  }
-  for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};$('pbBatchSourcePrompt').value='';batchChanged();});
-  $('pbBatchSourcePromptBuild').onclick=()=>{
-    try {
-      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value,config().video.cta_enabled,$('pbBatchCta').value);
-      status('占い結果を作るためのプロンプトを用意しました');
-    }catch(e){status(e.message);}
-  };
-  $('pbBatchSourcePromptCopy').onclick=async()=>{
-    try{if(!$('pbBatchSourcePrompt').value)throw Error('先に占い結果用プロンプトを生成してください');
-      await navigator.clipboard.writeText($('pbBatchSourcePrompt').value);status('占い結果用プロンプトをコピーしました');
-    }catch(e){$('pbBatchSourcePrompt').select();status(e.message);}
-  };
-  $('pbBatchSourceImport').onclick=()=>{
-    try {
-      const result=importBatchSource($('pbBatchSource').value);
-      if(config().video.cta_enabled && Object.values(result.entries).some(e=>!e.cta.trim())
-        && !$('pbBatchCta').value.trim())throw Error('個別CTAが空欄の星座があります。先に共通CTAを入力してください');
-      // Validation completes before any of the existing controls or saved draft are touched.
-      $('pbBatchYear').value=result.year;
-      $('pbBatchMonth').value=result.month;
-      $('pbBatchPeriod').value=result.period;
-      for(const d of batchBox.querySelectorAll('details')){
-        const sign=d.dataset.sign,e=result.entries[sign];
-        batchEntries[sign]={...e};
-        d.querySelectorAll('select').forEach((input,i)=>{input.value=i%2?e.orientations[(i-1)/2]:e.cards[i/2];});
-        d.querySelector('textarea').value=e.narration;
-        d.querySelector('input[maxlength]').value=e.cta;
-        delete batchResponses[sign];
-      }
-      batchChanged();
-      $('pbBatchSourceWarnings').textContent=result.warnings.length
-        ?'確認事項（原稿は変更していません）:\n'+result.warnings.join('\n'):'12星座のカード・向き・原稿・CTAを反映しました。内容を確認してください。';
-      status('12星座・48枚を反映しました。既存のシーン回答は無効です。内容を確認後、未取込分のプロンプトを生成してください。');
-    }catch(e){status(e.message);}
-  };
-  $('pbBatchBuild').onclick=()=>{
-    try{
-      const c=config(), signs=batchSelection();
-      if(!signs.length)throw Error('制作する星座を選択してください');
-      if(c.video.voice_mode!=='tts')throw Error('一括制作ではAI読み上げを選択してください');
-      if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGM登録一覧を読み込んでください');
-      batchRequested=signs.filter(sign=>!batchResponses[sign]);
-      if(!batchRequested.length)throw Error('選択した星座はすべて取り込み済みです。作り直す星座の原稿を編集してください');
-      const input=batchRequested.map(sign=>[sign,{...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()}]);
-      $('pbBatchPrompt').value=batchPrompt(c,input,bgmCatalog);
-      status(`${batchRequested.length}星座分をまとめたプロンプトを生成しました`);
-    }catch(e){status(e.message);}
-  };
-  $('pbBatchCopy').onclick=async()=>{
-    try{await navigator.clipboard.writeText($('pbBatchPrompt').value);status('コピーしました');}
-    catch{$('pbBatchPrompt').select();status('選択しました。iPhoneの「コピー」を使ってください。');}
-  };
-  $('pbBatchImport').onclick=()=>{
-    try{
-      if(!batchRequested.length)throw Error('先にプロンプトを生成してください');
-      const parsed=importBatch($('pbBatchResponse').value,batchRequested,batchEntries), c=config();
-      for(const sign of Object.keys(parsed)){
-        const entry={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
-        const conf=batchConfig(c,sign,entry);
-        const result=compileBatch(c,{[sign]:entry},{[sign]:parsed[sign]},[sign],bgmCatalog);
-        if(!result.videos.length||!conf.tarot)throw Error('入力に不備があります');
-      }
-      const count=Object.keys(parsed).length, missing=batchRequested.length-count;
-      Object.assign(batchResponses,parsed);$('pbBatchResponse').value='';batchChanged();
-      status(`${count}星座分を検証・取り込みました。${missing?`残り${missing}星座は「未取込分のプロンプトを生成」から追加できます。`:'制作対象の全星座を取り込みました。'}`);
-    }catch(e){status(e.message);}
-  };
-  function manifest(){
-    const c=config(), entries={};
-    for(const [sign] of SIGNS) entries[sign]={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
-    return compileBatch(c,entries,batchResponses,batchSelection(),bgmCatalog);
-  }
-  $('pbBatchCheck').onclick=()=>{try{
-    const m=manifest(), minutes=Number($('pbBatchMinutes').value);
-    if($('pbBatchMinutes').value&&(minutes<1||!Number.isInteger(minutes)))throw Error('1本目の制作時間は1分以上の整数で入力してください');
-    status(`${m.videos.length}本を確認しました。AI読み上げは${m.videos.length}回実行されます。${minutes?`過去の実績から制作時間は約${minutes*m.videos.length}分＋準備時間です。`:''} 一括制作ボタンで開始します。`);
-  }catch(e){status(e.message);}};
-  $('pbBatchReset').onclick=()=>{
-    if(!window.confirm('12星座の入力内容と保存済みの下書きを消して、最初からやり直しますか？'))return;
-    batchResponses={};batchRequested=[];
-    $('pbBatchYear').value=new Date().getFullYear();
-    $('pbBatchMonth').value=String(new Date().getMonth()+1);
-    $('pbBatchPeriod').value='full';
-    for(const id of ['pbBatchCta','pbBatchSourcePrompt','pbBatchSource','pbBatchPrompt','pbBatchResponse','pbBatchMinutes'])$(id).value='';
-    $('pbBatchSourceWarnings').textContent='';
-    for(const d of batchBox.querySelectorAll('details')){
-      const sign=d.dataset.sign;
-      batchEntries[sign]={cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''};
-      d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?'upright':'');
-      d.querySelector('textarea').value='';
-      d.querySelector('input[maxlength]').value='';
-      d.querySelector('.batch-select').checked=true;
-      d.open=false;
-    }
-    batchChanged();
-    localStorage.removeItem(BATCH_DRAFT);
-    status('12星座の入力と保存済みの下書きを消しました。最初から入力できます。');
-  };
-  $('pbBatchGenerate').onclick=()=>window.videoStudioSubmitBatch?.();
-  try{
-    const draft=JSON.parse(localStorage.getItem(BATCH_DRAFT)||'null');
-    if(draft?.repo===$('repo').value.trim()&&draft.entries){
-      for(const id of ['year','month','period','cta']) $('pbBatch'+id[0].toUpperCase()+id.slice(1)).value=draft[id]??'';
-      batchResponses=draft.responses||{};
-      for(const d of batchBox.querySelectorAll('details')){
-        const sign=d.dataset.sign, e=draft.entries[sign];if(!e)continue;
-        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||''};
-        d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?batchEntries[sign].orientations[(i-1)/2]:batchEntries[sign].cards[i/2]);
-        d.querySelector('textarea').value=batchEntries[sign].narration;
-        d.querySelector('input[maxlength]').value=batchEntries[sign].cta;
-        d.querySelector('.batch-select').checked=draft.selected?.includes(sign)??true;
-      }
-      batchChanged();
-    }
-  }catch{}
-  $('pbTarotCtaText').addEventListener('input',invalidate);
-  for(const id of ['pbTarotYear','pbTarotMonth','pbTarotPeriod','pbTarotZodiac'])$(id).addEventListener('change',invalidate);
+  const singleTarot=mountSingleEditor(invalidate);
+  batchEditor=mountBatchEditor({config,status,getCatalog:()=>bgmCatalog,getLoadedRepo:()=>loadedRepo});
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
@@ -402,19 +164,14 @@ export function mountBuilder(apiProvider) {
   });
   $('pbLoad').onclick=()=>run(async()=>{
     const api=connection(), expected=$('repo').value.trim();
-    const r=await readRegistry(api), bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
-    if(bgm.version!==1||!Array.isArray(bgm.tracks))throw Error('BGM登録一覧が不正です');
+    const {preset:r,bgm}=await loadPresetData(api);
     registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;
     invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');
   });
   async function save(kind, overwrite=false) {
     if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済み設定を読込」を押してください');
     const c=config(), id=overwrite?session.video_preset:$('pbSaveId').value.trim(), name=overwrite?resolvePreset(registry,'video',session.video_preset).name:$('pbSaveName').value.trim();
-    const parent=resolvePreset(registry,kind,kind==='video'?session.video_preset:session.layout_preset);
-    const values=kind==='video'?c.video:c.layout, defaults=kind==='video'?VIDEO_DEFAULTS:LAYOUT_DEFAULTS;
-    const base={...defaults,...parent.values}, delta=Object.fromEntries(Object.entries(values).filter(([k,value])=>value!==base[k]));
-    const entry={id,name,...(overwrite?{}:{extends:parent.id}),values:overwrite?clone(values):delta,default_layout:session.layout_preset,layout:clone(c.layout),background:c.background};
-    const next=savePreset(registry,kind,entry,overwrite), written=await writeRegistry(connection(),next,sha);
+    const written=await savePresetSettings({api:connection(),registry,sha,session,config:c,id,name,kind,overwrite});
     registry=written.registry;sha=written.sha;
     if(kind==='video'){session.video_preset=id;session.overrides.video={};}else{session.layout_preset=id;session.overrides.layout={};}
     invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
@@ -431,7 +188,7 @@ export function mountBuilder(apiProvider) {
   }
   $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
   lists();
-  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest}};
+  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
 
 
