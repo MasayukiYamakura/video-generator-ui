@@ -45,3 +45,11 @@ JSONの引用符はASCIIの半角ダブルクォートです。設定を変更�
 開発の正本は[生成側の文書索引](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/INDEX.md)、手順は[開発手順](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/DEVELOPMENT.md)と[公開手順](https://github.com/MasayukiYamakura/video-generator/blob/main/docs/DEPLOYMENT.md)です。
 `source-version.json`には公開物の元コミットとハッシュが記録されています。認証情報や非公開設定は含みません。
 公開リポジトリ内のファイルを直接修正する運用は行いません。
+
+## 12星座の投稿文・途中再開
+
+新しい占い結果用プロンプトは星座別の説明文と関連ハッシュタグ2個も生成します。
+投稿確認時に`#大阪 #占い #星座名`と公式LINE案内が付き、合計5個のタグになります。旧動画は共通定型文を使えます。
+TikTok・Instagramは本文冒頭に動画タイトル、YouTubeは専用タイトル欄を使用します。
+一括TTSが中断したら履歴を更新し、「未完了分を再開」を押します。日次上限では表示された再開目安とAI Studioの上限を確認してください。
+保存済み音声は7日間再利用できます。完成動画は3日間です。音声生成の結果不明では利用状況を確認してから再開してください。
