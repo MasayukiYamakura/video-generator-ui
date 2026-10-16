@@ -15,6 +15,11 @@ export function composeRows(videos,channels,body,start,interval){
  return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body:socialBody(v.social,v.tarot?.zodiac,body),due_at:new Date(base+i*interval*60000).toISOString()})));
 }
 
+export function isCompletedVideo(video, posts, channels){
+ if(video.cloud.status==='deleted')return true;
+ return channels.length>0&&channels.every(channel=>Object.values(posts).some(post=>post.video_id===video.id&&post.channel_id===channel.id&&post.status==='published'));
+}
+
 export function reviewRows(rows, posts){
  return rows.flatMap(row=>{
   const old=Object.values(posts).find(p=>p.video_id===row.video_id&&p.channel_id===row.channel_id);
@@ -52,22 +57,29 @@ export function mountSocial(){
   if(!state.channels.length)$('socialChannels').append(el('p','Secrets登録後、「投稿先を取得」を押してください。'));
   $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：未設定（場所なしで予約できます）';
   $('socialVideos').replaceChildren();
+  const completedVideos=el('details'),completedVideoList=el('div');
+  let completedVideoCount=0,availableVideoCount=0;
   for(const v of Object.values(state.videos).reverse()){
-   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;input.disabled=v.cloud.status!=='uploaded';input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
+   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed;input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
    if(v.cloud.error)box.append(el('p',v.cloud.error));if(v.cloud.delete_error)box.append(el('p',v.cloud.delete_error));
    if(['error','setup_required','pending'].includes(v.cloud.status)){const retry=el('button','この動画の生成結果から転送を再試行');retry.className='secondary';retry.dataset.socialAction='import';retry.onclick=()=>run({action:'import',run_id:v.run_id});box.append(retry);}
-   $('socialVideos').append(box);
+   if(completed){completedVideoList.append(box);completedVideoCount++;}else{$('socialVideos').append(box);availableVideoCount++;}
   }
+  if(completedVideoCount){completedVideos.append(el('summary',`投稿完了した動画（${completedVideoCount}件）を表示`),completedVideoList);$('socialVideos').append(completedVideos);}
+  $('socialSelectAll').disabled=!availableVideoCount;
   if(!Object.keys(state.videos).length)$('socialVideos').append(el('p','新しく生成した動画は、生成完了後にここへ登録されます。生成履歴の「投稿を準備する」からも取り込めます。'));
   $('socialPosts').replaceChildren();
+  const completedPosts=el('details'),completedPostList=el('div');
+  let completedPostCount=0;
   for(const p of Object.values(state.posts).reverse()){
    const box=el('article');box.className='item';box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
    const c=state.channels.find(c=>c.id===p.channel_id);if(c)box.append(el('p',c.name));
    if(p.error&&['failed','unknown','waiting','expired'].includes(p.status))box.append(el('p',p.error));
    if((['failed','expired'].includes(p.status)||(['ready','waiting'].includes(p.status)&&!p.buffer_id))&&state.videos[p.video_id]?.cloud.status==='uploaded'){const retry=el('button',p.buffer_id?'この投稿先だけ再予約':'日時・投稿文を確認して追加予約');retry.className='secondary';retry.dataset.socialAction='retry';retry.onclick=()=>{if(busy||pending)return;rows=[{...p,...(p.buffer_id?{retry_buffer_id:p.buffer_id}:{})}];renderRows();$('socialReview').scrollIntoView({behavior:'smooth'});};box.append(retry);}
    if(p.buffer_id){const a=el('a','Bufferで確認・変更');a.href='https://publish.buffer.com/';a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
-   $('socialPosts').append(box);
+   if(p.status==='published'){completedPostList.append(box);completedPostCount++;}else $('socialPosts').append(box);
   }
+  if(completedPostCount){completedPosts.append(el('summary',`投稿完了の履歴（${completedPostCount}件）を表示`),completedPostList);$('socialPosts').append(completedPosts);}
   control();
  }
  function renderRows(){
