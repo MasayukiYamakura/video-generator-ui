@@ -43,7 +43,8 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
       Array.from({length:12},(_,i)=>{const {x,y,angle}=motionPose(i,t*4,shuffle,cut,spread,gather,v);return `<g transform="translate(${x} ${y}) rotate(${angle} 110 187.5)"><rect width="220" height="375" rx="13" fill="#141729" stroke="#bc9b68" stroke-width="3"/><svg x="18" y="26" width="184" height="323" viewBox="0 0 220 350" color="#c6a979">${BACK_ART[v.card_back_design]}</svg></g>`;}).join('');
   }
   for(const [sign,name] of SIGNS) {
-    const details=el('details'), summary=el('summary',name+' · 未入力'), grid=el('div');
+    const details=el('details'), summary=el('summary'), title=el('span',name+' · 未入力'), grid=el('div');
+    title.className='batch-title';summary.append(title);
     grid.className='builder-grid';
     details.dataset.sign=sign;
     details.append(summary,grid);
@@ -63,7 +64,11 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     cta.addEventListener('input',()=>{batchEntries[sign].cta=cta.value;delete batchResponses[sign];batchChanged();});
     const ctaLabel=el('label','個別CTA（任意）');ctaLabel.append(cta);
     const check=el('input');check.type='checkbox';check.checked=true;check.className='batch-select';
-    const checkLabel=el('label','この星座を制作する');checkLabel.className='check';checkLabel.prepend(check);
+    check.setAttribute('aria-label',name+'を制作対象にする');
+    const checkLabel=el('label','制作');checkLabel.className='check batch-select-label';checkLabel.prepend(check);
+    checkLabel.addEventListener('click',event=>event.stopPropagation());
+    checkLabel.addEventListener('keydown',event=>{if(event.key===' '||event.key==='Enter')event.stopPropagation();});
+    summary.append(checkLabel);
     check.addEventListener('change',batchChanged);
     const socialPreview=el('p');socialPreview.className='muted';socialPreview.dataset.socialPreview='';
     const visuals=el('div');visuals.className='builder-grid';
@@ -73,7 +78,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     const play=el('button','3種類の動きをプレビュー');play.type='button';
     play.onclick=()=>{const start=performance.now();play.disabled=true;const tick=now=>{const t=(now-start)/5000;drawVisual(details,Math.min(1,t));if(t<1&&details.isConnected)requestAnimationFrame(tick);else play.disabled=false;};requestAnimationFrame(tick);};
     const note=el('p','簡易プレビュー：3種類の動き・背景色・裏面を確認できます。完成動画の尺は従来どおりです。');note.className='muted';
-    details.append(transcriptLabel,ctaLabel,socialPreview,visuals,preview,play,note,checkLabel);batchBox.append(details);drawVisual(details,.75);
+    details.append(transcriptLabel,ctaLabel,socialPreview,visuals,preview,play,note);batchBox.append(details);drawVisual(details,.75);
   }
   function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
   function saveDraft(){
@@ -86,7 +91,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     for(const d of batchBox.querySelectorAll('details')){
       const e=batchEntries[d.dataset.sign], ready=e.cards.every(Boolean)&&e.narration.trim();
       d.querySelector('[data-social-preview]').textContent=e.social?'投稿説明文：'+e.social.description+' ／ '+e.social.hashtags.join(' '):'投稿説明文なし：投稿時は共通定型文を使用';
-      d.querySelector('summary').textContent=TAROT_SIGNS.find(([s])=>s===d.dataset.sign)[1]+' · '+(batchResponses[d.dataset.sign]?'AI出力取込済':ready?'原稿入力済':'未入力');
+      d.querySelector('.batch-title').textContent=TAROT_SIGNS.find(([s])=>s===d.dataset.sign)[1]+' · '+(batchResponses[d.dataset.sign]?'AI出力取込済':ready?'原稿入力済':'未入力');
     }
     saveDraft();
     status('一括設定を変更しました。必要な組のプロンプトを確認してください。');
