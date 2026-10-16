@@ -1,4 +1,4 @@
-import {loadHistory,migrateHistory} from './history.mjs?v=presets-20261016';
+import {loadHistory,migrateHistory} from './history.mjs?v=maintenance-20261016';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
