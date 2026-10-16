@@ -1,6 +1,6 @@
 const BRANCH = 'ui-history';
 const cache = new Map();
-const FIELDS = ['repo','runId','id','audio','created','kind','signs','sha','bgm'];
+const FIELDS = ['repo','runId','id','audio','created','kind','signs','sha','bgm','batchProgress'];
 export function cleanRecord(value, repository) {
   if (!value || value.repo !== repository || !Number.isSafeInteger(value.runId) || value.runId <= 0) return null;
   const result = {};

@@ -1,4 +1,4 @@
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=maintenance-20261016';
+import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=batch-social-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {TAROT_POSITIONS} from './single-editor.mjs?v=maintenance-20261016';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
@@ -34,7 +34,8 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     const check=el('input');check.type='checkbox';check.checked=true;check.className='batch-select';
     const checkLabel=el('label','この星座を制作する');checkLabel.className='check';checkLabel.prepend(check);
     check.addEventListener('change',batchChanged);
-    details.append(transcriptLabel,ctaLabel,checkLabel);batchBox.append(details);
+    const socialPreview=el('p');socialPreview.className='muted';socialPreview.dataset.socialPreview='';
+    details.append(transcriptLabel,ctaLabel,socialPreview,checkLabel);batchBox.append(details);
   }
   function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
   function saveDraft(){
@@ -46,6 +47,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     batchRequested=[];$('pbBatchPrompt').value='';
     for(const d of batchBox.querySelectorAll('details')){
       const e=batchEntries[d.dataset.sign], ready=e.cards.every(Boolean)&&e.narration.trim();
+      d.querySelector('[data-social-preview]').textContent=e.social?'投稿説明文：'+e.social.description+' ／ '+e.social.hashtags.join(' '):'投稿説明文なし：投稿時は共通定型文を使用';
       d.querySelector('summary').textContent=TAROT_SIGNS.find(([s])=>s===d.dataset.sign)[1]+' · '+(batchResponses[d.dataset.sign]?'AI出力取込済':ready?'原稿入力済':'未入力');
     }
     saveDraft();
@@ -157,7 +159,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
       batchResponses=draft.responses||{};
       for(const d of batchBox.querySelectorAll('details')){
         const sign=d.dataset.sign, e=draft.entries[sign];if(!e)continue;
-        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||''};
+        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||'',...(e.social?{social:e.social}:{})};
         d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?batchEntries[sign].orientations[(i-1)/2]:batchEntries[sign].cards[i/2]);
         d.querySelector('textarea').value=batchEntries[sign].narration;
         d.querySelector('input[maxlength]').value=batchEntries[sign].cta;

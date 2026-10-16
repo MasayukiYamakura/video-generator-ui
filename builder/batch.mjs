@@ -1,3 +1,4 @@
+import {normalizeSocial} from './social-data.mjs?v=batch-social-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=maintenance-20261016';
 
@@ -60,6 +61,8 @@ export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
     if(!response)throw Error(`${TAROT_SIGNS[zodiac]}のAI出力を取り込んでください`);
     const config=batchConfig(shared,zodiac,entry);
     const script=applyConfig(response,config,bgmCatalog);
+    const social=normalizeSocial(entry.social,zodiac);
+    if(social)script.social=social;else delete script.social;
     const spoken=script.scenes.filter(s=>s.tarot_phase!=='cta').map(s=>s.speech_text??s.text).join('');
     if(plain(spoken)!==plain(entry.narration))throw Error(`${TAROT_SIGNS[zodiac]}の原稿とシーンの読み上げ文が一致しません`);
     if(response.scenes.some(s=>s.speech_text!==undefined))throw Error(`${TAROT_SIGNS[zodiac]}のAI回答にspeech_textは指定しないでください`);
@@ -138,10 +141,13 @@ export function importBatchSource(text) {
       throw Error(`${sign}：ナレーション原稿がありません`);
     if(typeof video.cta!=='string'||Array.from(video.cta).length>40)
       throw Error(`${sign}：個別CTAは空欄または40文字以内にしてください`);
-    found[video.zodiac]={cards,orientations,narration:video.narration,cta:video.cta};
+    const social=normalizeSocial(video.social,video.zodiac);
+    found[video.zodiac]={cards,orientations,narration:video.narration,cta:video.cta,...(social?{social}:{})};
     warnings.push(...narrationWarnings(video.narration,sign,data));
     if(video.cta.trim()&&video.narration.trim().endsWith(video.cta.trim())) warnings.push(`${sign}：CTA文が原稿末尾にもあります。二重読み上げにならないか確認してください。`);
   }
+  const descriptions=Object.values(found).map(e=>e.social?.description).filter(Boolean);
+  if(descriptions.length>1&&new Set(descriptions).size===1)warnings.push('全星座の投稿説明文が完全一致しています。星座ごとの内容を確認してください。');
   return {year:data.year,month:data.month,period:data.period,entries:found,warnings};
 }
 export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='') {
@@ -151,7 +157,7 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     '次の12星座の占い結果を、画面への一括入力用JSONとして作成してください。JSONのみ。Markdown・説明・省略は不要。',
     'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
     `共通設定: year=${year}, month=${month}, period=${period} (full=月全体, first=前半, second=後半)。`,
-    `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":""}]}。`,
+    `形式: {"version":1,"year":${year},"month":${month},"period":"${period}","videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"major-00-fool","name":"愚者","orientation":"upright"},{"position":"relationships","card_id":"major-06-lovers","name":"恋人","orientation":"upright"},{"position":"work","card_id":"wands-01","name":"ワンドのエース","orientation":"upright"},{"position":"advice","card_id":"major-09-hermit","name":"隠者","orientation":"reversed"}],"narration":"CTAを含まない全文","cta":"","social":{"description":"今回の原稿に基づく紹介文","hashtags":["#恋愛運","#仕事運"]}}]}。`,
     '上記は1星座分の形式例です。実際は12星座をvideosへ入れ、確定した占い結果を使用してください。カードIDとnameは必ず次の正式な一覧の同じ行を使い、正逆はuprightまたはreversed。各星座内でカードの重複は不可。',
     '星座IDは '+SIGNS.map(([id,name])=>`${id}=${name}`).join(', ')+' を各1件ずつ。カード位置はoverall, relationships, work, adviceの順。原稿の言葉は省略・要約せず全文をJSON文字列に入れ、CTA文を原稿に重複させない。個別CTAが不要なら空文字にする（画面の共通CTAを使用）。',
     '各星座についてライダー版タロット78枚から全体運・恋愛／対人・仕事／行動・アドバイスに1枚ずつ引き、正位置か逆位置かも決める。各星座内の4枚は重複させない。カード名は一覧の正式名称を使い、原稿内でも同じ名称にする。',
@@ -162,6 +168,7 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
         ? `CTAはON。共通CTA文は「${sharedCta.trim()}」。各videoのctaは空文字にし、画面の共通CTAを使う。指定文を一字一句変えず本編の後に読み上げるため、narrationには含めない。`
         : `CTAはON。共通CTA文が空欄なので、各videoのctaには次の定型文から1つだけ一字一句そのまま入れる。新しい文や星座名を足さない。narrationには含めない。星座の入力順に3文を繰り返す: ${CTA_PHRASES.map((phrase,index)=>`${index+1}.「${phrase}」`).join(' / ')}。`)
       : 'CTAはOFF。各videoのctaは空文字にし、narrationにもCTAを入れない。',
+    '各videoにsocial.description（星座名・対象期間と今回の原稿に基づく紹介を1〜2文、500文字以内）とsocial.hashtags（内容に関連するハッシュタグ2個の配列）を付ける。原稿にない結果は追加しない。説明文にタイトルの丸写し・ハッシュタグ・LINE誘導文は入れない。必須タグの #大阪 #占い #星座名 とLINE誘導文はシステムが付けるため生成不要。関連タグ2個は互いに異なり、必須タグと重複させない。',
     'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
   ].join('\n\n');
 }

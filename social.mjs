@@ -1,3 +1,4 @@
+import {socialBody} from './builder/social-data.mjs?v=batch-social-20261016';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
 const WORKFLOW='social_publish.yml';
@@ -11,7 +12,7 @@ export function utcFromJst(value){if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))
 export function filenameTitle(filename){if(typeof filename!=='string'||!filename.toLowerCase().endsWith('.mp4')||filename.length<=4||/[\\/]/.test(filename))throw Error('動画ファイル名が不正です');return filename.slice(0,-4);}
 export function composeRows(videos,channels,body,start,interval){
  const base=new Date(utcFromJst(start)).getTime();if(!Number.isFinite(interval)||interval<1||interval>10080)throw Error('投稿間隔は1〜10080分にしてください');
- return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body,due_at:new Date(base+i*interval*60000).toISOString()})));
+ return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body:socialBody(v.social,v.tarot?.zodiac,body),due_at:new Date(base+i*interval*60000).toISOString()})));
 }
 
 export function reviewRows(rows, posts){
@@ -118,7 +119,7 @@ export function mountSocial(){
  $('socialSaveBody').onclick=()=>run({action:'settings',body:$('socialBody').value});
  $('socialLoadBody').onclick=()=>{$('socialBody').value=state.settings?.body||'';say('保存済み定型文を読み込みました');};
  $('socialSelectAll').onclick=()=>{for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=!input.disabled;};
- $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all,state.posts);const skipped=all.length-rows.length;renderRows();say(`各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
+ $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all,state.posts);const skipped=all.length-rows.length;renderRows();const descriptions=videos.map(v=>v.social?.description).filter(Boolean);const duplicate=descriptions.length>1&&new Set(descriptions).size===1?'全動画の説明文が完全一致しています。内容を確認してください。 ':'';say(`${duplicate}各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
  $('socialSubmit').onclick=()=>{if(rows.length)run({action:'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id})=>({video_id,channel_id,title,body,due_at,retry_buffer_id}))});};
  $('socialStart').value=jstInput(new Date(Date.now()+3600000).toISOString());
  window.addEventListener('social-prepare',e=>{navigate('social');run({action:'import',run_id:e.detail.runId});});
