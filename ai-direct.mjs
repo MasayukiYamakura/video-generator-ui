@@ -1,3 +1,4 @@
+import {stableVisuals} from './builder/tarot-visual.mjs?v=visual-20261016';
 const WORKFLOW='generate_ai_json.yml';
 const SIGNS=['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
 const BGM_CATEGORIES=['calm','reflective','mysterious','hopeful','serious'];
@@ -56,7 +57,8 @@ export function buildBatchSourceRequest(){
   const prompt=$('pbBatchSourcePrompt')?.value||'';
   if(!prompt)throw Error('占い結果用の入力内容を確認してください');
   const year=Number($('pbBatchYear')?.value),month=Number($('pbBatchMonth')?.value),period=$('pbBatchPeriod')?.value;
-  return {version:1,kind:'batch-source',year,month,period,cta_enabled:ctaEnabled(),shared_cta:$('pbBatchCta')?.value.trim()||'',items:SIGNS.map(zodiac=>({zodiac,prompt:targeted(prompt,zodiac,'source')}))};
+  const visuals=stableVisuals(SIGNS,prompt);
+  return {version:1,kind:'batch-source',year,month,period,cta_enabled:ctaEnabled(),shared_cta:$('pbBatchCta')?.value.trim()||'',items:SIGNS.map(zodiac=>({zodiac,visual:visuals[zodiac],prompt:targeted(prompt,zodiac,'source')+'\nこの星座のvisualは全体で偏りなくランダム割当済みです。次の値を変更せず出力してください：'+JSON.stringify(visuals[zodiac])}))};
 }
 
 async function submit(request){

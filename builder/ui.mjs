@@ -1,7 +1,7 @@
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=maintenance-20261016';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
-import {mountBatchEditor} from './batch-editor.mjs?v=batch-social-20261016';
+import {mountBatchEditor} from './batch-editor.mjs?v=visual-20261016';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
