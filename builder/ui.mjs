@@ -371,6 +371,8 @@ export function mountBuilder(apiProvider) {
     if(modeSessions.has(id))session=clone(modeSessions.get(id));
     else session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};
     image=null;
+    // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
+    $('pbApplyOnSend').checked=true;
     invalidate();lists();
   }
   $('pbVideo').onchange=()=>selectPreset($('pbVideo').value);
