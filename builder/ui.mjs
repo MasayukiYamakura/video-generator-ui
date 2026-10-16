@@ -1,13 +1,14 @@
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-batch-20261011';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=tarot-batch-20261011';
-import {buildPrompt} from './prompt.mjs?v=json-quotes-20261014';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=zodiac-kana-20261014';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=tarot-batch-20261011';
-import {drawPreview} from './preview.mjs?v=title-guide-20261016';
+import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=presets-20261016';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=presets-20261016';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,savePreset,defaultLayout} from './model.mjs?v=presets-20261016';
+import {buildPrompt} from './prompt.mjs?v=presets-20261016';
+import {applyConfig,tarotTitle,TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=presets-20261016';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=presets-20261016';
+import {drawPreview} from './preview.mjs?v=presets-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './batch.mjs?v=tarot-motion-cta-20261015';
+import {SIGNS, POSITIONS, batchConfig, batchPrompt, compileBatch, importBatch, importBatchSource, batchSourcePrompt} from './batch.mjs?v=presets-20261016';
 
-const TAROT_SIGNS=[['aries','牡羊座'],['taurus','牡牛座'],['gemini','双子座'],['cancer','蟹座'],['leo','獅子座'],['virgo','乙女座'],['libra','天秤座'],['scorpio','蠍座'],['sagittarius','射手座'],['capricorn','山羊座'],['aquarius','水瓶座'],['pisces','魚座']];
+const TAROT_SIGNS=Object.entries(SIGN_NAMES);
 const TAROT_POSITIONS=[['overall','① 全体運'],['relationships','② 恋愛・対人'],['work','③ 仕事・行動'],['advice','④ アドバイス']];
 
 const $=id=>document.getElementById(id);
@@ -98,7 +99,7 @@ export function mountBuilder(apiProvider) {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
       if(c.video.template==='tarot_monthly'){
-        const batch=session.video_preset==='tarot_monthly_batch';
+        const batch=isBatch(config().video);
         c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
@@ -125,7 +126,13 @@ export function mountBuilder(apiProvider) {
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
-    const batch=session.video_preset==='tarot_monthly_batch';
+    const batch=isBatch(v);
+    $('pbProductionMode').parentElement.hidden=!tarot;
+    $('pbProductionMode').value=batch?'batch':'single';
+    $('pbTikTokStyle').parentElement.hidden=!isTikTok(v);
+    $('pbTikTokStyle').value=v.tiktok_style;
+    $('pb_voice_mode').disabled=batch;
+    $('pb_voice_mode').querySelectorAll('option').forEach(o=>o.disabled=batch&&o.value!=='tts');
     $('pbTarotArea').hidden=!tarot||batch;
     $('pbBatchArea').hidden=!batch;
     $('pbSingleNarration').hidden=batch;
@@ -154,11 +161,11 @@ export function mountBuilder(apiProvider) {
     $('pbThemeMode').parentElement.hidden=tarot;
     $('pbThemeTitle').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
-    if(batch)$('audioUpload').hidden=true;
+    if(batch){$('audioUpload').hidden=true;$('pb_voice_mode').value='tts';}
     $('pbPreviewError').textContent=''; paint();
   }
   function lists() {
-    options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),session.video_preset);
+    options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),visiblePreset(session.video_preset));
     $('pbBackgroundFile').value=session.background;
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
@@ -358,11 +365,24 @@ export function mountBuilder(apiProvider) {
     input.step=Number(input.max)===1?0.01:1;
     input.addEventListener('input',()=>{session.overrides.layout[key]=input.type==='number'?Number(input.value):input.value;invalidate();paint();});
   }
-  $('pbVideo').onchange=()=>{
-    session.video_preset=$('pbVideo').value;session.overrides={video:{},layout:{}};
-    session.layout_preset=defaultLayout(registry,session.video_preset);
-    session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
+  const modeSessions=new Map();
+  function selectPreset(id) {
+    modeSessions.set(session.video_preset,clone(session));
+    if(modeSessions.has(id))session=clone(modeSessions.get(id));
+    else session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};
+    image=null;
+    // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
+    $('pbApplyOnSend').checked=true;
     invalidate();lists();
+  }
+  $('pbVideo').onchange=()=>selectPreset($('pbVideo').value);
+  $('pbTikTokStyle').onchange=()=>selectPreset($('pbTikTokStyle').value==='legacy_vertical'?'tiktok_vertical_hook':'tiktok_standard');
+  $('pbProductionMode').onchange=()=>{
+    const batch=$('pbProductionMode').value==='batch';
+    selectPreset(batch?'tarot_monthly_batch':'tarot_monthly_remotion');
+    if(batch && config().video.voice_mode!=='tts') {
+      session.overrides.video.voice_mode='tts';renderFields();
+    }
   };
   $('pbBackgroundFile').onchange=()=>{session.background=$('pbBackgroundFile').value.trim();image=null;invalidate();lists();};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
@@ -409,9 +429,9 @@ export function mountBuilder(apiProvider) {
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
     return applyConfig(script,snapshot,bgmCatalog);
   }
-  $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
+  $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
   lists();
-  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>session.video_preset==='tarot_monthly_batch',manifest}};
+  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest}};
 }
 
 

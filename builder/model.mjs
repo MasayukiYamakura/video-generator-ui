@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=tarot-batch-20261011';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=presets-20261016';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -14,7 +14,7 @@ export function validateValues(values, kind) {
     if(typeof value!==typeof defaults[key] || (typeof value==='number' && !Number.isFinite(value))) throw Error(`${key}の型が不正です`);
   }
   if(kind==='video') {
-    const enums={format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
+    const enums={tarot_mode:['single','batch'],tiktok_style:['standard','legacy_vertical'],format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
       hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous','tts'], tts_voice:['hashimoto','male_a','male_b'], tts_style:['natural','calm','gentle','bright','serious','powerful'], tts_pace:['slow','normal','fast'],
       background_mode:['fixed','mixed','stock'], stock_provider:['pexels','pixabay'],
       bgm_mode:['off','ai','category','track'], bgm_category:['ai',...CATEGORIES]};
@@ -40,7 +40,13 @@ export function validateValues(values, kind) {
   }
   return values;
 }
-function entries(registry, kind) { const saved=registry[`${kind}_presets`]; return [...(kind==='video' ? VIDEO_PRESETS : LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)), ...saved]; }
+function entries(registry, kind) {
+ const saved=registry[`${kind}_presets`];
+ const list=[...(kind==='video'?[...VIDEO_PRESETS,...COMPAT_VIDEO_PRESETS]:LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)),...saved];
+ if(kind!=='video')return list;
+ return list.map(p=>p.id==='tarot_monthly_batch'?{...p,values:{tarot_mode:'batch',...p.values}}:
+  p.id==='tiktok_vertical_hook'?{...p,values:{tiktok_style:'legacy_vertical',...p.values}}:p);
+}
 export function resolvePreset(registry, kind, id, seen=new Set()) {
   const entry=entries(registry,kind).find(p=>p.id===id);
   if(!entry) throw Error(`プリセットが見つかりません: ${id}`);
@@ -84,7 +90,10 @@ export function validateRegistry(registry) {
 export function validateBackground(file) {
   if(typeof file!=='string'||!file||file.length>200||file.includes('..')||/[\\\x00-\x1f]/.test(file)||file.startsWith('/')||!(/\.(png|jpe?g|webp)$/i.test(file))) throw Error('背景画像はmedia内のPNG/JPEG/WebPファイル名にしてください');
 }
-export function catalog(registry,kind) { return kind==='background' ? [...BACKGROUNDS,...registry.backgrounds] : entries(registry,kind); }
+export function catalog(registry,kind) {
+  const list=kind==='background' ? [...BACKGROUNDS,...registry.backgrounds] : entries(registry,kind);
+  return kind==='video'?list.filter(p=>!COMPAT_VIDEO_PRESETS.some(old=>old.id===p.id)).map(p=>p.id==='tarot_monthly_remotion'?{...p,name:'月間星座タロット'}:p):list;
+}
 export function defaultLayout(registry,id) {
   const p=resolvePreset(registry,'video',id), v={...VIDEO_DEFAULTS,...p.values};
   return p.default_layout || (v.format==='vertical'?(v.template==='portrait_brand'?'portrait_standard':'vertical_legacy'):'landscape_standard');
@@ -136,3 +145,19 @@ export function savePreset(registry, kind, entry, overwrite=false) {
 
 
 
+
+// Remove retired selectable presets without breaking custom descendants or losing their settings.
+export function migrateRegistry(registry) {
+  validateRegistry(registry);
+  const next=clone(registry), retired=new Set(['tiktok_anonymous','tarot_monthly']);
+  next.video_presets=next.video_presets.filter(p=>!retired.has(p.id)).map(p=>{
+    let ancestor=p, depends=false;
+    while(ancestor.extends) {
+      if(retired.has(ancestor.extends)){depends=true;break;}
+      ancestor=entries(registry,'video').find(q=>q.id===ancestor.extends);
+    }
+    if(depends){const resolved=resolvePreset(registry,'video',p.id);delete resolved.extends;return resolved;}
+    return p.id==='tarot_monthly_remotion'?{...p,name:'月間星座タロット'}:p;
+  });
+  return validateRegistry(next);
+}
