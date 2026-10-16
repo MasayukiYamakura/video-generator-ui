@@ -131,6 +131,7 @@ export function mountBuilder(apiProvider) {
     $('pbProductionMode').value=batch?'batch':'single';
     $('pbTikTokStyle').parentElement.hidden=!isTikTok(v);
     $('pbTikTokStyle').value=v.tiktok_style;
+    $('pb_voice_mode').disabled=batch;
     $('pb_voice_mode').querySelectorAll('option').forEach(o=>o.disabled=batch&&o.value!=='tts');
     $('pbTarotArea').hidden=!tarot||batch;
     $('pbBatchArea').hidden=!batch;
