@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=maintenance-20261016';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=single-social-20261016';
 
 const COMMON = [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -14,6 +14,8 @@ const COMMON = [
 ];
 export function buildPrompt(config, transcript='', bgmCatalog=null, output='full') {
   const {video:v,layout:l,ai}=config, settings=fixedSettings(config);
+  const zodiac=v.template==='tarot_monthly'?config.tarot?.zodiac:undefined;
+  const socialRule=`動画の原稿に基づく投稿用socialを必ずルートに付ける。形式は {"description":"紹介文","hashtags":[${zodiac?'"#関連語1","#関連語2"':'"#関連語1","#関連語2","#関連語3"'}]}。descriptionは原稿の要点を紹介する日本語1〜2文・500文字以内。原稿にない結果を加えず、タイトルの丸写しを避ける。descriptionにはハッシュタグとLINE案内を含めない。hashtagsは内容に関連する重複しない${zodiac?'2':'3'}個。#大阪、#占い${zodiac?'、#星座名':''}と「占い無料鑑定・無料コーチングはプロフィールの公式LINEから！」はシステムが追加するため、AIのsocialに含めない。`;
   if(v.template==='tarot_monthly') {
     const phaseList='intro → overall → relationships → work → advice'+(v.cta_enabled?' → （任意でsummary） → cta（最後に1scene）':' → （任意で最後にsummary）。ctaは作らない');
     const period=config.tarot.period ?? 'full';
@@ -29,8 +31,9 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       `空のsceneは作らない。各sceneのtextを順に連結するとナレーション原稿${v.cta_enabled?'と最後のCTA文':'のみ'}と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?`introのhook_textは ${JSON.stringify(title)} にする。AIの別案や手動フック設定を使わず、改行位置も維持する。`:'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
       `冒頭の通常字幕=${v.intro_caption}、本編の通常字幕=${v.body_caption}、冒頭の波形=${v.intro_visualizer}、本編の波形=${v.body_visualizer}。字幕・フックの位置と文字サイズは画面の確定値を使う。`,
       'introとctaには情景映像を付けない。overall, relationships, work, adviceの各役割で少なくとも1sceneに tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:原稿に合う英語の具体的な検索語 を付ける。カードを表に返してから情景映像へ切り替える。1役割が1sceneだけでもよい。カードの公開と字幕の時刻は音声との照合で決まるので、start_time/end_timeは出力しない。',
+      socialRule,
       ...(v.bgm_mode==='ai'?[`BGMカテゴリを登録済みの ${availableCategories(bgmCatalog).join(' / ')} から選び、bgm_categoryとして出力する。未登録のカテゴリや曲を作らない。`]:[]),
-      output==='content'?'出力形式: {"scenes":[...]}。BGMをAIが選ぶ場合のみbgm_categoryを追加。カード・年月・星座・音声・その他のBGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...]}。録音の場合のみaudio_fileを含める。BGMをAIが選ぶ場合はglobal_settings.bgm.categoryを選択したカテゴリで補完する。`,
+      output==='content'?'出力形式: {"scenes":[...],"social":{"description":"...","hashtags":[...]}}。BGMをAIが選ぶ場合のみbgm_categoryを追加。カード・年月・星座・音声・その他のBGM設定は画面で確定し合成する。':`出力形式: {"global_settings":${JSON.stringify(settings)},"tarot":${JSON.stringify(config.tarot)},"scenes":[...],"social":{"description":"...","hashtags":[...]}}。録音の場合のみaudio_fileを含める。BGMをAIが選ぶ場合はglobal_settings.bgm.categoryを選択したカテゴリで補完する。`,
       '【ナレーション原稿】', transcript,
       ...(v.cta_enabled?['【最後に読むCTA文（上の原稿の続き）】',config.cta_text]:[]),
     ].join('\n\n');
@@ -51,6 +54,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     ai.search==='manual'?`英語検索語は指定値 ${JSON.stringify(ai.search_text)} を使う。`:'素材検索語は内容を想像できる具体的な英語2〜4語。同じ語を連続させない。',
     ai.stock_scenes==='manual'&&v.background_mode==='mixed'?`動画を挿入する字幕シーン番号（1始まり）=${ai.stock_indices||'なし'}。それ以外へ動画を追加しない。`:'動画挿入箇所は上記の背景方針に従いAIが判断。',
   ];
+  rules.push('【投稿用説明文とハッシュタグ】',socialRule);
   if(v.bgm_mode==='ai') {
     const categories=availableCategories(bgmCatalog);
     if(!categories.length) throw Error('BGM AI選択にはGitHubから登録一覧を読み込んでください');
@@ -60,9 +64,9 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
   }
   if(v.format==='landscape') rules.push(ai.theme==='manual'?`テーマタイトルは ${JSON.stringify(ai.theme_title)} を保持。`:'短いテーマtitleをAIが作成。subtitleは「ハシモトの占いと思想」で固定。');
   rules.push('【確定設定（変更禁止）】',JSON.stringify(settings,null,2),'【JSON出力ルール】');
-  if(output==='content') rules.push('内容だけ返す移行モード: {"scenes":[...],"bgm_category":"AI選択時のみ","theme_title":"横型時のみ"}。global_settingsは返さない。画面が確定設定を合成する。');
-  else if(v.voice_mode==='tts') rules.push('互換モード: {"global_settings":上記確定設定,"scenes":[...]}。audio_fileは不要。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
-  else rules.push('互換モード: {"audio_file":"新規録音.m4a","global_settings":上記確定設定,"scenes":[...]}。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
+  if(output==='content') rules.push('内容だけ返す移行モード: {"scenes":[...],"social":{"description":"...","hashtags":[...]},"bgm_category":"AI選択時のみ","theme_title":"横型時のみ"}。global_settingsは返さない。画面が確定設定を合成する。');
+  else if(v.voice_mode==='tts') rules.push('互換モード: {"global_settings":上記確定設定,"scenes":[...],"social":{"description":"...","hashtags":[...]}}。audio_fileは不要。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
+  else rules.push('互換モード: {"audio_file":"新規録音.m4a","global_settings":上記確定設定,"scenes":[...],"social":{"description":"...","hashtags":[...]}}。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');
   rules.push('各シーンにはtext、必要ならhook_text、caption_enabled、category_tags、visualizer、動画使用時のみmedia_type/media_query。字幕なし本人映像以外に秒数を書かない。',
     '出力前に確認: 指定タイトルの各行をhook_textの改行で再現できるか。textだけに改行がありhook_textが1行になっていたら修正する。手動タイトルはJSON解析後の文字列が指定値と一致すること。BGMの有効無効・曲・音量・ダッキングを確定設定から変更しない。',
     '返答を画面へ貼り「画面設定をJSONへ適用」で確認。システムは確定値を保持し、許可した内容だけ採用する。',

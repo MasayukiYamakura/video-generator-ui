@@ -61,7 +61,7 @@ export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
     if(!entry?.narration?.trim())throw Error(`${TAROT_SIGNS[zodiac]}の原稿がありません`);
     if(!response)throw Error(`${TAROT_SIGNS[zodiac]}のAI出力を取り込んでください`);
     const config=batchConfig(shared,zodiac,entry);
-    const script=applyConfig(response,config,bgmCatalog);
+    const script=applyConfig({...response,social:undefined},config,bgmCatalog);
     const social=normalizeSocial(entry.social,zodiac);
     if(social)script.social=social;else delete script.social;
     const spoken=script.scenes.filter(s=>s.tarot_phase!=='cta').map(s=>s.speech_text??s.text).join('');
