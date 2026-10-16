@@ -50,7 +50,7 @@ export function mountSocial(){
   const previous=new Set(selectedChannels().map(c=>c?.id));$('socialChannels').replaceChildren();
   for(const c of state.channels){const l=el('label'),input=el('input');input.type='checkbox';input.value=c.id;input.checked=previous.size?previous.has(c.id):false;input.disabled=c.isDisconnected||c.isLocked||c.isQueuePaused;l.className='check';l.append(input,el('span',`${MEDIA[c.service]}：${c.name}${input.disabled?'（接続・停止状態を確認）':''}`));$('socialChannels').append(l);}
   if(!state.channels.length)$('socialChannels').append(el('p','Secrets登録後、「投稿先を取得」を押してください。'));
-  $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：大阪市（初回取得が必要）';
+  $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：未設定（場所なしで予約できます）';
   $('socialVideos').replaceChildren();
   for(const v of Object.values(state.videos).reverse()){
    const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;input.disabled=v.cloud.status!=='uploaded';input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
@@ -75,7 +75,7 @@ export function mountSocial(){
   rows.forEach((r,i)=>{
    const video=state.videos[r.video_id];if(video?.filename)r.title=filenameTitle(video.filename);
    const box=el('details');box.open=rows.length===1;box.className='item';const c=state.channels.find(c=>c.id===r.channel_id);box.append(el('summary',`${i+1}. ${r.title} ／ ${MEDIA[r.service]}・${c?.name||r.channel_id}`));
-   box.append(el('p',r.service==='youtube'?'場所・0秒カバー：Buffer経由では非対応':`カバー：開始0秒${r.service==='instagram'?` ／ 場所：${state.settings?.instagram_location?.text||'大阪市（初回取得が必要）'}`:''}`));
+   box.append(el('p',r.service==='youtube'?'場所・0秒カバー：Buffer経由では非対応':`カバー：開始0秒${r.service==='instagram'?` ／ 場所：${state.settings?.instagram_location?.text||'未設定（場所を付けずに予約）'}`:''}`));
    if(r.retry_buffer_id)box.append(el('p','失敗したBuffer投稿を同じIDで再予約します。成功済みの投稿先には再送しません。'));
    const time=field(box,'投稿日時（日本時間）',jstInput(r.due_at),'datetime-local');time.onchange=()=>{try{r.due_at=utcFromJst(time.value);}catch(e){say(e.message);}};
    const title=field(box,'タイトル（動画ファイル名・拡張子なし）',r.title);title.readOnly=true;
