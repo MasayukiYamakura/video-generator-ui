@@ -1,5 +1,6 @@
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=maintenance-20261016';
 import {clone, assertObject} from './model.mjs?v=maintenance-20261016';
+import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -67,6 +68,7 @@ export function applyConfig(script, config, bgmCatalog) {
   assertObject(script,'AI出力');
   if(!Array.isArray(script.scenes)||!script.scenes.length||script.scenes.length>1000) throw Error('空ではないscenes配列が必要です（最大1000）');
   const {video:v,ai}=config, g=fixedSettings(config);
+  const social=normalizeSocial(script.social,v.template==='tarot_monthly'?config.tarot?.zodiac:undefined);
   const aiCategory=v.bgm_mode==='ai'||(v.bgm_mode==='category'&&v.bgm_category==='ai');
   if(aiCategory) {
     const category=script.global_settings?.bgm?.category ?? script.bgm_category;
@@ -128,7 +130,7 @@ export function applyConfig(script, config, bgmCatalog) {
       }
       return out;
     });
-    return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,tarot:clone(config.tarot),scenes};
+    return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,tarot:clone(config.tarot),scenes,...(social?{social}:{})};
   }
   const manualIndices=new Set(ai.stock_indices.split(',').filter(x=>x.trim()).map(x=>Number(x.trim())-1));
   if(ai.stock_scenes==='manual'&&[...manualIndices].some(i=>i<0||i>=script.scenes.length)) throw Error('素材シーン番号がシーン数の範囲外です');
@@ -167,7 +169,7 @@ export function applyConfig(script, config, bgmCatalog) {
     // outside this opt-in compiler are sent unchanged by the existing UI.
     return scene;
   });
-  return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes};
+  return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
 
 

@@ -1,4 +1,4 @@
-import {mountSocial} from './social.mjs?v=archive-social-20261016';
+import {mountSocial} from './social.mjs?v=single-social-20261016';
 mountSocial();
 
 

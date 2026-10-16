@@ -1,13 +1,13 @@
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=maintenance-20261016';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
-import {mountBatchEditor} from './batch-editor.mjs?v=batch-header-20261016';
+import {mountBatchEditor} from './batch-editor.mjs?v=single-social-20261016';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
 import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=maintenance-20261016';
-import {buildPrompt} from './prompt.mjs?v=maintenance-20261016';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=maintenance-20261016';
+import {buildPrompt} from './prompt.mjs?v=single-social-20261016';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=single-social-20261016';
 import {decodeContent} from './storage.mjs?v=maintenance-20261016';
 import {drawPreview} from './preview.mjs?v=maintenance-20261016';
 
@@ -178,11 +178,12 @@ export function mountBuilder(apiProvider) {
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
-  $('pbBuild').onclick=()=>{try{const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
+  $('pbBuild').onclick=()=>{try{const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
     if(!$('pbApplyOnSend').checked)return script;
     if(!snapshot)throw Error('画面設定を適用するには、設定変更後にプロンプトを生成してください');
+    if(snapshot.social_required&&!script.social)throw Error('AIのJSONに投稿用socialがありません。説明文と関連ハッシュタグを含めて生成し直してください');
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
     return applyConfig(script,snapshot,bgmCatalog);
   }

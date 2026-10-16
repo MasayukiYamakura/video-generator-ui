@@ -1,5 +1,5 @@
 import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=visual-20261016';
+import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=single-social-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {TAROT_POSITIONS} from './single-editor.mjs?v=visual-20261016';
 import {el,options} from './dom.mjs?v=visual-20261016';

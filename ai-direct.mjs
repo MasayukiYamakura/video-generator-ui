@@ -41,7 +41,8 @@ export function buildSingleRequest(){
   $('pbBuild')?.click();
   const prompt=$('pbPrompt')?.value||'';
   if(!prompt)throw Error('先に月間星座タロットの入力内容を確認してください');
-  return {version:1,kind:'single-scenes',prompt,cta_enabled:ctaEnabled(),cta_text:$('pbTarotCtaText')?.value.trim()||'',allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[]};
+  const tarot=window.videoConfigurator?.previewConfig()?.video.template==='tarot_monthly';
+  return {version:1,kind:'single-scenes',prompt,tarot,cta_enabled:tarot&&ctaEnabled(),cta_text:tarot?$('pbTarotCtaText')?.value.trim()||'':'',allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[]};
 }
 export function buildBatchScenesRequest(){
   $('pbBatchBuild')?.click();
