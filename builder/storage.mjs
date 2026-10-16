@@ -1,4 +1,4 @@
-import {emptyRegistry, validateRegistry, clone} from './model.mjs?v=tarot-batch-20261011';
+import {emptyRegistry, validateRegistry, migrateRegistry, clone} from './model.mjs?v=presets-20261016';
 export const PRESET_PATH='config/prompt-builder.json';
 export const decodeContent=response=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(response.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
 export function encodeContent(value) {
@@ -7,7 +7,7 @@ export function encodeContent(value) {
   return btoa(text);
 }
 export async function readRegistry(api) {
-  try { const r=await api(`contents/${PRESET_PATH}?ref=main`); return {registry:validateRegistry(decodeContent(r)),sha:r.sha}; }
+  try { const r=await api(`contents/${PRESET_PATH}?ref=main`); return {registry:migrateRegistry(decodeContent(r)),sha:r.sha}; }
   catch(e) { if(e.status===404) return {registry:emptyRegistry(),sha:null}; throw e; }
 }
 export async function writeRegistry(api, registry, expectedSha) {

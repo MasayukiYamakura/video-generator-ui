@@ -1,4 +1,4 @@
-import {syncHistory} from './history.mjs';
+import {loadHistory,migrateHistory} from './history.mjs?v=presets-20261016';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
@@ -7,8 +7,10 @@ const isZodiacArtifact=name=>Object.values(BATCH_SIGNS).some(label=>name?.endsWi
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
+const historyMigrated=saved.historyMigrated || {};
+const legacyHistory=history.slice();
 $('repo').value = saved.repo || $('repo').value; $('token').value = token; $('remember').checked = Boolean(saved.token);
-function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history, pending })); }
+function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history:historyMigrated[$('repo').value.trim()] ? history.filter(h=>h.status!=='completed').concat(history.filter(h=>h.status==='completed').slice(0,50)) : history, historyMigrated, pending })); }
 function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw Error('リポジトリは owner/name 形式で指定してください'); if (pending && pending.repo !== r) throw Error('未受付の処理とリポジトリが異なります'); return r; }
 async function api(path, method='GET', body) {
   token = $('token').value.trim(); if (!token) throw Error('GitHubトークンを入力してください');
@@ -36,7 +38,7 @@ function render() {
           const link=node('a',label+'をダウンロード（ZIP）');link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${artifact.id}`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
         }
       }
-    } else if(h.status==='completed' && h.conclusion==='success') { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a',h.kind&&h.kind!=='video'?'確認結果をダウンロード（ZIP）':'動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
+    } else if(h.status==='completed' && (h.conclusion==='success'||h.artifacts?.length)) { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a',h.kind&&h.kind!=='video'?'確認結果をダウンロード（ZIP）':'動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
     if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'){const prepare=node('button','投稿を準備する');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
     $('history').append(box);
   }
@@ -51,7 +53,13 @@ async function recover() {
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); $('historySyncStatus').textContent='共通履歴を同期中…'; const repository=repo(); const shared=await syncHistory(api,repository,history.filter(h=>h.repo===repository)); history=[...shared,...history.filter(h=>h.repo!==repository)]; persist(); render(); $('historySyncStatus').textContent='共通履歴に同期しました。端末の既存履歴も保持しています。'; for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { let r; try { r=await api(`actions/runs/${h.runId}`); } catch(e) { if(e.status!==404) throw e; h.status='completed'; h.conclusion='unavailable'; h.step='実行記録が削除済み、または参照できません'; continue; } h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){$('historySyncStatus').textContent='履歴の同期・更新に失敗しました。端末の履歴を保持しています。更新ボタンで再試行できます。';message(e.message);} finally{persist();render();polling=false;}
+ try { if(pending) await recover(); $('historySyncStatus').textContent='共通履歴を読込中…'; const repository=repo();
+ const shared=historyMigrated[repository]?await loadHistory(api,repository):await migrateHistory(api,repository,legacyHistory.filter(h=>h.repo===repository));
+ historyMigrated[repository]=true;
+ const merged=new Map(history.filter(h=>h.repo===repository).map(h=>[h.runId,h]));
+ for(const h of shared)merged.set(h.runId,{...merged.get(h.runId),...h,status:merged.get(h.runId)?.status||'queued'});
+ history=[...[...merged.values()].sort((a,b)=>Date.parse(b.created)-Date.parse(a.created)),...history.filter(h=>h.repo!==repository)];
+ persist(); render(); $('historySyncStatus').textContent='共通履歴を読み込みました。動画本体の保存期間は3日間です。'; for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { let r; try { r=await api(`actions/runs/${h.runId}`); } catch(e) { if(e.status!==404) throw e; h.status='completed'; h.conclusion='unavailable'; h.step='実行記録が削除済み、または参照できません'; continue; } h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){$('historySyncStatus').textContent='共通履歴の読込・更新に失敗しました。端末の表示用履歴と受付情報を保持しています。更新ボタンで再試行できます。';message(e.message);} finally{persist();render();polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -91,7 +99,7 @@ $('connect').onclick=async()=>{try{const r=await api('');if(!r.private)throw Err
 $('forget').onclick=()=>{token='';$('token').value='';$('remember').checked=false;persist();$('connectionStatus').textContent='トークンを削除しました。履歴は保持しています。';};
 $('jsonFile').onchange=async()=>{const f=$('jsonFile').files[0];if(f){if(f.size>1024*1024)return message('JSONは1 MiBまでです');$('script').value=await f.text();$('script').dispatchEvent(new Event('input'));}};
 async function submit(kind='video'){if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0];let script,ext,mode;
-if(kind==='batch'){if(!window.videoConfigurator?.batch?.active())throw Error('12星座一括制作プリセットを選択してください');script=window.videoConfigurator.batch.manifest();mode='tts';}
+if(kind==='batch'){if(!window.videoConfigurator?.batch?.active())throw Error('タロットの複数星座モードを選択してください');script=window.videoConfigurator.batch.manifest();mode='tts';}
 else if(kind==='title-preview'){if(new TextEncoder().encode($('script').value).length>1024*1024)throw Error('JSONは1 MiBまでです');script=JSON.parse($('script').value);if(window.videoConfigurator)script=window.videoConfigurator.prepareScript(script);if(!script.scenes?.length)throw Error('タイトルを含むJSONが必要です');mode='title-preview';}else{({script,ext,mode}=validate(file,$('script').value));if(kind==='audio-preview'&&mode==='tts')throw Error('試聴は添付録音・匿名加工音声に対応しています');}
 const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const r=await api('');if(!r.private)throw Error('音声の保存先は非公開リポジトリにしてください');const active=(await listRuns()).find(r=>r.status!=='completed');if(active)throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();pending={id,repo:repo(),kind,signs:kind==='batch'?script.videos.map(v=>v.zodiac):undefined,audio:kind==='batch'?`12星座一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let a=null;if(!['tts','title-preview'].includes(mode)){a=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const j=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(a?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:a.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:j.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(e){message(pending ? `${e.message}。受付IDを保持しました。受付状況を確認してから再操作してください。` : e.message);}finally{busy=false;render();}}
 $('generate').onclick=()=>submit('video');

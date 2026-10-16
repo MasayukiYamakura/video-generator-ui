@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {syncHistory,cleanRecord} from './history.mjs';
+import {syncHistory,cleanRecord,loadHistory} from './history.mjs';
 const repo='owner/private';
 const record={repo,runId:1,id:'receipt',audio:'録音.m4a',created:'2026-10-15T00:00:00Z',kind:'video',token:'SECRET',artifacts:[{token:'SECRET'}]};
 function server(){
@@ -43,4 +43,11 @@ test('local audio label enriches background-created record',async()=>{
  const {api,files}=server();files.set('1',{repo,runId:1,audio:'動画生成'});
  const results=await syncHistory(api,repo,[record]);
  assert.equal(results[0].audio,'録音.m4a');assert.equal(files.get('1').audio,'録音.m4a');
+});
+
+test('normal history reads never write, including when the branch does not exist',async()=>{
+ const {api,files}=server();files.set('1',record);let writes=0;
+ const read=async(path,method='GET',body)=>{if(method!=='GET')writes++;return api(path,method,body);};
+ assert.equal((await loadHistory(read,repo)).length,1);await loadHistory(read,repo);assert.equal(writes,0);
+ assert.deepEqual(await loadHistory(async(path,method='GET')=>{assert.equal(method,'GET');if(!path)return {private:true};throw Object.assign(Error('missing'),{status:404});},repo),[]);
 });

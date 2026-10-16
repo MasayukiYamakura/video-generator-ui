@@ -17,10 +17,11 @@ async function ensureBranch(api) {
   try { await api('git/refs','POST',{ref:`refs/heads/${BRANCH}`,sha:main.object.sha}); }
   catch(e) { if(e.status!==422) throw e; await api(`git/ref/heads/${BRANCH}`); }
 }
-export async function syncHistory(api, repository, local) {
+export async function loadHistory(api, repository) {
   if(!(await api('')).private) throw Error('履歴の保存先は非公開リポジトリにしてください');
-  await ensureBranch(api);
-  const ref=await api(`git/ref/heads/${BRANCH}`);
+  let ref;
+  try { ref=await api(`git/ref/heads/${BRANCH}`); }
+  catch(e) { if(e.status===404)return [];throw e; }
   const tree=await api(`git/trees/${ref.object.sha}?recursive=1`);
   if(tree.truncated) throw Error('履歴一覧が大きすぎるため取得できません。端末の履歴は保持しています');
   const entries=tree.tree.filter(x=>x.type==='blob' && /^history\/\d+\.json$/.test(x.path));
@@ -33,6 +34,13 @@ export async function syncHistory(api, repository, local) {
     const h=cleanRecord(value,repository);
     if(h) records.set(h.runId,h);
   }
+  return [...records.values()].sort((a,b)=>Date.parse(b.created)-Date.parse(a.created));
+}
+// Used once per repository to import pre-server local history. Normal refresh is read-only.
+export async function migrateHistory(api, repository, local) {
+  const shared=await loadHistory(api,repository);
+  const records=new Map(shared.map(h=>[h.runId,h]));
+  if(local.length)await ensureBranch(api);
   for(const value of local) {
     const h=cleanRecord(value,repository); if(!h) continue;
     const remote=records.get(h.runId);
@@ -55,3 +63,6 @@ export async function syncHistory(api, repository, local) {
   }
   return [...records.values()].map(h=>({...local.find(x=>x.repo===repository&&x.runId===h.runId),...h,status:local.find(x=>x.repo===repository&&x.runId===h.runId)?.status||'queued'})).sort((a,b)=>Date.parse(b.created)-Date.parse(a.created));
 }
+
+// Compatibility for callers importing the previous migration helper.
+export const syncHistory=migrateHistory;

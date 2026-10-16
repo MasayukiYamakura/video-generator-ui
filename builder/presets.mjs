@@ -1,6 +1,7 @@
 // Semantic presets contain no pixel coordinates. Layouts and renderer internals
 // have their own sources; anonymous is a one-field semantic override.
 export const VIDEO_DEFAULTS = Object.freeze({
+  tarot_mode:'single', tiktok_style:'standard',
   format:'landscape', template:'standard', tarot_renderer:'classic', hook_enabled:false, cta_enabled:false,
   hook_orientation:'vertical', intro_scenes:2, intro_caption:true,
   body_caption:true, intro_tags:false, body_tags:false,
@@ -9,7 +10,7 @@ export const VIDEO_DEFAULTS = Object.freeze({
   bgm_volume_db:0, bgm_ducking:true, bgm_start_seconds:0, bgm_delay_seconds:0, bgm_loop:false, bgm_fade_in_seconds:0.5, bgm_fade_out_seconds:1.5,
   voice_mode:'original', tts_voice:'hashimoto', tts_style:'natural', tts_pace:'normal', tts_custom_style:'', hook_band_enabled:false,
 });
-export const VIDEO_PRESETS = [
+const ALL_VIDEO_PRESETS = [
   {id:'tiktok_standard', name:'TikTok標準', default_layout:'portrait_standard', values:{
     format:'vertical', template:'portrait_brand', hook_enabled:true,
     hook_orientation:'horizontal', intro_scenes:1, intro_caption:false,
@@ -23,13 +24,19 @@ export const VIDEO_PRESETS = [
     intro_tags:false, body_tags:false, intro_visualizer:false, body_visualizer:false,
     background_mode:'fixed', bgm_mode:'off',
   }},
-  {id:'tarot_monthly_remotion', name:'月間星座タロット・Remotion版（4枚引き）', extends:'tarot_monthly', layout:{caption_center_y:980,caption_font_size:52}, values:{tarot_renderer:'remotion'}},
-  {id:'tarot_monthly_batch', name:'12星座一括制作・Remotion版（4枚引き）', extends:'tarot_monthly_remotion', values:{cta_enabled:true}},
+  {id:'tarot_monthly_remotion', name:'月間星座タロット', default_layout:'portrait_standard', layout:{hook_center_y:610,caption_center_y:980,caption_font_size:52}, values:{
+    format:'vertical',template:'tarot_monthly',tarot_renderer:'remotion',voice_mode:'tts',hook_enabled:true,
+    hook_orientation:'horizontal',intro_scenes:1,intro_caption:false,background_mode:'fixed',bgm_mode:'off',
+  }},
+  {id:'tarot_monthly_batch', name:'12星座一括制作・Remotion版（4枚引き）', extends:'tarot_monthly_remotion', values:{cta_enabled:true,tarot_mode:'batch'}},
   {id:'tiktok_vertical_hook', name:'TikTok縦書きフック', default_layout:'vertical_legacy', values:{
-    format:'vertical', hook_enabled:true, intro_caption:false,
+    format:'vertical', hook_enabled:true, intro_caption:false, tiktok_style:'legacy_vertical',
   }},
   {id:'youtube_landscape', name:'YouTube横型', default_layout:'landscape_standard', values:{}},
 ];
+// Retired IDs remain resolvable for saved presets and exact legacy rendering.
+export const COMPAT_VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>['tiktok_anonymous','tarot_monthly','tarot_monthly_batch','tiktok_vertical_hook'].includes(p.id));
+export const VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>!COMPAT_VIDEO_PRESETS.includes(p));
 export const LAYOUT_DEFAULTS = Object.freeze({
   tag_x:36, tag_y:126, visualizer_x:960, visualizer_y:500,
   visualizer_size:680, visualizer_width_ratio:0.28,
