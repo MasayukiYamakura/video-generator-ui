@@ -2,9 +2,9 @@ import {socialBody} from './builder/social-data.mjs?v=single-social-20261016';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
 const WORKFLOW='social_publish.yml';
-const LABELS={ready:'未送信',waiting:'予約枠待ち',unknown:'結果確認中（再送保留）',scheduled:'予約済み',sending:'公開処理中',published:'投稿完了',failed:'失敗',expired:'日時の再設定が必要',approval_required:'Bufferで承認が必要',manual_required:'手動投稿の設定です'};
+const LABELS={ready:'未送信',waiting:'予約枠待ち',unknown:'結果確認中（再送保留）',scheduled:'予約済み',sending:'公開処理中',published:'投稿完了',failed:'失敗',expired:'日時の再設定が必要',approval_required:'Bufferで承認が必要',manual_required:'手動投稿の設定です',withdrawn:'取り下げ済み'};
 const MEDIA={tiktok:'TikTok',instagram:'Instagramリール',youtube:'YouTubeショート'};
-const CLOUD={pending:'転送待ち',setup_required:'Cloudinary設定待ち',error:'転送失敗',uploaded:'転送済み',deleted:'投稿後削除済み'};
+const CLOUD={pending:'転送待ち',setup_required:'Cloudinary設定待ち',error:'転送失敗',uploaded:'転送済み',deleted:'投稿後削除済み',withdrawn:'取り下げ済み（Cloudinaryから削除）'};
 const el=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 function decode(content){return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\s/g,'')),c=>c.charCodeAt(0))));}
 export function jstInput(iso){return new Date(new Date(iso).getTime()+9*3600000).toISOString().slice(0,16);}
@@ -18,6 +18,11 @@ export function composeRows(videos,channels,body,start,interval){
 export function isCompletedVideo(video, posts, channels){
  if(video.cloud.status==='deleted')return true;
  return channels.length>0&&channels.every(channel=>Object.values(posts).some(post=>post.video_id===video.id&&post.channel_id===channel.id&&post.status==='published'));
+}
+
+export function canWithdrawVideo(video, posts){
+ if(!['uploaded','pending','setup_required','error'].includes(video.cloud.status))return false;
+ return !Object.values(posts).some(post=>post.video_id===video.id&&(post.buffer_id||!['ready','waiting','failed','expired'].includes(post.status)));
 }
 
 export function reviewRows(rows, posts){
@@ -58,20 +63,26 @@ export function mountSocial(){
   $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：未設定（場所なしで予約できます）';
   $('socialVideos').replaceChildren();
   const completedVideos=el('details'),completedVideoList=el('div');
-  let completedVideoCount=0,availableVideoCount=0;
+  const withdrawnVideos=el('details'),withdrawnVideoList=el('div');
+  let completedVideoCount=0,availableVideoCount=0,withdrawnVideoCount=0;
   for(const v of Object.values(state.videos).reverse()){
    const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed;input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
    if(v.cloud.error)box.append(el('p',v.cloud.error));if(v.cloud.delete_error)box.append(el('p',v.cloud.delete_error));
    if(['error','setup_required','pending'].includes(v.cloud.status)){const retry=el('button','この動画の生成結果から転送を再試行');retry.className='secondary';retry.dataset.socialAction='import';retry.onclick=()=>run({action:'import',run_id:v.run_id});box.append(retry);}
-   if(completed){completedVideoList.append(box);completedVideoCount++;}else{$('socialVideos').append(box);availableVideoCount++;}
+   if(canWithdrawVideo(v,state.posts)){const withdraw=el('button','投稿せず動画を取り下げる');withdraw.className='secondary';withdraw.dataset.socialAction='withdraw';withdraw.onclick=()=>{if(!confirm('この動画を投稿一覧から取り下げ、Cloudinary上のファイルを削除します。元に戻せません。実行しますか？'))return;run({action:'withdraw',video_id:v.id});};box.append(withdraw);}
+   if(v.cloud.status==='withdrawn'){withdrawnVideoList.append(box);withdrawnVideoCount++;}
+   else if(completed){completedVideoList.append(box);completedVideoCount++;}
+   else{$('socialVideos').append(box);availableVideoCount++;}
   }
   if(completedVideoCount){completedVideos.append(el('summary',`投稿完了した動画（${completedVideoCount}件）を表示`),completedVideoList);$('socialVideos').append(completedVideos);}
+  if(withdrawnVideoCount){withdrawnVideos.append(el('summary',`取り下げ済みの動画（${withdrawnVideoCount}件）を表示`),withdrawnVideoList);$('socialVideos').append(withdrawnVideos);}
   $('socialSelectAll').disabled=!availableVideoCount;
   if(!Object.keys(state.videos).length)$('socialVideos').append(el('p','新しく生成した動画は、生成完了後にここへ登録されます。生成履歴の「投稿を準備する」からも取り込めます。'));
   $('socialPosts').replaceChildren();
   const completedPosts=el('details'),completedPostList=el('div');
   let completedPostCount=0;
   for(const p of Object.values(state.posts).reverse()){
+   if(p.status==='withdrawn')continue;
    const box=el('article');box.className='item';box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
    const c=state.channels.find(c=>c.id===p.channel_id);if(c)box.append(el('p',c.name));
    if(p.error&&['failed','unknown','waiting','expired'].includes(p.status))box.append(el('p',p.error));
