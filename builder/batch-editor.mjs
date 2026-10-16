@@ -1,7 +1,8 @@
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=batch-social-20261016';
+import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
+import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=visual-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_POSITIONS} from './single-editor.mjs?v=maintenance-20261016';
-import {el,options} from './dom.mjs?v=maintenance-20261016';
+import {TAROT_POSITIONS} from './single-editor.mjs?v=visual-20261016';
+import {el,options} from './dom.mjs?v=visual-20261016';
 const TAROT_SIGNS=SIGNS;
 const $=id=>document.getElementById(id);
 export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
@@ -11,6 +12,36 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
   options($('pbBatchMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
   $('pbBatchYear').value=new Date().getFullYear();
   const batchBox=$('pbBatchEntries');
+  function visualControls(container,change) {
+    for(const [key,label,choices] of VISUAL_FIELDS) {
+      const field=el('label',label), select=el('select');select.dataset.visualKey=key;
+      options(select,choices,normalizeVisual()[key]);
+      select.addEventListener('change',()=>change(key,select.value));field.append(select);container.append(field);
+    }
+  }
+  const sharedVisual=el('div');sharedVisual.className='builder-grid';
+  visualControls(sharedVisual,()=>{});
+  const applyVisual=el('button','選択中の星座へ映像設定をまとめて適用');applyVisual.type='button';
+  applyVisual.onclick=()=>{
+    const value=Object.fromEntries([...sharedVisual.querySelectorAll('select')].map(x=>[x.dataset.visualKey,x.value]));
+    for(const sign of batchSelection()){batchEntries[sign].visual={...value};syncVisual(batchBox.querySelector(`[data-sign="${sign}"]`),value);}
+    batchChanged();
+  };
+  batchBox.before(sharedVisual,applyVisual);
+  function syncVisual(details,value) {
+    const v=normalizeVisual(value);
+    details.querySelectorAll('[data-visual-key]').forEach(x=>x.value=v[x.dataset.visualKey]);
+    drawVisual(details,.75);
+  }
+  function drawVisual(details,t) {
+    const v=normalizeVisual(batchEntries[details.dataset.sign].visual), colors=PALETTES[v.background_theme];
+    const svg=details.querySelector('[data-visual-preview]');if(!svg)return;
+    const clamp=x=>Math.max(0,Math.min(1,x));
+    const shuffle=clamp(t/.3),cut=clamp((t-.34)/.26),spread=clamp((t-.64)/.25),gather=clamp((t-.88)/.12);
+    const id='visual-'+details.dataset.sign;
+    svg.innerHTML=`<defs><radialGradient id="${id}"><stop stop-color="${colors[0]}"/><stop offset=".56" stop-color="${colors[1]}"/><stop offset="1" stop-color="${colors[2]}"/></radialGradient></defs><rect width="1080" height="1920" fill="url(#${id})"/>`+
+      Array.from({length:12},(_,i)=>{const {x,y,angle}=motionPose(i,t*4,shuffle,cut,spread,gather,v);return `<g transform="translate(${x} ${y}) rotate(${angle} 110 187.5)"><rect width="220" height="375" rx="13" fill="#141729" stroke="#bc9b68" stroke-width="3"/><svg x="18" y="26" width="184" height="323" viewBox="0 0 220 350" color="#c6a979">${BACK_ART[v.card_back_design]}</svg></g>`;}).join('');
+  }
   for(const [sign,name] of SIGNS) {
     const details=el('details'), summary=el('summary',name+' · 未入力'), grid=el('div');
     grid.className='builder-grid';
@@ -35,7 +66,14 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     const checkLabel=el('label','この星座を制作する');checkLabel.className='check';checkLabel.prepend(check);
     check.addEventListener('change',batchChanged);
     const socialPreview=el('p');socialPreview.className='muted';socialPreview.dataset.socialPreview='';
-    details.append(transcriptLabel,ctaLabel,socialPreview,checkLabel);batchBox.append(details);
+    const visuals=el('div');visuals.className='builder-grid';
+    visualControls(visuals,(key,value)=>{batchEntries[sign].visual={...normalizeVisual(batchEntries[sign].visual),[key]:value};drawVisual(details,.75);batchChanged();});
+    const preview=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    preview.setAttribute('viewBox','0 0 1080 1920');preview.setAttribute('aria-label',name+'の映像設定プレビュー');preview.dataset.visualPreview='';preview.style.cssText='width:180px;max-width:100%;display:block';
+    const play=el('button','3種類の動きをプレビュー');play.type='button';
+    play.onclick=()=>{const start=performance.now();play.disabled=true;const tick=now=>{const t=(now-start)/5000;drawVisual(details,Math.min(1,t));if(t<1&&details.isConnected)requestAnimationFrame(tick);else play.disabled=false;};requestAnimationFrame(tick);};
+    const note=el('p','簡易プレビュー：3種類の動き・背景色・裏面を確認できます。完成動画の尺は従来どおりです。');note.className='muted';
+    details.append(transcriptLabel,ctaLabel,socialPreview,visuals,preview,play,note,checkLabel);batchBox.append(details);drawVisual(details,.75);
   }
   function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
   function saveDraft(){
@@ -76,8 +114,9 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
       $('pbBatchPeriod').value=result.period;
       for(const d of batchBox.querySelectorAll('details')){
         const sign=d.dataset.sign,e=result.entries[sign];
-        batchEntries[sign]={...e};
-        d.querySelectorAll('select').forEach((input,i)=>{input.value=i%2?e.orientations[(i-1)/2]:e.cards[i/2];});
+        batchEntries[sign]={...e,visual:normalizeVisual(e.visual??batchEntries[sign].visual)};
+        syncVisual(d,batchEntries[sign].visual);
+        d.querySelectorAll('select:not([data-visual-key])').forEach((input,i)=>{input.value=i%2?e.orientations[(i-1)/2]:e.cards[i/2];});
         d.querySelector('textarea').value=e.narration;
         d.querySelector('input[maxlength]').value=e.cta;
         delete batchResponses[sign];
@@ -141,10 +180,11 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
     for(const d of batchBox.querySelectorAll('details')){
       const sign=d.dataset.sign;
       batchEntries[sign]={cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''};
-      d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?'upright':'');
+      d.querySelectorAll('select:not([data-visual-key])').forEach((input,i)=>input.value=i%2?'upright':'');
       d.querySelector('textarea').value='';
       d.querySelector('input[maxlength]').value='';
       d.querySelector('.batch-select').checked=true;
+      syncVisual(d);
       d.open=false;
     }
     batchChanged();
@@ -159,8 +199,9 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
       batchResponses=draft.responses||{};
       for(const d of batchBox.querySelectorAll('details')){
         const sign=d.dataset.sign, e=draft.entries[sign];if(!e)continue;
-        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||'',...(e.social?{social:e.social}:{})};
-        d.querySelectorAll('select').forEach((input,i)=>input.value=i%2?batchEntries[sign].orientations[(i-1)/2]:batchEntries[sign].cards[i/2]);
+        batchEntries[sign]={cards:e.cards||['','','',''],orientations:e.orientations||['upright','upright','upright','upright'],narration:e.narration||'',cta:e.cta||'',...(e.social?{social:e.social}:{}),visual:normalizeVisual(e.visual)};
+        syncVisual(d,batchEntries[sign].visual);
+        d.querySelectorAll('select:not([data-visual-key])').forEach((input,i)=>input.value=i%2?batchEntries[sign].orientations[(i-1)/2]:batchEntries[sign].cards[i/2]);
         d.querySelector('textarea').value=batchEntries[sign].narration;
         d.querySelector('input[maxlength]').value=batchEntries[sign].cta;
         d.querySelector('.batch-select').checked=draft.selected?.includes(sign)??true;
