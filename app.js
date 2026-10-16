@@ -10,7 +10,14 @@ let history = saved.history || [], pending = saved.pending || null, token = save
 const historyMigrated=saved.historyMigrated || {};
 const legacyHistory=history.slice();
 $('repo').value = saved.repo || $('repo').value; $('token').value = token; $('remember').checked = Boolean(saved.token);
-function persist() { localStorage.setItem(KEY, JSON.stringify({ repo: $('repo').value.trim(), token: $('remember').checked ? token : '', history:historyMigrated[$('repo').value.trim()] ? history.filter(h=>h.status!=='completed').concat(history.filter(h=>h.status==='completed').slice(0,50)) : history, historyMigrated, pending })); }
+function persist() {
+ const counts=new Map();
+ const cached=history.filter(h=>{
+  if(!historyMigrated[h.repo]||h.status!=='completed')return true;
+  const count=(counts.get(h.repo)||0)+1;counts.set(h.repo,count);return count<=50;
+ });
+ localStorage.setItem(KEY,JSON.stringify({repo:$('repo').value.trim(),token:$('remember').checked?token:'',history:cached,historyMigrated,pending}));
+}
 function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw Error('リポジトリは owner/name 形式で指定してください'); if (pending && pending.repo !== r) throw Error('未受付の処理とリポジトリが異なります'); return r; }
 async function api(path, method='GET', body) {
   token = $('token').value.trim(); if (!token) throw Error('GitHubトークンを入力してください');

@@ -40,7 +40,13 @@ export function validateValues(values, kind) {
   }
   return values;
 }
-function entries(registry, kind) { const saved=registry[`${kind}_presets`]; return [...(kind==='video' ? [...VIDEO_PRESETS,...COMPAT_VIDEO_PRESETS] : LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)), ...saved]; }
+function entries(registry, kind) {
+ const saved=registry[`${kind}_presets`];
+ const list=[...(kind==='video'?[...VIDEO_PRESETS,...COMPAT_VIDEO_PRESETS]:LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)),...saved];
+ if(kind!=='video')return list;
+ return list.map(p=>p.id==='tarot_monthly_batch'?{...p,values:{tarot_mode:'batch',...p.values}}:
+  p.id==='tiktok_vertical_hook'?{...p,values:{tiktok_style:'legacy_vertical',...p.values}}:p);
+}
 export function resolvePreset(registry, kind, id, seen=new Set()) {
   const entry=entries(registry,kind).find(p=>p.id===id);
   if(!entry) throw Error(`プリセットが見つかりません: ${id}`);

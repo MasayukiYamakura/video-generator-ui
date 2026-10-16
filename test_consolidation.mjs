@@ -41,3 +41,12 @@ test('single Remotion tarot compiles all three audio modes; uploaded audio never
  const c=resolveConfig(emptyRegistry(),{video_preset:'tarot_monthly_batch',overrides:{video:{voice_mode:'original'}}});
  assert.throws(()=>compileBatch(c,{}, {},['taurus']),/AI読み上げ/);
 });
+
+test('old fully saved mode presets acquire their missing mode metadata',()=>{
+ const r=emptyRegistry();r.video_presets=[
+  {id:'tarot_monthly_batch',name:'旧一括設定',values:{template:'tarot_monthly',tarot_renderer:'remotion',format:'vertical',voice_mode:'tts'}},
+  {id:'tiktok_vertical_hook',name:'旧縦書き設定',values:{format:'vertical'}},
+ ];
+ assert.equal(isBatch(resolveConfig(r,{video_preset:'tarot_monthly_batch'}).video),true);
+ assert.equal(resolveConfig(r,{video_preset:'tiktok_vertical_hook'}).video.tiktok_style,'legacy_vertical');
+});
