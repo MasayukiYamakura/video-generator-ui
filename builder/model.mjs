@@ -14,7 +14,7 @@ export function validateValues(values, kind) {
     if(typeof value!==typeof defaults[key] || (typeof value==='number' && !Number.isFinite(value))) throw Error(`${key}の型が不正です`);
   }
   if(kind==='video') {
-    const enums={tarot_mode:['single','batch'],tiktok_style:['standard','legacy_vertical'],format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
+    const enums={tarot_mode:['single','batch'],tiktok_style:['standard','legacy_vertical'],output_mode:['vertical_only','vertical_horizontal','horizontal_only'],format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
       hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous','tts'], tts_voice:['hashimoto','male_a','male_b'], tts_style:['natural','calm','gentle','bright','serious','powerful'], tts_pace:['slow','normal','fast'],
       background_mode:['fixed','mixed','stock'], stock_provider:['pexels','pixabay'],
       bgm_mode:['off','ai','category','track'], bgm_category:['ai',...CATEGORIES]};

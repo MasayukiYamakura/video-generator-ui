@@ -4,7 +4,7 @@ import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
-  const g={format:v.format, overlay_opacity:SYSTEM.overlay[v.template],
+  const g={format:v.format, output_mode:v.output_mode, overlay_opacity:SYSTEM.overlay[v.template],
     voice_mode:v.voice_mode, theme:{enabled:v.format==='landscape',title:'',
       subtitle:'ハシモトの占いと思想',icon:'icon.png',font_size:72,x:140,y:90,
       max_width_ratio:0.6,text_color:'white',highlight_color:'#FFC857',bg_color:'black',bg_opacity:0.85},

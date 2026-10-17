@@ -39,7 +39,9 @@ export function mountBuilder(apiProvider) {
         c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
-      drawPreview($('pbCanvas'),c,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset);$('pbPreviewError').textContent='';}
+      const previewFormat=c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format;
+      const preview={...c,video:{...c.video,format:previewFormat},width:previewFormat==='vertical'?1080:1920,height:previewFormat==='vertical'?1920:1080};
+      drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
   function renderFields() {
@@ -61,6 +63,11 @@ export function mountBuilder(apiProvider) {
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
+    const pairedOutputTarget=v.format==='vertical'&&(['standard','portrait_brand'].includes(v.template)||v.tiktok_style==='legacy_vertical'||tarot);
+    $('pb_output_mode').parentElement.hidden=!pairedOutputTarget;
+    $('pbPreviewFormatField').hidden=v.output_mode!=='vertical_horizontal';
+    if(v.output_mode==='horizontal_only')$('pbPreviewFormat').value='landscape';
+    else if(v.output_mode!=='vertical_horizontal')$('pbPreviewFormat').value='vertical';
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     const batch=isBatch(v);
     $('pbProductionMode').parentElement.hidden=!tarot;
@@ -107,7 +114,8 @@ export function mountBuilder(apiProvider) {
     renderFields();
   }
   const singleTarot=mountSingleEditor(invalidate);
-  batchEditor=mountBatchEditor({config,status,getCatalog:()=>bgmCatalog,getLoadedRepo:()=>loadedRepo});
+  batchEditor=mountBatchEditor({config,status,getCatalog:()=>bgmCatalog,getLoadedRepo:()=>loadedRepo,
+    setOutputMode:mode=>{session.overrides.video.output_mode=mode;}});
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
@@ -132,6 +140,8 @@ export function mountBuilder(apiProvider) {
     modeSessions.set(session.video_preset,clone(session));
     if(modeSessions.has(id))session=clone(modeSessions.get(id));
     else session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};
+    if(id==='tarot_monthly_batch'&&!modeSessions.has(id)&&batchEditor.savedOutputMode())
+      session.overrides.video.output_mode=batchEditor.savedOutputMode();
     image=null;
     // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
     $('pbApplyOnSend').checked=true;
@@ -152,7 +162,7 @@ export function mountBuilder(apiProvider) {
   }
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
-  $('pbPreviewIntro').onchange=paint;$('pbSafe').onchange=paint;
+  $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=paint;$('pbSafe').onchange=paint;
   $('pbBackgroundPreview').onclick=()=>run(async()=>{
     const file=config().background, request=++imageRequest;
     const r=await connection()(`contents/media/${file.split('/').map(encodeURIComponent).join('/')}?ref=main`);
