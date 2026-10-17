@@ -5,9 +5,9 @@ import {TAROT_POSITIONS} from './single-editor.mjs?v=visual-20261016';
 import {el,options} from './dom.mjs?v=visual-20261016';
 const TAROT_SIGNS=SIGNS;
 const $=id=>document.getElementById(id);
-export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
+export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutputMode}) {
   const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
-  let batchResponses={},batchRequested=[];
+  let batchResponses={},batchRequested=[],savedOutputMode=null;
   const BATCH_DRAFT='tarot-batch-draft-v1';
   options($('pbBatchMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
   $('pbBatchYear').value=new Date().getFullYear();
@@ -82,9 +82,10 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
   }
   function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
   function saveDraft(){
+    if(config().video.tarot_mode==='batch')savedOutputMode=config().video.output_mode;
     try{localStorage.setItem(BATCH_DRAFT,JSON.stringify({repo:$('repo').value.trim(),entries:batchEntries,responses:batchResponses,
       year:$('pbBatchYear').value,month:$('pbBatchMonth').value,period:$('pbBatchPeriod').value,cta:$('pbBatchCta').value,
-      selected:batchSelection()}));}catch{status('端末の保存容量が不足しています。画面を閉じる前に入力を控えてください。');}
+      outputMode:savedOutputMode??'vertical_only',selected:batchSelection()}));}catch{status('端末の保存容量が不足しています。画面を閉じる前に入力を控えてください。');}
   }
   function batchChanged(){
     batchRequested=[];$('pbBatchPrompt').value='';
@@ -200,6 +201,10 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
   try{
     const draft=JSON.parse(localStorage.getItem(BATCH_DRAFT)||'null');
     if(draft?.repo===$('repo').value.trim()&&draft.entries){
+      if(['vertical_only','vertical_horizontal','horizontal_only'].includes(draft.outputMode)){
+        savedOutputMode=draft.outputMode;
+        setOutputMode?.(savedOutputMode);
+      }
       for(const id of ['year','month','period','cta']) $('pbBatch'+id[0].toUpperCase()+id.slice(1)).value=draft[id]??'';
       batchResponses=draft.responses||{};
       for(const d of batchBox.querySelectorAll('details')){
@@ -214,5 +219,5 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo}) {
       batchChanged();
     }
   }catch{}
-  return {changed:batchChanged,manifest};
+  return {changed:batchChanged,manifest,savedOutputMode:()=>savedOutputMode};
 }

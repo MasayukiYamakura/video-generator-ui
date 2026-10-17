@@ -1,5 +1,6 @@
 // Editable field metadata; no persistence or network operations.
 export const VIDEO_FIELDS=[
+  ['output_mode','出力形式',[['vertical_only','縦型のみ'],['vertical_horizontal','縦型＋横型'],['horizontal_only','横型のみ']]],
   ['voice_mode','音声方式',[['original','録音音声'],['anonymous','匿名加工音声'],['tts','AI読み上げ']]],
   ['tts_voice','声',[['hashimoto','ハシモト本人（Voice IDの登録が必要）'],['male_a','男性A'],['male_b','男性B']]],
   ['tts_style','話し方',[['natural','自然'],['calm','落ち着いた'],['gentle','優しい'],['bright','明るい'],['serious','真剣'],['powerful','力強い']]],

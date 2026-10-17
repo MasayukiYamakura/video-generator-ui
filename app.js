@@ -4,6 +4,10 @@ const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
   libra:'てんびん座',scorpio:'さそり座',sagittarius:'いて座',capricorn:'やぎ座',aquarius:'みずがめ座',pisces:'うお座'};
 const isZodiacArtifact=name=>Object.values(BATCH_SIGNS).some(label=>name?.endsWith(label));
+const FORMAT_LABEL={vertical:'縦型',landscape:'横型'};
+const OUTPUT_STATUS={daily_limit:'日次上限・再開待ち',minute_limit:'分単位の制限・再開待ち',rate_limit_unknown:'制限到達（種別不明）',temporary_error:'一時エラー',result_unknown:'音声生成の結果不明・確認後に再開',needs_fix:'認証・入力等の修正が必要',not_started:'未着手・中断中',audio_ready:'音声生成済み・動画は未完了',failed:'描画失敗'};
+const outputFormats=h=>h.outputFormats||(h.outputMode==='vertical_horizontal'?['vertical','landscape']:h.outputMode==='horizontal_only'?['landscape']:['vertical']);
+const resumeAudioMessage=h=>h.kind==='batch'?'保存済み音声がある星座は再利用します（7日間）。期限切れ・未生成の星座はAI読み上げを生成します。':h.reusableAudioAvailable?'保存済み共通音声を再利用します（7日間）。':h.kind==='batch'||h.audioMode==='tts'?'保存済み音声の期限切れです。未完了分はAI読み上げを再生成します。':'録音の保存期限が切れています。元の録音を再度添付して新規生成してください。';
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
@@ -34,26 +38,54 @@ function node(tag,text) { const n=document.createElement(tag); n.textContent=tex
 function render() {
   $('history').replaceChildren();
   for (const h of history.filter(h=>h.repo===$('repo').value.trim())) { const box=node('article',''); box.className='item'; box.append(node('strong',h.audio),node('p',new Date(h.created).toLocaleString('ja-JP')));
-    const partial=h.kind==='batch'&&h.status==='completed'&&h.conclusion!=='success'&&(h.artifacts?.length||Object.values(h.batchProgress?.signs||{}).includes('completed'));
+    const batchDone=Object.values(h.batchProgress?.signs||{}).some(value=>value==='completed'||Object.values(value||{}).includes('completed'));
+    const outputValues=Object.values(h.outputStatus?.outputs||{});
+    const videoPartial=h.pairedOutput&&outputValues.includes('completed')&&outputValues.some(value=>value!=='completed');
+    const partial=h.status==='completed'&&h.conclusion!=='success'&&((h.kind==='batch'&&(h.artifacts?.length||batchDone))||videoPartial);
     const label=partial?'一部完成・未完了分を再開できます':h.kind==='batch'&&h.status==='completed'&&h.batchProgress?.control?.stop?'中断・未完了分を再開できます':h.status!=='completed' ? (h.status==='queued' || h.status==='waiting' || h.status==='pending' ? '待機中' : '処理中') : h.conclusion==='success' ? '完了' : h.conclusion==='cancelled' ? 'キャンセル' : '失敗'; box.append(node('p',label+(h.step ? ` · ${h.step}` : '')));
     const link=node('a','実行詳細'); link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}`; link.target='_blank'; link.rel='noopener noreferrer'; box.append(link); if(h.bgm) box.append(node('p',h.bgm));
     if(h.kind==='batch') {
       for(const [sign,label] of Object.entries(BATCH_SIGNS).filter(([sign])=>h.signs?.includes(sign))){
         const artifact=h.artifacts?.find(a=>a.name===`video-${h.id}-${sign}`||a.name?.endsWith(label));
         const stage=h.batchProgress?.signs?.[sign];
-        const stageLabel={daily_limit:'日次上限・再開待ち',minute_limit:'分単位の制限・再開待ち',rate_limit_unknown:'制限到達（種別不明）',temporary_error:'一時エラー',result_unknown:'音声生成の結果不明・確認後に再開',needs_fix:'認証・入力等の修正が必要',not_started:'未着手・中断中',audio_ready:'音声生成済み・動画は未完了'}[stage];
-        const row=node('p',label+' · '+(artifact?'完了':stageLabel?stageLabel:h.status==='completed'?(h.conclusion==='success'?'成果物を確認中・更新してください':'失敗または成果物なし'):h.step===`Render ${sign}`?'制作中':'制作待ち'));
-        box.append(row);
+        for(const format of h.outputFormats||['vertical']) {
+          const formatStatus=typeof stage==='object'?stage[format]:stage==='completed'?'completed':stage;
+          const text=formatStatus==='completed'?'完了':OUTPUT_STATUS[formatStatus]||(!artifact&&h.status==='completed'?'成果物なし':h.step===`Render ${sign}`?'制作中':'制作待ち');
+          box.append(node('p',`${label} · ${FORMAT_LABEL[format]||format} · ${text}`));
+        }
         if(artifact&&!artifact.expired&&Date.parse(artifact.expires_at)>Date.now()){
-          const link=node('a',label+'をダウンロード（ZIP）');link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${artifact.id}`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
+          const link=node('a',label+'の縦横動画をダウンロード（ZIP）');link.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${artifact.id}`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
         }
       }
+    } else if(h.pairedOutput&&h.kind==='video') {
+      for(const format of h.outputFormats||['vertical']) {
+        const name=format==='vertical'?h.verticalArtifact:h.horizontalArtifact;
+        const artifact=h.artifacts?.find(a=>a.name===name);
+        const status=h.outputStatus?.outputs?.[format];
+        const expired=artifact&&(artifact.expired||Date.parse(artifact.expires_at)<Date.now());
+        const statusText=artifact?(expired?'保存期限切れ':'完了'):status==='completed'?'成果物を確認中・更新してください':status?.status==='failed'?'描画失敗':h.status==='completed'?'成果物なし':'制作待ち';
+        box.append(node('p',`${FORMAT_LABEL[format]||format} · ${statusText}`));
+        if(artifact&&!expired){const download=node('a',`${FORMAT_LABEL[format]||format}をダウンロード（ZIP）`);download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${artifact.id}`;download.target='_blank';download.rel='noopener noreferrer';box.append(download);}
+      }
     } else if(h.status==='completed' && (h.conclusion==='success'||h.artifacts?.length)) { if(h.artifacts?.length) for(const a of h.artifacts) { if(a.expired || Date.parse(a.expires_at)<Date.now()) { box.append(node('p','ダウンロード期限切れ')); continue; } const download=node('a',h.kind&&h.kind!=='video'?'確認結果をダウンロード（ZIP）':'動画をダウンロード（ZIP）'); download.href=`https://github.com/${h.repo}/actions/runs/${h.runId}/artifacts/${a.id}`; download.target='_blank'; download.rel='noopener noreferrer'; box.append(download); } else box.append(node('p','成果物なし・削除済み、または期限切れ')); }
-    if(h.kind==='batch'&&h.status==='completed'&&h.conclusion!=='success'&&h.resumeAvailable&&h.sha&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
+    const batchNeedsResume=h.kind==='batch'&&h.signs?.some(sign=>{
+      const artifact=h.artifacts?.find(item=>item.name.endsWith(BATCH_SIGNS[sign]));
+      const stage=h.batchProgress?.signs?.[sign];
+      const incomplete=typeof stage==='object'&&stage!==null&&outputFormats(h).some(format=>stage[format]!=='completed');
+      return incomplete||!artifact||artifact.expired||Date.parse(artifact.expires_at)<=Date.now();
+    });
+    if(h.kind==='batch'&&h.status==='completed'&&h.resumeAvailable&&h.sha&&batchNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
       if(h.batchProgress?.control?.retry_at)box.append(node('p','再開目安：'+new Date(h.batchProgress.control.retry_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'（日本時間・上限解除は保証されません）'));
-      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(x=>x.repo===h.repo&&x.status!=='completed');resume.onclick=()=>resumeBatch(h);box.append(resume,node('p','保存済み音声を再利用します（7日間）。結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
+      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(x=>x.repo===h.repo&&x.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)+' 結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
     }
-    if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'){const prepare=node('button','投稿を準備する');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
+    const videoNeedsResume=h.kind==='video'&&h.pairedOutput&&outputFormats(h).some(format=>{
+      const artifact=h.artifacts?.find(item=>item.name===(format==='vertical'?h.verticalArtifact:h.horizontalArtifact));
+      return !artifact||artifact.expired||Date.parse(artifact.expires_at)<=Date.now();
+    });
+    if(h.status==='completed'&&h.resumeAvailable&&h.sha&&videoNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
+      const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)));
+    }
+    if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','投稿を準備する');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
     $('history').append(box);
   }
   controls();
@@ -66,14 +98,49 @@ async function recover() {
   const r=runs[0]; if(!history.some(h=>h.runId===r.id)) history.unshift({repo:pending.repo,audio:pending.audio,created:pending.created,id:pending.id,runId:r.id,status:r.status,conclusion:r.conclusion,bgm:pending.bgm,kind:pending.kind||'video',signs:pending.signs,sha:pending.sha}); pending=null; persist(); render(); message('実行受付完了。画面を消したり、別アプリを開いたりしても生成が続きます。'); return true;
 }
 async function refresh() {
- if(polling || document.hidden || !$('token').value.trim()) return; polling=true;
- try { if(pending) await recover(); $('historySyncStatus').textContent='共通履歴を読込中…'; const repository=repo();
- const shared=historyMigrated[repository]?await loadHistory(api,repository):await migrateHistory(api,repository,legacyHistory.filter(h=>h.repo===repository));
- historyMigrated[repository]=true;
- const merged=new Map(history.filter(h=>h.repo===repository).map(h=>[h.runId,h]));
- for(const h of shared)merged.set(h.runId,{...merged.get(h.runId),...h,status:merged.get(h.runId)?.status||'queued'});
- history=[...[...merged.values()].sort((a,b)=>Date.parse(b.created)-Date.parse(a.created)),...history.filter(h=>h.repo!==repository)];
- persist(); render(); $('historySyncStatus').textContent='共通履歴を読み込みました。動画本体の保存期間は3日間です。'; for(const h of history.filter(h=>h.repo===$('repo').value.trim())) { let r; try { r=await api(`actions/runs/${h.runId}`); } catch(e) { if(e.status!==404) throw e; h.status='completed'; h.conclusion='unavailable'; h.step='実行記録が削除済み、または参照できません'; continue; } h.status=r.status;h.conclusion=r.conclusion;h.step=''; const jobData=await api(`actions/runs/${h.runId}/jobs`); const actualBgm=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.name.startsWith('BGM: ') && s.status==='completed' && s.conclusion==='success'); if(actualBgm) h.bgm=actualBgm.name; if(r.status==='completed'||h.kind==='batch') { const receipt=h.id || /^Pages ([0-9a-f-]+)/.exec(r.display_title||'')?.[1]; const a=await api(`actions/runs/${h.runId}/artifacts?per_page=100`);h.resumeAvailable=h.kind==='batch'&&a.artifacts.some(x=>x.name===`batch-input-${receipt}`&&!x.expired&&Date.parse(x.expires_at)>Date.now());h.artifacts=a.artifacts.filter(x=>h.kind==='batch'?x.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(x.name):x.name===`video-${receipt}`||isZodiacArtifact(x.name)); if(receipt&&!h.id) h.id=receipt; } if(r.status!=='completed') { h.step=jobData.jobs.flatMap(j=>j.steps||[]).find(s=>s.status==='in_progress')?.name || ''; } } persist();render(); } catch(e){$('historySyncStatus').textContent='共通履歴の読込・更新に失敗しました。端末の表示用履歴と受付情報を保持しています。更新ボタンで再試行できます。';message(e.message);} finally{persist();render();polling=false;}
+ if(polling || document.hidden || !$('token').value.trim()) return;
+ polling=true;
+ try {
+  if(pending) await recover();
+  $('historySyncStatus').textContent='共通履歴を読込中…';
+  const repository=repo();
+  const shared=historyMigrated[repository]?await loadHistory(api,repository):await migrateHistory(api,repository,legacyHistory.filter(h=>h.repo===repository));
+  historyMigrated[repository]=true;
+  const merged=new Map(history.filter(h=>h.repo===repository).map(h=>[h.runId,h]));
+  for(const h of shared)merged.set(h.runId,{...merged.get(h.runId),...h,status:merged.get(h.runId)?.status||'queued'});
+  history=[...[...merged.values()].sort((a,b)=>Date.parse(b.created)-Date.parse(a.created)),...history.filter(h=>h.repo!==repository)];
+  persist();render();$('historySyncStatus').textContent='共通履歴を読み込みました。動画本体は3日、再開用データは7日間保存されます。';
+  for(const h of history.filter(h=>h.repo===$('repo').value.trim())) {
+    let run;
+    try {run=await api(`actions/runs/${h.runId}`);}
+    catch(error) {if(error.status!==404)throw error;h.status='completed';h.conclusion='unavailable';h.step='実行記録が削除済み、または参照できません';continue;}
+    h.status=run.status;h.conclusion=run.conclusion;h.step='';
+    const jobData=await api(`actions/runs/${h.runId}/jobs`);
+    const actualBgm=jobData.jobs.flatMap(job=>job.steps||[]).find(step=>step.name.startsWith('BGM: ')&&step.status==='completed'&&step.conclusion==='success');
+    if(actualBgm)h.bgm=actualBgm.name;
+    if(run.status==='completed'||h.kind==='batch') {
+      const receipt=h.id||/^Pages ([0-9a-f-]+)/.exec(run.display_title||'')?.[1];
+      const result=await api(`actions/runs/${h.runId}/artifacts?per_page=100`),artifacts=result.artifacts;
+      const active=artifact=>artifact&&!artifact.expired&&Date.parse(artifact.expires_at)>Date.now();
+      h.resumeAvailable=h.kind==='batch'
+        ?artifacts.some(artifact=>artifact.name===`batch-input-${receipt}`&&active(artifact))
+        :h.kind==='video'&&h.pairedOutput&&artifacts.some(artifact=>artifact.name===`video-input-${receipt}`&&active(artifact));
+      h.reusableAudioAvailable=artifacts.some(artifact=>artifact.name===`video-audio-${receipt}`&&active(artifact))
+        ||h.audioMode!=='tts'&&artifacts.some(artifact=>artifact.name===`video-input-${receipt}`&&active(artifact));
+      h.artifacts=h.kind==='batch'
+        ?artifacts.filter(artifact=>artifact.name.startsWith(`video-${receipt}-`)||isZodiacArtifact(artifact.name))
+        :h.pairedOutput
+          ?artifacts.filter(artifact=>[h.verticalArtifact,h.horizontalArtifact].includes(artifact.name))
+          :artifacts.filter(artifact=>artifact.name===`video-${receipt}`||isZodiacArtifact(artifact.name));
+      if(receipt&&!h.id)h.id=receipt;
+    }
+    if(run.status!=='completed')h.step=jobData.jobs.flatMap(job=>job.steps||[]).find(step=>step.status==='in_progress')?.name||'';
+  }
+  persist();render();
+ } catch(error) {
+  $('historySyncStatus').textContent='共通履歴の読込・更新に失敗しました。端末の表示用履歴と受付情報を保持しています。更新ボタンで再試行できます。';
+  message(error.message);
+ } finally {persist();render();polling=false;}
 }
 function validate(file,text) {
  if(new TextEncoder().encode(text).length>1024*1024) throw Error('JSONは1 MiBまでです');
@@ -115,12 +182,12 @@ $('jsonFile').onchange=async()=>{const f=$('jsonFile').files[0];if(f){if(f.size>
 async function submit(kind='video'){if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0];let script,ext,mode;
 if(kind==='batch'){if(!window.videoConfigurator?.batch?.active())throw Error('タロットの複数星座モードを選択してください');script=window.videoConfigurator.batch.manifest();mode='tts';}
 else if(kind==='title-preview'){if(new TextEncoder().encode($('script').value).length>1024*1024)throw Error('JSONは1 MiBまでです');script=JSON.parse($('script').value);if(window.videoConfigurator)script=window.videoConfigurator.prepareScript(script);if(!script.scenes?.length)throw Error('タイトルを含むJSONが必要です');mode='title-preview';}else{({script,ext,mode}=validate(file,$('script').value));if(kind==='audio-preview'&&mode==='tts')throw Error('試聴は添付録音・匿名加工音声に対応しています');}
-const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const r=await api('');if(!r.private)throw Error('音声の保存先は非公開リポジトリにしてください');const active=(await listRuns()).find(r=>r.status!=='completed');if(active)throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();pending={id,repo:repo(),kind,signs:kind==='batch'?script.videos.map(v=>v.zodiac):undefined,audio:kind==='batch'?`12星座一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let a=null;if(!['tts','title-preview'].includes(mode)){a=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const j=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(a?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:a.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:j.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(e){message(pending ? `${e.message}。受付IDを保持しました。受付状況を確認してから再操作してください。` : e.message);}finally{busy=false;render();}}
-async function resumeBatch(h){
+const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const connection=await api('');if(!connection.private)throw Error('音声の保存先は非公開リポジトリにしてください');if((await listRuns()).some(run=>run.status!=='completed'))throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();const settings=script.global_settings||{};const formats=settings.output_mode==='vertical_horizontal'?['vertical','landscape']:settings.output_mode==='horizontal_only'?['landscape']:settings.format==='landscape'?['landscape']:['vertical'];pending={id,repo:repo(),kind,signs:kind==='batch'?script.videos.map(video=>video.zodiac):undefined,outputMode:settings.output_mode,pairedOutput:settings.format==='vertical'&&Boolean(settings.output_mode),outputFormats:formats,audio:kind==='batch'?`12星座一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let audioBlob=null;if(!['tts','title-preview'].includes(mode)){audioBlob=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const scriptBlob=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(audioBlob?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:audioBlob.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:scriptBlob.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(error){message(pending?`${error.message}。受付IDを保持しました。受付状況を確認してから再操作してください。`:error.message);}finally{busy=false;render();}}
+async function resumeGeneration(h){
  if(busy||pending)return;busy=true;controls();
  try{
   if((await listRuns()).some(r=>r.status!=='completed'))throw Error('生成中の処理が完了してから再開してください');
-  pending={id:h.id,repo:h.repo,kind:'batch',sha:h.sha,signs:h.signs,audio:h.audio,bgm:h.bgm,created:new Date().toISOString(),resumeFrom:h.runId};persist();
+  pending={id:h.id,repo:h.repo,kind:h.kind,sha:h.sha,signs:h.signs,outputMode:h.outputMode,pairedOutput:h.pairedOutput,outputFormats:outputFormats(h),audio:h.audio,bgm:h.bgm,created:new Date().toISOString(),resumeFrom:h.runId};persist();
   await dispatch();
  }catch(e){message(e.message+'。受付情報は保持しています。受付状況を確認してください。');}
  finally{busy=false;render();}

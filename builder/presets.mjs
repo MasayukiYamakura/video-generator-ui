@@ -1,7 +1,7 @@
 // Semantic presets contain no pixel coordinates. Layouts and renderer internals
 // have their own sources; anonymous is a one-field semantic override.
 export const VIDEO_DEFAULTS = Object.freeze({
-  tarot_mode:'single', tiktok_style:'standard',
+  tarot_mode:'single', tiktok_style:'standard', output_mode:'vertical_only',
   format:'landscape', template:'standard', tarot_renderer:'classic', hook_enabled:false, cta_enabled:false,
   hook_orientation:'vertical', intro_scenes:2, intro_caption:true,
   body_caption:true, intro_tags:false, body_tags:false,
