@@ -1,12 +1,13 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=maintenance-20261016';
-import {clone, assertObject} from './model.mjs?v=maintenance-20261016';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
+import {clone, assertObject} from './model.mjs?v=landscape-theme-20261019';
 import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
   const g={format:v.format, output_mode:v.output_mode, overlay_opacity:SYSTEM.overlay[v.template],
     voice_mode:v.voice_mode, theme:{enabled:v.format==='landscape',title:'',
-      subtitle:'ハシモトの占いと思想',icon:'icon.png',font_size:72,x:140,y:90,
+      subtitle:'ハシモトの占いと思想',icon:'icon.png',font_size:l.theme_font_size,x:l.theme_x,y:l.theme_y,
+      subtitle_font_size:l.subtitle_font_size,subtitle_x:l.subtitle_x,subtitle_y:l.subtitle_y,
       max_width_ratio:0.6,text_color:'white',highlight_color:'#FFC857',bg_color:'black',bg_opacity:0.85},
     hook:{enabled:v.hook_enabled, orientation:v.hook_orientation, scenes:v.intro_scenes,
       sides:['right','left'], visualizer:true,
@@ -144,7 +145,8 @@ export function applyConfig(script, config, bgmCatalog) {
     if(source.speech_text!==undefined&&typeof source.speech_text!=='string') throw Error('speech_textは文字列にしてください');
     const intro=index<v.intro_scenes;
     const scene={text:source.text,caption_enabled:intro?v.intro_caption:v.body_caption,
-      category_tags:intro?v.intro_tags:v.body_tags, visualizer:intro?v.intro_visualizer:v.body_visualizer};
+      category_tags:intro?v.intro_tags:v.body_tags, visualizer:intro?v.intro_visualizer:v.body_visualizer,
+      theme_visible:intro?v.intro_theme:v.body_theme,subtitle_visible:intro?v.intro_subtitle:v.body_subtitle};
     if(source.speech_text!==undefined) scene.speech_text=source.speech_text;
     if(v.hook_enabled&&intro&&!(source.media_type==='local'&&source.text==='')) {
       scene.hook_text=ai.hook==='manual'?(manualHooks[index]??manualHooks[0]):source.hook_text;
@@ -171,6 +173,7 @@ export function applyConfig(script, config, bgmCatalog) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
+
 
 
 
