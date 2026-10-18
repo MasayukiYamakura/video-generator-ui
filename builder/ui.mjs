@@ -30,7 +30,13 @@ export function mountBuilder(apiProvider) {
   async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
   function config() {return resolveConfig(registry,session);}
   const configuredInput=()=>singleTarot.configured(config());
-  function invalidate() {snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';batchEditor.changed();status('設定が変わりました。プロンプトを生成し直してください。');}
+  function invalidate() {
+    snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';
+    const preset=resolvePreset(registry,'video',session.video_preset);
+    const video={...VIDEO_DEFAULTS,...preset.values,...session.overrides.video};
+    if(isBatch(video))batchEditor.changed();
+    status('設定が変わりました。プロンプトを生成し直してください。');
+  }
   function paint() {
     try {const c=config();let title='';try{const script=JSON.parse($('script').value);title=script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';}catch{}
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
@@ -49,6 +55,8 @@ export function mountBuilder(apiProvider) {
     const lp=resolvePreset(registry,'layout',session.layout_preset), l={...LAYOUT_DEFAULTS,...lp.values,...p.layout,...session.overrides.layout};
     for(const [key] of VIDEO_FIELDS) {const input=$('pb_'+key);if(typeof v[key]==='boolean')input.checked=v[key];else input.value=v[key];}
     for(const key of Object.keys(LAYOUT_DEFAULTS)) $('pb_'+key).value=l[key];
+    $('pbHookMode').value=session.ai.hook||'ai';
+    $('pbHookText').value=session.ai.manual_hook||'';
     $('pb_bgm_category').disabled=v.bgm_mode!=='category';$('pb_bgm_track').disabled=v.bgm_mode!=='track';
     for(const key of ['bgm_start_seconds','bgm_delay_seconds','bgm_loop','bgm_fade_in_seconds','bgm_fade_out_seconds']) $('pb_'+key).disabled=v.bgm_mode==='off';
     $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
@@ -158,7 +166,12 @@ export function mountBuilder(apiProvider) {
   };
   $('pbBackgroundFile').onchange=()=>{const video=config().video;session.background=$('pbBackgroundFile').value.trim();const switched=video.format==='landscape'&&video.background_mode==='stock'&&Boolean(session.background);if(switched)session.overrides.video.background_mode='fixed';image=null;invalidate();lists();if(switched)status('横型の背景素材を「固定画像のみ」に切り替えました。');};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
-    $(id).addEventListener('input',()=>{session.ai[key]=key==='stock_percent'?Number($(id).value):$(id).value;invalidate();renderFields();});
+    const input=$(id);
+    input.addEventListener(input.tagName==='SELECT'?'change':'input',()=>{
+      session.ai[key]=key==='stock_percent'?Number(input.value):input.value;
+      invalidate();
+      if(input.tagName==='SELECT')renderFields();else paint();
+    });
   }
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
