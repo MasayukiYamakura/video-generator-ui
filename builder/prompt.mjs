@@ -1,13 +1,19 @@
 import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=single-social-20261016';
 
-const COMMON = [
+const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
   '【共通ルール】',
-  'ナレーション原稿が読み上げ内容の唯一のマスター。意味のまとまりごとにsceneへ分割する。原稿内容は変更・要約・言い換えしない。字幕装飾[[ ]]のみ必要に応じ追加可能。speech_textは原則出力しない。字幕と読み上げを意図的に変える明示指示がある場合だけspeech_textを使う。',
+  correctTypos
+    ? 'ナレーション原稿が読み上げ内容の唯一のマスター。明らかな誤字・脱字だけを文脈に沿って自然な日本語へ最小限修正する。意味・情報・話す順序は変えず、要約・内容の追加・不要な言い換えはしない。字幕装飾[[ ]]のみ必要に応じ追加可能。speech_textは原則出力しない。字幕と読み上げを意図的に変える明示指示がある場合だけspeech_textを使う。'
+    : 'ナレーション原稿が読み上げ内容の唯一のマスター。意味のまとまりごとにsceneへ分割する。原稿内容は変更・要約・言い換えしない。字幕装飾[[ ]]のみ必要に応じ追加可能。speech_textは原則出力しない。字幕と読み上げを意図的に変える明示指示がある場合だけspeech_textを使う。',
   'JSONのみ出力。説明、Markdown、コードフェンス、コメント、末尾カンマは禁止。',
   'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
-  '台本の言葉を言い換え・要約・追加しない。全シーンのtextを順番につなげると元のナレーション原稿と同じ内容になるようにし、冒頭も空にしない。',
-  '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（選択したナレーション音声で自動照合）。',
+  correctTypos
+    ? '誤字・脱字の最小限の修正を除き、台本の言葉を言い換え・要約・追加しない。全シーンのtextを順番につなげると、誤字修正後のナレーション原稿と同じ内容になるようにし、冒頭も空にしない。'
+    : '台本の言葉を言い換え・要約・追加しない。全シーンのtextを順番につなげると元のナレーション原稿と同じ内容になるようにし、冒頭も空にしない。',
+  correctTypos
+    ? '各sceneのtextは句読点を含め20〜25文字程度を目安に、意味が自然につながる箇所で区切る。文末や固有名詞を不自然に切らず、区切りを優先して多少前後してよい。hook_textの文字数はこの目安に含めない。字幕の秒数start_time/end_timeは出力しない（選択したナレーション音声で自動照合）。'
+    : '意味のまとまりでシーン分割。字幕の秒数start_time/end_timeは出力しない（選択したナレーション音声で自動照合）。',
   '制作者が指定した改行は、JSON文字列内で改行エスケープ \\n として維持する。JSONを解析すると実際の改行になるようにし、バックスラッシュを二重にして文字として表示させない。',
   'textは録音照合・通常字幕用、hook_textは冒頭タイトルの表示用。タイトルの改行指定をtextだけに入れてはいけない。必ず表示対象のhook_textに入れる。指定された行数・各行の文言・改行位置を保持し、1行への連結・別位置への改行・短縮・装飾の追加をしない。',
   '本人映像の明示指示がある場合のみ、media_type:local、指定されたファイル名media_query、text:""、開始・終了秒、media_startを記録する。',
@@ -38,8 +44,9 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       ...(v.cta_enabled?['【最後に読むCTA文（上の原稿の続き）】',config.cta_text]:[]),
     ].join('\n\n');
   }
-  const rules=[...COMMON,
-    `【動画設定】\n${v.format} / ${v.template}。字幕は1シーン${v.format==='vertical'?'20〜24':'30'}文字程度。`,
+  const correctTypos=v.format==='landscape'&&v.template==='standard';
+  const rules=[...commonRules(correctTypos),
+    `【動画設定】\n${v.format} / ${v.template}。字幕は1シーン${correctTypos?'20〜25':v.format==='vertical'?'20〜24':'30'}文字程度。`,
     `冒頭は最初の${v.intro_scenes}シーン。フック${v.hook_enabled?'ON':'OFF'}・${v.hook_orientation==='horizontal'?'横書き':'縦書き'}。`,
     `冒頭: 字幕=${v.intro_caption}, タグ=${v.intro_tags}, 波形=${v.intro_visualizer}。本編: 字幕=${v.body_caption}, タグ=${v.body_tags}, 波形=${v.body_visualizer}。`,
     'Pexels動画が取得できたシーンは波形非表示。portrait_brandのPexels/Pixabay動画ではタグ非表示（レンダラーの既存動作）。',
@@ -73,3 +80,4 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+
