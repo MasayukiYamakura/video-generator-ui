@@ -112,7 +112,7 @@ export function resolveConfig(registry, session) {
   if(v.tarot_renderer==='remotion'&&v.template!=='tarot_monthly') throw Error('Remotion版は月間星座タロット専用です');
   if(v.template==='portrait_brand'&&l.caption_font_size<72) throw Error('portrait_brandの字幕サイズは既存描画に合わせ72以上にしてください');
   if(v.template!=='portrait_brand'&&(v.intro_tags||v.body_tags)) throw Error('カテゴリタグはportrait_brand専用です');
-  if(v.background_mode==='mixed'&&v.template!=='portrait_brand') throw Error('一部動画＋人物画像はportrait_brandで選択してください');
+  if(v.background_mode==='mixed'&&v.template!=='portrait_brand'&&!(v.template==='standard'&&v.format==='landscape')) throw Error('一部動画＋背景画像はTikTok標準またはYouTube横型で選択してください');
   if(v.bgm_mode==='category'&&!CATEGORIES.includes(v.bgm_category)) throw Error('手動BGMカテゴリを選択してください');
   if(v.bgm_mode==='track'&&!v.bgm_track) throw Error('手動BGM曲を選択してください');
   const w=v.format==='vertical'?1080:1920, h=v.format==='vertical'?1920:1080;

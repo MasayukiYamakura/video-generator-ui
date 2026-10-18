@@ -1,12 +1,12 @@
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=maintenance-20261016';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-mixed-20261018';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
 import {mountBatchEditor} from './batch-editor.mjs?v=single-social-20261016';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=maintenance-20261016';
-import {buildPrompt} from './prompt.mjs?v=single-social-20261016';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=landscape-mixed-20261018';
+import {buildPrompt} from './prompt.mjs?v=landscape-mixed-20261018';
 import {applyConfig,tarotTitle} from './compiler.mjs?v=single-social-20261016';
 import {decodeContent} from './storage.mjs?v=maintenance-20261016';
 import {drawPreview} from './preview.mjs?v=maintenance-20261016';
