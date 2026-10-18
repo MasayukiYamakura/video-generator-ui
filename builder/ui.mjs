@@ -1,15 +1,15 @@
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-mixed-20261018';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
 import {mountBatchEditor} from './batch-editor.mjs?v=single-social-20261016';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=landscape-mixed-20261018';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=landscape-theme-20261019';
 import {buildPrompt} from './prompt.mjs?v=landscape-mixed-20261018';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=single-social-20261016';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=landscape-theme-20261019';
 import {decodeContent} from './storage.mjs?v=maintenance-20261016';
-import {drawPreview} from './preview.mjs?v=maintenance-20261016';
+import {drawPreview} from './preview.mjs?v=landscape-theme-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -47,7 +47,9 @@ export function mountBuilder(apiProvider) {
       }
       const previewFormat=c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format;
       const preview={...c,video:{...c.video,format:previewFormat},width:previewFormat==='vertical'?1080:1920,height:previewFormat==='vertical'?1920:1080};
-      drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset);$('pbPreviewError').textContent='';}
+      const script=(()=>{try{return JSON.parse($('script').value);}catch{return {};}})();
+      const themeTitle=c.ai.theme==='manual'?c.ai.theme_title:(script.global_settings?.theme?.title||script.theme_title||'テーマタイトル');
+      drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset,themeTitle);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
   function renderFields() {
@@ -60,7 +62,7 @@ export function mountBuilder(apiProvider) {
     $('pb_bgm_category').disabled=v.bgm_mode!=='category';$('pb_bgm_track').disabled=v.bgm_mode!=='track';
     for(const key of ['bgm_start_seconds','bgm_delay_seconds','bgm_loop','bgm_fade_in_seconds','bgm_fade_out_seconds']) $('pb_'+key).disabled=v.bgm_mode==='off';
     $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
-    for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand';
+    for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand'&&v.format!=='landscape';
     $('pb_hook_orientation').disabled=!v.hook_enabled;$('pb_hook_band_enabled').disabled=v.hook_orientation!=='horizontal';
     $('pbBackgroundFile').disabled=v.background_mode==='stock'&&v.format!=='landscape';
     $('pbHookText').disabled=$('pbHookMode').value!=='manual'||!v.hook_enabled;
@@ -71,6 +73,8 @@ export function mountBuilder(apiProvider) {
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
+    for(const key of ['intro_theme','body_theme','intro_subtitle','body_subtitle']) $('pb_'+key).parentElement.hidden=v.format!=='landscape';
+    for(const key of ['theme_x','theme_y','theme_font_size','subtitle_x','subtitle_y','subtitle_font_size']) $('pb_'+key).parentElement.hidden=v.format!=='landscape';
     const pairedOutputTarget=v.format==='vertical'&&(['standard','portrait_brand'].includes(v.template)||v.tiktok_style==='legacy_vertical'||tarot);
     $('pb_output_mode').parentElement.hidden=!pairedOutputTarget;
     $('pbPreviewFormatField').hidden=v.output_mode!=='vertical_horizontal';
@@ -106,7 +110,7 @@ export function mountBuilder(apiProvider) {
     for(const key of ['caption_center_y','caption_font_size','max_width_ratio']) $('pb_'+key).parentElement.hidden=fixedTarot;
     $('pbGeneralLayoutArea').querySelector('p').textContent=fixedTarot
       ? 'Remotion版タロットの見出し・カード・本編字幕は投稿画面向けの固定配置です。フックと波形は下の項目で調整できます。ガイドは動画に入りません。'
-      : '左上を原点とする動画のピクセル座標。入力値をそのままJSONへ反映します。縦書きフックは中心Yではなく上端Yを使用します。タグはportrait_brandで表示します。';
+       : '左上を原点とする動画のピクセル座標。入力値をJSONへ反映します。縦書きフックは中心Yではなく上端Yを使用します。タグは人物画像またはYouTube横型で表示します。';
     $('pbBackgroundPreview').hidden=tarot;
     $('pb_intro_scenes').parentElement.hidden=tarot; // Tarot intro is delimited by tarot_phase.
     $('pbThemeMode').parentElement.hidden=tarot;
@@ -144,6 +148,22 @@ export function mountBuilder(apiProvider) {
     input.addEventListener('input',()=>{session.overrides.layout[key]=input.type==='number'?Number(input.value):input.value;invalidate();paint();});
   }
   const modeSessions=new Map();
+  async function loadBackgroundPreview(announce=false) {
+    const c=config();
+    if(c.video.background_mode==='stock'||c.video.template==='tarot_monthly')return;
+    const file=c.background,request=++imageRequest;
+    const r=await connection()(`contents/media/${file.split('/').map(encodeURIComponent).join('/')}?ref=main`);
+    if(request!==imageRequest||file!==session.background)return;
+    const decoded=atob(r.content.replace(/\s/g,''));
+    const bytes=Uint8Array.from(decoded,char=>char.charCodeAt(0));
+    const url=URL.createObjectURL(new Blob([bytes])),img=new Image();
+    try {await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('背景画像をプレビューできません'));img.src=url;});
+      if(file===session.background){image=img;paint();if(announce)status('背景画像を読み込みました');}
+    }finally{URL.revokeObjectURL(url);}
+  }
+  function refreshBackground() {
+    if(loadedRepo===$('repo').value.trim())loadBackgroundPreview().catch(e=>status(e.message));
+  }
   function selectPreset(id) {
     modeSessions.set(session.video_preset,clone(session));
     if(modeSessions.has(id))session=clone(modeSessions.get(id));
@@ -153,7 +173,7 @@ export function mountBuilder(apiProvider) {
     image=null;
     // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
     $('pbApplyOnSend').checked=true;
-    invalidate();lists();
+    invalidate();lists();refreshBackground();
   }
   $('pbVideo').onchange=()=>selectPreset($('pbVideo').value);
   $('pbTikTokStyle').onchange=()=>selectPreset($('pbTikTokStyle').value==='legacy_vertical'?'tiktok_vertical_hook':'tiktok_standard');
@@ -164,7 +184,7 @@ export function mountBuilder(apiProvider) {
       session.overrides.video.voice_mode='tts';renderFields();
     }
   };
-  $('pbBackgroundFile').onchange=()=>{const video=config().video;session.background=$('pbBackgroundFile').value.trim();const switched=video.format==='landscape'&&video.background_mode==='stock'&&Boolean(session.background);if(switched)session.overrides.video.background_mode='fixed';image=null;invalidate();lists();if(switched)status('横型の背景素材を「固定画像のみ」に切り替えました。');};
+  $('pbBackgroundFile').onchange=()=>{const video=config().video;session.background=$('pbBackgroundFile').value.trim();const switched=video.format==='landscape'&&video.background_mode==='stock'&&Boolean(session.background);if(switched)session.overrides.video.background_mode='fixed';image=null;invalidate();lists();refreshBackground();if(switched)status('横型の背景素材を「固定画像のみ」に切り替えました。');};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
     const input=$(id);
     input.addEventListener(input.tagName==='SELECT'?'change':'input',()=>{
@@ -176,28 +196,22 @@ export function mountBuilder(apiProvider) {
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
   $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=paint;$('pbSafe').onchange=paint;
-  $('pbBackgroundPreview').onclick=()=>run(async()=>{
-    const file=config().background, request=++imageRequest;
-    const r=await connection()(`contents/media/${file.split('/').map(encodeURIComponent).join('/')}?ref=main`);
-    if(request!==imageRequest||file!==session.background)return;
-    const decoded=atob(r.content.replace(/\s/g,''));
-    const bytes=Uint8Array.from(decoded,c=>c.charCodeAt(0));
-    const url=URL.createObjectURL(new Blob([bytes])), img=new Image();
-    try {await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('背景画像をプレビューできません'));img.src=url;});if(file===session.background){image=img;paint();status('背景画像を読み込みました');}}finally{URL.revokeObjectURL(url);}
-  });
+  $('pbBackgroundPreview').onclick=()=>run(()=>loadBackgroundPreview(true));
   $('pbLoad').onclick=()=>run(async()=>{
     const api=connection(), expected=$('repo').value.trim();
     const {preset:r,bgm}=await loadPresetData(api);
     registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;
-    invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');
+    modeSessions.clear();
+    session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
+    invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');refreshBackground();
   });
   async function save(kind, overwrite=false) {
     if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済み設定を読込」を押してください');
     const c=config(), id=overwrite?session.video_preset:$('pbSaveId').value.trim(), name=overwrite?resolvePreset(registry,'video',session.video_preset).name:$('pbSaveName').value.trim();
     const written=await savePresetSettings({api:connection(),registry,sha,session,config:c,id,name,kind,overwrite});
     registry=written.registry;sha=written.sha;
-    if(kind==='video'){session.video_preset=id;session.overrides.video={};}else{session.layout_preset=id;session.overrides.layout={};}
-    invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);
+    if(kind==='video'){modeSessions.delete(id);session.video_preset=id;session.overrides.video={};session.background=resolvePreset(registry,'video',id).background||'background.png';}else{session.layout_preset=id;session.overrides.layout={};}
+    invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);refreshBackground();
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
@@ -214,6 +228,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
+
 
 
 

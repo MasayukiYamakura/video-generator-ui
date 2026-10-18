@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=maintenance-20261016';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -111,13 +111,13 @@ export function resolveConfig(registry, session) {
   if(v.template==='tarot_monthly'&&v.format!=='vertical') throw Error('月間星座タロットは縦型専用です');
   if(v.tarot_renderer==='remotion'&&v.template!=='tarot_monthly') throw Error('Remotion版は月間星座タロット専用です');
   if(v.template==='portrait_brand'&&l.caption_font_size<72) throw Error('portrait_brandの字幕サイズは既存描画に合わせ72以上にしてください');
-  if(v.template!=='portrait_brand'&&(v.intro_tags||v.body_tags)) throw Error('カテゴリタグはportrait_brand専用です');
+  if(v.template!=='portrait_brand'&&v.format!=='landscape'&&(v.intro_tags||v.body_tags)) throw Error('カテゴリタグはportrait_brandまたは横型専用です');
   if(v.background_mode==='mixed'&&v.template!=='portrait_brand'&&!(v.template==='standard'&&v.format==='landscape')) throw Error('一部動画＋背景画像はTikTok標準またはYouTube横型で選択してください');
   if(v.bgm_mode==='category'&&!CATEGORIES.includes(v.bgm_category)) throw Error('手動BGMカテゴリを選択してください');
   if(v.bgm_mode==='track'&&!v.bgm_track) throw Error('手動BGM曲を選択してください');
   const w=v.format==='vertical'?1080:1920, h=v.format==='vertical'?1920:1080;
-  for(const k of ['tag_x','visualizer_x']) if(l[k]>w) throw Error(`${k}が画面の外です`);
-  for(const k of ['tag_y','visualizer_y','caption_center_y','hook_top']) if(l[k]>h) throw Error(`${k}が画面の外です`);
+  for(const k of ['tag_x','visualizer_x','theme_x','subtitle_x']) if(l[k]>w) throw Error(`${k}が画面の外です`);
+  for(const k of ['tag_y','visualizer_y','caption_center_y','hook_top','theme_y','subtitle_y']) if(l[k]>h) throw Error(`${k}が画面の外です`);
   if(l.hook_center_y<=0||l.hook_center_y>=h) throw Error('フック中心は画面内に配置してください');
   const background=session.background || video.background || 'background.png';
   if(v.background_mode!=='stock'||v.template==='portrait_brand') validateBackground(background);
@@ -161,3 +161,4 @@ export function migrateRegistry(registry) {
   });
   return validateRegistry(next);
 }
+

@@ -1,6 +1,6 @@
-import {tarotTitle} from './compiler.mjs?v=maintenance-20261016';
+import {tarotTitle} from './compiler.mjs?v=landscape-theme-20261019';
 // Position guide only. Actual video is rendered by Python or Remotion.
-export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='') {
+export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,video:v,layout:l}=config;
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
   const c=canvas.getContext('2d'); c.scale(scale,scale);
@@ -53,7 +53,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     c.fillStyle='rgba(0,0,0,0.2)';c.fillRect(0,0,w,h);
   }
   function text(t,x,y,size) {c.fillStyle='white';c.font=`${size}px sans-serif`;c.textAlign='center';c.fillText(t,x,y);}
-  if(v.template==='portrait_brand'&&(intro?v.intro_tags:v.body_tags)) {
+  if((v.template==='portrait_brand'||v.format==='landscape')&&(intro?v.intro_tags:v.body_tags)) {
     const x=pairedLandscape?710:l.tag_x,y=pairedLandscape?55:l.tag_y;
     c.fillStyle='#804bb5';c.fillRect(x,y,720,92);
     text('占い   コーチング   引き寄せ',x+360,y+60,40);
@@ -65,6 +65,28 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     for(let i=0;i<40;i++) {
       const height=Math.max(10,(1-Math.abs(i-19.5)/20)*w*0.08);
       c.fillRect(centerX-width/2+i*width/40,centerY-height/2,width/60,height);
+    }
+  }
+  if(v.format==='landscape'&&!tarot) {
+    const showTheme=intro?v.intro_theme:v.body_theme;
+    const showSubtitle=intro?v.intro_subtitle:v.body_subtitle;
+    if(showTheme) {
+      const size=l.theme_font_size;
+      c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
+      const label=(themeTitle||'テーマタイトル').replaceAll('[[','').replaceAll(']]','');
+      const width=Math.min(w-l.theme_x,Math.max(180,c.measureText(label).width+size));
+      const height=size*1.75;
+      c.fillStyle='rgba(0,0,0,.85)';c.fillRect(l.theme_x,l.theme_y,width,height);
+      c.strokeStyle='#dcdcdc';c.lineWidth=3;c.strokeRect(l.theme_x,l.theme_y,width,height);
+      c.fillStyle='white';c.fillText(label,l.theme_x+size*.4,l.theme_y+height/2,Math.max(1,width-size*.8));
+    }
+    if(showSubtitle) {
+      const size=l.subtitle_font_size,label='ハシモトの占いと思想';
+      c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
+      const width=Math.min(w-l.subtitle_x,c.measureText(label).width+size*2.5),height=size*1.6;
+      c.fillStyle='#b31827';c.beginPath();c.moveTo(l.subtitle_x,l.subtitle_y);c.lineTo(l.subtitle_x+width,l.subtitle_y);
+      c.lineTo(l.subtitle_x+width-height*.9,l.subtitle_y+height);c.lineTo(l.subtitle_x,l.subtitle_y+height);c.closePath();c.fill();
+      c.fillStyle='white';c.fillText(label,l.subtitle_x+size*.8,l.subtitle_y+height/2,Math.max(1,width-size*2));
     }
   }
   if(intro&&v.hook_enabled) {
@@ -117,4 +139,5 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
 }
+
 

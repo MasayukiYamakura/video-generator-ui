@@ -23,14 +23,19 @@ export const VIDEO_FIELDS=[
   ['intro_caption','冒頭の通常字幕'],['body_caption','本編の通常字幕'],
   ['intro_tags','冒頭のタグ'],['body_tags','本編のタグ'],
   ['intro_visualizer','冒頭の波形'],['body_visualizer','本編の波形'],
+  ['intro_theme','冒頭のテーマ'],['intro_subtitle','冒頭のサブタイトル'],
+  ['body_theme','本編のテーマ'],['body_subtitle','本編のサブタイトル'],
   ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','背景画像＋一部動画'],['stock','全編AI動画素材']]],
   ['stock_provider','動画素材提供元',[['pexels','Pexels'],['pixabay','Pixabay']]],
   ['hook_band_enabled','横書きフックの黒帯'],
 ];
 export const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
+  theme_x:'テーマ X（左端）',theme_y:'テーマ Y（上端）',theme_font_size:'テーマ文字サイズ',
+  subtitle_x:'サブタイトル X（左端）',subtitle_y:'サブタイトル Y（上端）',subtitle_font_size:'サブタイトル文字サイズ',
   visualizer_x:'波形 X（中心）',visualizer_y:'波形 Y（中心）',visualizer_size:'波形 size（キャンバス）',
   visualizer_width_ratio:'バー波形の表示幅比率',hook_center_y:'横書きフック Y（中心）',
   hook_top:'縦書きフック Y（上端）',hook_margin_x:'縦書きフック左右余白比率',
   caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
   max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
   hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_top:'上ガイド比率',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
+

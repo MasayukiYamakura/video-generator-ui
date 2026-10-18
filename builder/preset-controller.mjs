@@ -1,5 +1,5 @@
-import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=maintenance-20261016';
-import {clone,resolvePreset,savePreset} from './model.mjs?v=maintenance-20261016';
+import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
+import {clone,resolvePreset,savePreset} from './model.mjs?v=landscape-theme-20261019';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=maintenance-20261016';
 export async function loadPresetData(api) {
   const preset=await readRegistry(api),bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
@@ -14,3 +14,4 @@ export async function savePresetSettings({api,registry,sha,session,config:c,id,n
   const next=savePreset(registry,kind,entry,overwrite);
   return writeRegistry(api,next,sha);
 }
+
