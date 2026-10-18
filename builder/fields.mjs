@@ -23,7 +23,7 @@ export const VIDEO_FIELDS=[
   ['intro_caption','冒頭の通常字幕'],['body_caption','本編の通常字幕'],
   ['intro_tags','冒頭のタグ'],['body_tags','本編のタグ'],
   ['intro_visualizer','冒頭の波形'],['body_visualizer','本編の波形'],
-  ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','人物画像＋一部動画'],['stock','全編AI動画素材']]],
+  ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','背景画像＋一部動画'],['stock','全編AI動画素材']]],
   ['stock_provider','動画素材提供元',[['pexels','Pexels'],['pixabay','Pixabay']]],
   ['hook_band_enabled','横書きフックの黒帯'],
 ];
