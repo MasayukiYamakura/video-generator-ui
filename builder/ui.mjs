@@ -54,7 +54,7 @@ export function mountBuilder(apiProvider) {
     $('pb_bgm_volume_db').disabled=v.bgm_mode==='off';$('pb_bgm_ducking').disabled=v.bgm_mode==='off';
     for(const key of ['intro_tags','body_tags']) $('pb_'+key).disabled=v.template!=='portrait_brand';
     $('pb_hook_orientation').disabled=!v.hook_enabled;$('pb_hook_band_enabled').disabled=v.hook_orientation!=='horizontal';
-    $('pbBackgroundFile').disabled=v.background_mode==='stock';
+    $('pbBackgroundFile').disabled=v.background_mode==='stock'&&v.format!=='landscape';
     $('pbHookText').disabled=$('pbHookMode').value!=='manual'||!v.hook_enabled;
     $('pbSearchText').disabled=$('pbSearchMode').value!=='manual'||v.background_mode==='fixed';
     $('pbStockPercent').disabled=$('pbStockMode').value!=='ai'||v.background_mode!=='mixed';
@@ -156,7 +156,7 @@ export function mountBuilder(apiProvider) {
       session.overrides.video.voice_mode='tts';renderFields();
     }
   };
-  $('pbBackgroundFile').onchange=()=>{session.background=$('pbBackgroundFile').value.trim();image=null;invalidate();lists();};
+  $('pbBackgroundFile').onchange=()=>{const video=config().video;session.background=$('pbBackgroundFile').value.trim();const switched=video.format==='landscape'&&video.background_mode==='stock'&&Boolean(session.background);if(switched)session.overrides.video.background_mode='fixed';image=null;invalidate();lists();if(switched)status('横型の背景素材を「固定画像のみ」に切り替えました。');};
   for(const [id,key] of [['pbHookMode','hook'],['pbHookText','manual_hook'],['pbSearchMode','search'],['pbSearchText','search_text'],['pbStockMode','stock_scenes'],['pbStockPercent','stock_percent'],['pbStockIndices','stock_indices'],['pbThemeMode','theme'],['pbThemeTitle','theme_title']]) {
     $(id).addEventListener('input',()=>{session.ai[key]=key==='stock_percent'?Number($(id).value):$(id).value;invalidate();renderFields();});
   }
