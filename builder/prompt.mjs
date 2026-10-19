@@ -1,4 +1,4 @@
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=single-social-20261016';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=presentation-contract-20261019';
 
 const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -80,4 +80,5 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+
 

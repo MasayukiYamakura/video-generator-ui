@@ -40,6 +40,86 @@ export function validateValues(values, kind) {
   }
   return values;
 }
+// Optional, versioned storage contract. Rendering/preview activation belongs to
+// the next PRs; absent values never manufacture or replace legacy defaults.
+const PRESENTATION_VIDEO_KEYS = new Set([
+  'hook_enabled','hook_orientation','intro_scenes','intro_caption','body_caption',
+  'intro_tags','body_tags','intro_visualizer','body_visualizer',
+  'intro_theme','body_theme','intro_subtitle','body_subtitle',
+  'background_mode','stock_provider','hook_band_enabled',
+]);
+const PRESENTATION_ELEMENTS = ['caption','hook','tags','visualizer','theme','subtitle','icon'];
+function knownKeys(value, allowed, label) {
+  assertObject(value,label);
+  for(const key of Object.keys(value)) if(forbidden.has(key)||!allowed.includes(key)) throw Error(`未対応の${label}: ${key}`);
+}
+function numberIn(value, min, max, label) {
+  if(typeof value!=='number'||!Number.isFinite(value)||value<min||value>max) throw Error(`${label}は${min}〜${max}の数値です`);
+}
+export function validatePresentation(value) {
+  knownKeys(value,['version','vertical','landscape'],'形式別設定');
+  if(value.version!==1) throw Error('未対応の形式別設定バージョンです');
+  for(const format of ['vertical','landscape']) {
+    if(!own(value,format)) continue;
+    const slot=value[format],w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;
+    knownKeys(slot,['video','layout','background','icon','person','theme','scenery_visibility'],'形式別表示');
+    if(own(slot,'video')) {
+      knownKeys(slot.video,[...PRESENTATION_VIDEO_KEYS],'形式別video');
+      validateValues(slot.video,'video');
+    }
+    if(own(slot,'layout')) {
+      const extra=['caption_center_x','hook_center_x','tag_font_size','tag_scale'];
+      knownKeys(slot.layout,[...Object.keys(LAYOUT_DEFAULTS),...extra],'形式別layout');
+      validateValues(Object.fromEntries(Object.entries(slot.layout).filter(([k])=>!extra.includes(k))),'layout');
+      for(const [k,v] of Object.entries(slot.layout)) {
+        if(k.endsWith('_x'))numberIn(v,0,w,k);
+        if(k.endsWith('_y')||k==='hook_top')numberIn(v,0,h,k);
+        if(k==='hook_center_y')numberIn(v,1,h-1,k);
+        if(k==='tag_font_size')numberIn(v,1,300,k);
+        if(k==='tag_scale')numberIn(v,0.05,5,k);
+      }
+    }
+    if(own(slot,'background'))validateBackground(slot.background);
+    for(const kind of ['icon','person']) {
+      if(!own(slot,kind))continue;
+      const asset=slot[kind];
+      knownKeys(asset,kind==='icon'?['file','x','y','size','intro','body']:['file','x','y','width','height','enabled'],kind);
+      if(own(asset,'file'))validateBackground(asset.file);
+      for(const key of ['x','y','size','width','height']) if(own(asset,key)) {
+        const max=key==='x'||key==='width'?w:key==='y'||key==='height'?h:Math.min(w,h);
+        numberIn(asset[key],['x','y'].includes(key)?0:1,max,`${kind}.${key}`);
+      }
+      for(const key of ['intro','body','enabled'])if(own(asset,key)&&typeof asset[key]!=='boolean')throw Error(`${kind}.${key}は真偽値です`);
+    }
+    if(own(slot,'theme')) {
+      knownKeys(slot.theme,['title','subtitle'],'形式別theme');
+      for(const text of Object.values(slot.theme))if(typeof text!=='string'||text.length>500)throw Error('形式別themeは500文字以内の文字列です');
+    }
+    if(own(slot,'scenery_visibility')) {
+      knownKeys(slot.scenery_visibility,PRESENTATION_ELEMENTS,'外部映像中の表示');
+      for(const flag of Object.values(slot.scenery_visibility))if(typeof flag!=='boolean')throw Error('外部映像中の表示は真偽値です');
+    }
+  }
+  return value;
+}
+export function mergePresentation(parent, override) {
+  if(parent===undefined&&override===undefined)return undefined;
+  if(parent!==undefined)validatePresentation(parent);
+  if(override!==undefined)validatePresentation(override);
+  const result={version:1};
+  for(const format of ['vertical','landscape']) {
+    const a=parent?.[format],b=override?.[format];
+    if(a===undefined&&b===undefined)continue;
+    const slot={...(a||{}),...(b||{})};
+    for(const key of ['video','layout','icon','person','theme','scenery_visibility']) {
+      if(a?.[key]!==undefined||b?.[key]!==undefined)slot[key]={...(a?.[key]||{}),...(b?.[key]||{})};
+    }
+    result[format]=slot;
+  }
+  validatePresentation(result);
+  return clone(result);
+}
+
 function entries(registry, kind) {
  const saved=registry[`${kind}_presets`];
  const list=[...(kind==='video'?[...VIDEO_PRESETS,...COMPAT_VIDEO_PRESETS]:LAYOUT_PRESETS).filter(p=>!saved.some(q=>q.id===p.id)),...saved];
@@ -53,7 +133,8 @@ export function resolvePreset(registry, kind, id, seen=new Set()) {
   if(seen.has(id)) throw Error('プリセットの継承が循環しています');
   seen.add(id);
   const parent=entry.extends ? resolvePreset(registry,kind,entry.extends,seen) : {};
-  return {...parent,...entry,layout:{...(parent.layout||{}),...(entry.layout||{})},values:{...(parent.values||{}),...entry.values}};
+  const presentation=mergePresentation(parent.presentation,entry.presentation);
+  return {...parent,...entry,...(presentation===undefined?{}:{presentation}),layout:{...(parent.layout||{}),...(entry.layout||{})},values:{...(parent.values||{}),...entry.values}};
 }
 export function validateRegistry(registry) {
   assertObject(registry,'プリセット一覧');
@@ -69,7 +150,8 @@ export function validateRegistry(registry) {
       if(p.extends!==undefined&&typeof p.extends!=='string') throw Error('継承元が不正です');
       if(kind==='layout'&&!['vertical','landscape'].includes(p.format)) throw Error('レイアウトの画面形式が必要です');
       validateValues(p.values,kind);
-      if(kind==='video'){if(p.layout!==undefined)validateValues(p.layout,'layout');if(p.background!==undefined)validateBackground(p.background);}
+      if(kind==='video'){if(p.layout!==undefined)validateValues(p.layout,'layout');if(p.background!==undefined)validateBackground(p.background);if(p.presentation!==undefined)validatePresentation(p.presentation);}
+      else if(p.presentation!==undefined)throw Error('形式別設定は動画プリセットに保存してください');
       ids.add(p.id);
     }
     for(const p of list) {
@@ -129,7 +211,8 @@ export function resolveConfig(registry, session) {
   if(v.template!=='tarot_monthly'&&v.hook_enabled&&ai.hook==='manual'&&!ai.manual_hook.trim()) throw Error('手動フック文章を入力してください');
   if(v.background_mode!=='fixed'&&ai.search==='manual'&&!ai.search_text.trim()) throw Error('手動の英語検索語を入力してください');
   if(ai.stock_scenes==='manual'&&ai.stock_indices.trim()&&!/^\d+(\s*,\s*\d+)*$/.test(ai.stock_indices.trim())) throw Error('素材シーンは1から始まる番号をカンマで指定してください');
-  return {video:v, layout:l, ai, background, width:w, height:h};
+  const presentation=mergePresentation(video.presentation,session.presentation);
+  return {video:v, layout:l, ai, background, width:w, height:h,...(presentation===undefined?{}:{presentation})};
 }
 export function savePreset(registry, kind, entry, overwrite=false) {
   const next=clone(registry), key=`${kind}_presets`;
@@ -161,4 +244,5 @@ export function migrateRegistry(registry) {
   });
   return validateRegistry(next);
 }
+
 
