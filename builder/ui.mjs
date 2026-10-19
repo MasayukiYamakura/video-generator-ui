@@ -1,17 +1,18 @@
-import {formatConfig} from './presentation.mjs?v=presentation-active-20261019';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=presentation-active-20261019';
+import {formatConfig} from './presentation.mjs?v=tarot-brand-20261019';
+import {tarotBrand} from './tarot-brand.mjs?v=tarot-brand-20261019';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=tarot-brand-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=presentation-active-20261019';
-import {mountBatchEditor} from './batch-editor.mjs?v=presentation-active-20261019';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-active-20261019';
+import {mountSingleEditor} from './single-editor.mjs?v=tarot-brand-20261019';
+import {mountBatchEditor} from './batch-editor.mjs?v=tarot-brand-20261019';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=tarot-brand-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=presentation-active-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-active-20261019';
-import {buildPrompt} from './prompt.mjs?v=presentation-active-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
-import {decodeContent} from './storage.mjs?v=presentation-active-20261019';
-import {drawPreview} from './preview.mjs?v=presentation-active-20261019';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-brand-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=tarot-brand-20261019';
+import {buildPrompt} from './prompt.mjs?v=tarot-brand-20261019';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-brand-20261019';
+import {decodeContent} from './storage.mjs?v=tarot-brand-20261019';
+import {drawPreview} from './preview.mjs?v=tarot-brand-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -48,9 +49,10 @@ export function mountBuilder(apiProvider) {
         c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
-      const previewFormat=c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format;
+      const previewFormat=session.designFormat||(c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format);
       const preview=c.video.template==='tarot_monthly'?{...c,video:{...c.video,format:previewFormat},width:previewFormat==='vertical'?1080:1920,height:previewFormat==='vertical'?1920:1080}:previewConfig();
       preview.scenery=$('pbPreviewScenery').checked;
+      if(c.video.template==='tarot_monthly'&&c.video.tarot_renderer==='remotion'&&previewFormat==='landscape')preview.tarotBrand=tarotBrand(c,title);
       const script=(()=>{try{return JSON.parse($('script').value);}catch{return {};}})();
       const themeTitle=preview.design?.theme.title|| (c.ai.theme==='manual'?c.ai.theme_title:(script.global_settings?.theme?.title||script.theme_title||'テーマタイトル'));
       drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset,themeTitle);$('pbPreviewError').textContent='';}
@@ -84,7 +86,7 @@ export function mountBuilder(apiProvider) {
     $('pbPreviewFormatField').hidden=v.output_mode!=='vertical_horizontal';
     if(v.output_mode==='horizontal_only')$('pbPreviewFormat').value='landscape';
     else if(v.output_mode!=='vertical_horizontal')$('pbPreviewFormat').value='vertical';
-    if(!tarot&&session.designFormat)$('pbPreviewFormat').value=session.designFormat;
+    if(session.designFormat)$('pbPreviewFormat').value=session.designFormat;
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     const batch=isBatch(v);
     $('pbProductionMode').parentElement.hidden=!tarot;
@@ -133,6 +135,7 @@ export function mountBuilder(apiProvider) {
   }
   const singleTarot=mountSingleEditor(invalidate);
   batchEditor=mountBatchEditor({config,status,getCatalog:()=>bgmCatalog,getLoadedRepo:()=>loadedRepo,
+    validateDesign:()=>presentationEditor?.assertValid(),
     setOutputMode:mode=>{session.overrides.video.output_mode=mode;}});
   for(const [key,label,items,type] of VIDEO_FIELDS) {
     const input=field($(key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
@@ -155,7 +158,7 @@ export function mountBuilder(apiProvider) {
   }
   presentationEditor=mountPresentationEditor({root:$('pdEditor'),getConfig:config,
     getFormat:()=>session.designFormat||resolvePreset(registry,'video',session.video_preset).values.format||VIDEO_DEFAULTS.format,
-    setFormat:format=>{session.designFormat=format;$('pbPreviewFormat').value=format;paint();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background)image=null;if(config().video.template!=='tarot_monthly')invalidate();paint();}});
+    setFormat:format=>{session.designFormat=format;$('pbPreviewFormat').value=format;paint();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background)image=null;invalidate();paint();}});
   const modeSessions=new Map();
   async function loadBackgroundPreview(announce=false) {
     const c=previewConfig();
@@ -205,7 +208,7 @@ export function mountBuilder(apiProvider) {
   }
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
-  $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=()=>{if(config().video.template!=='tarot_monthly'){session.designFormat=$('pbPreviewFormat').value;presentationEditor.render();refreshBackground();}paint();};$('pbPreviewScenery').onchange=paint;$('pbSafe').onchange=paint;
+  $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=()=>{session.designFormat=$('pbPreviewFormat').value;presentationEditor.render();refreshBackground();paint();};$('pbPreviewScenery').onchange=paint;$('pbSafe').onchange=paint;
   $('pbBackgroundPreview').onclick=()=>run(()=>loadBackgroundPreview(true));
   $('pbLoad').onclick=()=>run(async()=>{
     const api=connection(), expected=$('repo').value.trim();

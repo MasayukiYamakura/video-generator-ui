@@ -1,4 +1,5 @@
-import {tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
+import {tarotTitle} from './compiler.mjs?v=tarot-brand-20261019';
+import {tarotBrandElements} from './tarot-brand.mjs?v=tarot-brand-20261019';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -12,7 +13,8 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   const c=canvas.getContext('2d'); c.scale(scale,scale);
   const tarot=v.template==='tarot_monthly';
   const rightColumn=v.template==='portrait_brand';
-  const pairedLandscape=!active&&v.format==='landscape'&&['vertical_horizontal','horizontal_only'].includes(v.output_mode);
+  const pairedLandscape=!active&&v.format==='landscape'&&(tarot||['vertical_horizontal','horizontal_only'].includes(v.output_mode));
+  const brand=tarot&&v.format==='landscape'?tarotBrandElements(config.tarotBrand,intro,config.scenery&&!intro):[];
   c.fillStyle=tarot?'#141522':'#242e3d';c.fillRect(0,0,w,h);
   if(tarot) {
     c.fillStyle='#e3cd9c';
@@ -24,8 +26,8 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
         c.fillStyle='#1c2948';c.fillRect(pairedLandscape?320:430,pairedLandscape?360:1010,220,375);
         c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(pairedLandscape?324:434,pairedLandscape?364:1014,212,367);
       } else {
-        const centerX=pairedLandscape?w*.5:w/2;
-        c.font='32px sans-serif';c.fillText(config.tarot ? tarotTitle(config.tarot).replace('\n',' · ') : '対象年月・星座の運勢',centerX,pairedLandscape?65:365);
+        const centerX=brand.length?355:pairedLandscape?w*.5:w/2;
+        c.font=`${brand.length?24:32}px sans-serif`;c.fillText(config.tarot ? tarotTitle(config.tarot).replace('\n',' · ') : '対象年月・星座の運勢',centerX,pairedLandscape?65:365);
         c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',centerX,pairedLandscape?116:427);
         for(let i=0;i<4;i++){
           const x=cardLeft[i%2],y=cardTop[Math.floor(i/2)];
@@ -62,7 +64,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(active&&design.person?.enabled){const p=design.person;c.strokeStyle='#8bd6bd';c.lineWidth=3;c.strokeRect(p.x,p.y,p.width,p.height);}
   if(active&&design.icon?.[intro?'intro':'body']&&visibility.icon!==false){const a=design.icon;c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(a.x,a.y,a.size,a.size);}
   function text(t,x,y,size) {c.fillStyle='white';c.font=`${size}px sans-serif`;c.textAlign='center';c.fillText(t,x,y);}
-  if((v.template==='portrait_brand'||v.format==='landscape')&&(intro?v.intro_tags:v.body_tags)) {
+  if(!tarot&&(v.template==='portrait_brand'||v.format==='landscape')&&(intro?v.intro_tags:v.body_tags)) {
     const x=pairedLandscape?710:l.tag_x,y=pairedLandscape?55:l.tag_y;
     const scale=active?l.tag_scale:1,size=active?l.tag_font_size:40;
     c.fillStyle='#804bb5';c.fillRect(x,y,720*scale,Math.max(92,Math.floor(size*1.7)+4)*scale);
@@ -100,14 +102,14 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     }
   }
   if(intro&&v.hook_enabled) {
-    const hookCenterX=active?l.hook_center_x:pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?150:250):l.hook_center_y;
+    const hookCenterX=brand.length?355:active?l.hook_center_x:pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?150:250):l.hook_center_y;
     if(pairedLandscape||v.hook_orientation==='horizontal') {
       const lines=(title||'タイトルを入力してください').replaceAll('[[','').replaceAll(']]','').split('\n');
       if(tarot&&v.tarot_renderer==='remotion') {
         // Match tarot-remotion/src/tarot.jsx: Intro has a fixed size (at most
         // 140px), 1.25 line height, and is centered 15px above hook_center_y.
         // The Python hook's auto-fit setting does not apply to this renderer.
-        const size=Math.min(l.hook_font_size||130,pairedLandscape?78:140);
+        const size=Math.min(l.hook_font_size||130,brand.length?48:pairedLandscape?78:140);
         c.font=`900 ${size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;
         c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff8e9';
         c.shadowColor='#070a11';c.shadowBlur=27;c.shadowOffsetY=5;
@@ -130,6 +132,13 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     }
   }
   if((intro?v.intro_caption:v.body_caption)&&!(tarot&&v.tarot_renderer==='remotion')) text('通常字幕の位置',active?l.caption_center_x:pairedLandscape&&rightColumn?w*.68:w/2,pairedLandscape?h*.68:l.caption_center_y+l.caption_font_size/3,pairedLandscape?48:l.caption_font_size);
+  for(const e of brand) {
+    if(e.kind==='icon'){c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(e.x,e.y,e.width,e.height);continue;}
+    c.fillStyle=e.kind==='theme'?'rgba(4,7,17,.85)':'#9f2435';c.fillRect(e.x,e.y,e.width,e.height);
+    if(e.kind==='theme'){c.strokeStyle='#c9aa76';c.lineWidth=2;c.strokeRect(e.x,e.y,e.width,e.height);}
+    c.font=`800 ${e.size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';c.fillStyle='#fff9ec';
+    c.fillText(e.text,e.x+e.size*.4,e.y+e.height/2);
+  }
   if(safe&&v.format==='vertical') {
     c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(0,0,w,h*l.safe_top);c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
     c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(0,h*l.safe_top);c.lineTo(w,h*l.safe_top);c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
