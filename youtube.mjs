@@ -1,4 +1,5 @@
 import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
+import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=youtube-publish-20261019';
 const $=id=>document.getElementById(id);
 const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 const LABEL={uploaded:'非公開アップロード済み（動画の処理完了はStudioで確認）',resumable:'一部送信済み・同じ送信から再開可能',unknown:'結果確認中・新規送信は保留'};
@@ -23,8 +24,10 @@ export function mountYouTube(){
  const invalidate=()=>{review=null;$('youtubeReview').replaceChildren();controls();};
  function controls(){
   $('repo').disabled=busy;
-  for(const id of ['youtubeConnect','youtubeImport','youtubeBuild'])$(id).disabled=busy||Boolean(pending)||(id==='youtubeBuild'&&(!state.setup||!state.channel));
+  for(const id of ['youtubeConnect','youtubeImport','youtubeBuild','youtubeSync'])$(id).disabled=busy||Boolean(pending)||(id==='youtubeBuild'&&(!state.setup||!state.channel));
+  for(const button of panel.querySelectorAll('button[data-youtube-operation]'))button.disabled=busy||Boolean(pending);
   $('youtubeSubmit').disabled=!review||busy||Boolean(pending);
+  $('youtubeSubmit').textContent=review?.action==='publish'?'確認した動画の公開設定を変更':'確認した内容で非公開送信・再開';
   $('youtubeRecover').hidden=!pending;$('youtubeRecover').disabled=busy;
  }
  function selectVideo(){
@@ -33,7 +36,7 @@ export function mountYouTube(){
   try{$('youtubeDescription').value=video?socialBody(video.social,video.tarot?.zodiac,''):'';}catch{$('youtubeDescription').value='';}
  }
  function render(){
-  $('youtubeSetup').textContent=state.setup?`投稿先：${state.channel?.name||'接続確認が必要'} ${state.channel?.id||''}`:'初回認証・Secrets登録待ち（操作ガイド参照）';
+  $('youtubeSetup').textContent=state.setup?`投稿先：${state.channel?.name||'接続確認が必要'} ${state.channel?.id||''} ／ 公開設定の更新権限：${state.channel?.can_update?'確認済み':'PR8の認証手順で登録が必要'}`:'初回認証・Secrets登録待ち（操作ガイド参照）';
   const selected=$('youtubeVideo').value;
   $('youtubeVideo').replaceChildren();
   for(const video of Object.values(state.videos||{})){
@@ -50,6 +53,13 @@ export function mountYouTube(){
    if(post.error)box.append(node('p',post.error));
    if(/^[\w-]{11}$/.test(post.video_id||'')){
     const link=node('a','YouTube Studioで確認');link.href=`https://studio.youtube.com/video/${post.video_id}/edit`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
+    box.append(node('p',post.remote?REMOTE_LABEL[post.remote.state]||'状態の確認が必要です':'公開状態は未照合です。先に照合してください。'));
+    if(post.remote?.checked_at)box.append(node('p','最終照合：'+dueLabel(post.remote.checked_at)));
+    if(post.remote?.publish_at)box.append(node('p','YouTubeの予約日時：'+dueLabel(post.remote.publish_at)));
+    if(post.publication){box.append(node('p',PUBLICATION_LABEL[post.publication.status]||'公開設定を確認してください'));if(post.publication.error)box.append(node('p',post.publication.error));}
+    const sync=node('button','この動画の公開状態を照合');sync.className='secondary';sync.dataset.youtubeOperation='sync';
+    sync.onclick=()=>run({action:'sync_one',source_id:post.source_id,video_id:post.video_id,channel_id:post.channel_id});box.append(sync);
+    if(post.can_publish&&state.channel?.can_update)publicationControls(box,post);
    }else{
     const button=node('button','同じ送信の状態確認・再開');button.className='secondary';button.disabled=busy||Boolean(pending)||!post.can_resume;
     button.onclick=()=>{review={action:'resume',confirmed:true,source_id:post.source_id,channel_id:post.channel_id};$('youtubeReview').replaceChildren(node('p',`${post.metadata?.snippet?.title} ／ ${post.channel_id} ／ 非公開の同じ送信のみ確認・再開します。新規アップロードは作りません。`));controls();};box.append(button);if(!post.can_resume)box.append(node('p','送信情報を確認できません。YouTube Studioで確認してください。新規送信は保留します。'));
@@ -58,6 +68,22 @@ export function mountYouTube(){
   }
   if(!state.videos?.[selected])selectVideo();controls();
  }
+ function publicationControls(box,post){
+  const field=(label,input)=>{const l=node('label',label);l.append(input);box.append(l);return input;};
+  const mode=field('この動画の公開設定',node('select'));mode.dataset.youtubeVisibility=post.video_id;
+  for(const [value,label] of [['','選択してください'],['public','今すぐ公開'],['unlisted','限定公開'],['scheduled','日時を指定して予約公開']]){const option=node('option',label);option.value=value;mode.append(option);}
+  mode.value='';
+  const due=field('予約公開日時（日本時間・予約公開のみ）',node('input'));due.type='datetime-local';due.value=jstInput(new Date(Date.now()+3600000).toISOString());due.hidden=true;
+  const check=field('非公開動画をStudioで再生し、内容・タイトル・説明文・カテゴリを確認しました',node('input'));check.type='checkbox';check.parentElement.className='check';check.dataset.youtubeReviewed=post.video_id;
+  const build=node('button','この動画の公開設定を確認');build.className='secondary';build.dataset.youtubeOperation='review';
+  mode.onchange=()=>{due.hidden=mode.value!=='scheduled';check.checked=false;invalidate();};
+  due.oninput=()=>{check.checked=false;invalidate();};check.onchange=invalidate;
+  build.onclick=()=>{try{
+   review=publicationReview(post,state.channel,{visibility:mode.value,due:due.value,reviewed:check.checked});
+   const label={public:'今すぐ公開（誰でも視聴できます）',unlisted:'限定公開（URLを知る人が視聴できます）',scheduled:'予約公開：'+dueLabel(review.publish_at)}[review.visibility];
+   $('youtubeReview').replaceChildren(node('strong',post.remote.title),node('p',`投稿先：${state.channel.name} (${state.channel.id}) ／ 動画ID：${post.video_id}`),node('p',label),node('p','同じ動画の公開設定だけを変更します。新しい動画はアップロードしません。'));controls();
+  }catch(e){invalidate();say(e.message);}};box.append(build);
+ }
  async function refresh(){
   const repository=repo();
   try{const result=await api('contents/view.json?ref=youtube-state');if(repository!==repo())return;state=decode(result.content);}
@@ -65,6 +91,10 @@ export function mountYouTube(){
   if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
    if(['completed','failed'].includes(result.status)){pending=null;save();invalidate();}
+  }
+  if(review?.action==='publish'){
+   const post=Object.values(state.uploads||{}).find(p=>p.video_id===review.video_id&&p.channel_id===review.channel_id);
+   if(!post?.can_publish||post.remote?.etag!==review.etag)invalidate();
   }
   render();polling();
  }
@@ -79,7 +109,7 @@ export function mountYouTube(){
   try{const current=await api(ref);if(current.object.sha!==pending.sha)throw Error('受付入力が変更されています');}
   catch(e){if(e.status!==404)throw e;await api('git/refs','POST',{ref:`refs/heads/youtube-input/${pending.id}`,sha:pending.sha});}
   await api('actions/workflows/youtube_private.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha}});
-  say('受け付けました。非公開の送信結果を一覧更新で確認してください。画面を閉じられます。');
+  say('受け付けました。YouTubeの処理結果を一覧更新で確認してください。画面を閉じられます。');
  }
  async function run(request){
   if(busy||pending)return;busy=true;controls();
@@ -94,6 +124,7 @@ export function mountYouTube(){
   finally{busy=false;controls();polling();}
  }
  $('youtubeConnect').onclick=()=>run({action:'connect'});
+ $('youtubeSync').onclick=()=>run({action:'sync'});
  $('youtubeRefresh').onclick=()=>refresh().catch(e=>say(e.message));
  $('youtubeImport').onclick=()=>{const runId=$('youtubeRun').value.trim();if(!/^\d+$/.test(runId)){say('生成履歴の実行IDを指定してください');return;}run({action:'import',run_id:runId});};
  $('youtubeRecover').onclick=async()=>{if(busy)return;busy=true;controls();try{await refresh();if(pending){if(pending.sha)await dispatch();else{pending=null;save();say('送信前の受付を取り消しました。内容を確認してやり直してください');}}}catch(e){say(e.message);}finally{busy=false;controls();polling();}};
