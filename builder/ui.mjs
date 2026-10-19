@@ -1,16 +1,17 @@
-import {mountPresentationEditor} from './presentation-editor.mjs?v=presentation-editor-20261019';
+import {formatConfig} from './presentation.mjs?v=presentation-active-20261019';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=presentation-active-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=presentation-editor-20261019';
-import {mountBatchEditor} from './batch-editor.mjs?v=presentation-editor-20261019';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-editor-20261019';
+import {mountSingleEditor} from './single-editor.mjs?v=presentation-active-20261019';
+import {mountBatchEditor} from './batch-editor.mjs?v=presentation-active-20261019';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-active-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-editor-20261019';
-import {buildPrompt} from './prompt.mjs?v=presentation-editor-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-editor-20261019';
-import {decodeContent} from './storage.mjs?v=presentation-editor-20261019';
-import {drawPreview} from './preview.mjs?v=presentation-editor-20261019';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=presentation-active-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-active-20261019';
+import {buildPrompt} from './prompt.mjs?v=presentation-active-20261019';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
+import {decodeContent} from './storage.mjs?v=presentation-active-20261019';
+import {drawPreview} from './preview.mjs?v=presentation-active-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -30,6 +31,7 @@ export function mountBuilder(apiProvider) {
   };
   async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
   function config() {return resolveConfig(registry,session);}
+  function previewConfig() {const c=config();if(c.video.template==='tarot_monthly')return c;const format=session.designFormat||(c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format);return formatConfig(c,format);}
   const configuredInput=()=>singleTarot.configured(config());
   function invalidate() {
     snapshot=null;$('pbPrompt').value='';$('pbBatchSourcePrompt').value='';
@@ -47,9 +49,10 @@ export function mountBuilder(apiProvider) {
         title=tarotTitle(c.tarot);
       }
       const previewFormat=c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format;
-      const preview={...c,video:{...c.video,format:previewFormat},width:previewFormat==='vertical'?1080:1920,height:previewFormat==='vertical'?1920:1080};
+      const preview=c.video.template==='tarot_monthly'?{...c,video:{...c.video,format:previewFormat},width:previewFormat==='vertical'?1080:1920,height:previewFormat==='vertical'?1920:1080}:previewConfig();
+      preview.scenery=$('pbPreviewScenery').checked;
       const script=(()=>{try{return JSON.parse($('script').value);}catch{return {};}})();
-      const themeTitle=c.ai.theme==='manual'?c.ai.theme_title:(script.global_settings?.theme?.title||script.theme_title||'テーマタイトル');
+      const themeTitle=preview.design?.theme.title|| (c.ai.theme==='manual'?c.ai.theme_title:(script.global_settings?.theme?.title||script.theme_title||'テーマタイトル'));
       drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset,themeTitle);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
@@ -81,6 +84,7 @@ export function mountBuilder(apiProvider) {
     $('pbPreviewFormatField').hidden=v.output_mode!=='vertical_horizontal';
     if(v.output_mode==='horizontal_only')$('pbPreviewFormat').value='landscape';
     else if(v.output_mode!=='vertical_horizontal')$('pbPreviewFormat').value='vertical';
+    if(!tarot&&session.designFormat)$('pbPreviewFormat').value=session.designFormat;
     const fixedTarot=tarot&&v.tarot_renderer==='remotion';
     const batch=isBatch(v);
     $('pbProductionMode').parentElement.hidden=!tarot;
@@ -151,19 +155,19 @@ export function mountBuilder(apiProvider) {
   }
   presentationEditor=mountPresentationEditor({root:$('pdEditor'),getConfig:config,
     getFormat:()=>session.designFormat||resolvePreset(registry,'video',session.video_preset).values.format||VIDEO_DEFAULTS.format,
-    setFormat:format=>{session.designFormat=format;},onChange:value=>{session.presentation=value;}});
+    setFormat:format=>{session.designFormat=format;$('pbPreviewFormat').value=format;paint();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background)image=null;if(config().video.template!=='tarot_monthly')invalidate();paint();}});
   const modeSessions=new Map();
   async function loadBackgroundPreview(announce=false) {
-    const c=config();
+    const c=previewConfig();
     if(c.video.background_mode==='stock'||c.video.template==='tarot_monthly')return;
-    const file=c.background,request=++imageRequest;
+    const file=c.background,format=c.video.format,request=++imageRequest;
     const r=await connection()(`contents/media/${file.split('/').map(encodeURIComponent).join('/')}?ref=main`);
-    if(request!==imageRequest||file!==session.background)return;
+    if(request!==imageRequest||file!==previewConfig().background||format!==previewConfig().video.format)return;
     const decoded=atob(r.content.replace(/\s/g,''));
     const bytes=Uint8Array.from(decoded,char=>char.charCodeAt(0));
     const url=URL.createObjectURL(new Blob([bytes])),img=new Image();
     try {await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('背景画像をプレビューできません'));img.src=url;});
-      if(file===session.background){image=img;paint();if(announce)status('背景画像を読み込みました');}
+      if(file===previewConfig().background&&format===previewConfig().video.format){image=img;paint();if(announce)status('背景画像を読み込みました');}
     }finally{URL.revokeObjectURL(url);}
   }
   function refreshBackground() {
@@ -201,7 +205,7 @@ export function mountBuilder(apiProvider) {
   }
   $('script').addEventListener('input',paint);
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
-  $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=paint;$('pbSafe').onchange=paint;
+  $('pbPreviewIntro').onchange=paint;$('pbPreviewFormat').onchange=()=>{if(config().video.template!=='tarot_monthly'){session.designFormat=$('pbPreviewFormat').value;presentationEditor.render();refreshBackground();}paint();};$('pbPreviewScenery').onchange=paint;$('pbSafe').onchange=paint;
   $('pbBackgroundPreview').onclick=()=>run(()=>loadBackgroundPreview(true));
   $('pbLoad').onclick=()=>run(async()=>{
     const api=connection(), expected=$('repo').value.trim();
@@ -223,7 +227,7 @@ export function mountBuilder(apiProvider) {
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
-  $('pbBuild').onclick=()=>{try{const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
+  $('pbBuild').onclick=()=>{try{presentationEditor.assertValid();const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
     if(!$('pbApplyOnSend').checked)return script;
