@@ -1,4 +1,4 @@
-import {socialBody} from './builder/social-data.mjs?v=single-social-20261016';
+import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
 const WORKFLOW='social_publish.yml';

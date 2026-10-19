@@ -1,5 +1,7 @@
+import {MBTI_NAMES} from './subjects.mjs?v=mbti-20261019';
 export const LINE_CTA='占い無料鑑定・無料コーチングはプロフィールの公式LINEから！';
 export const ZODIAC_TAGS={aries:'牡羊座',taurus:'牡牛座',gemini:'双子座',cancer:'蟹座',leo:'獅子座',virgo:'乙女座',libra:'天秤座',scorpio:'蠍座',sagittarius:'射手座',capricorn:'山羊座',aquarius:'水瓶座',pisces:'魚座'};
+Object.assign(ZODIAC_TAGS,MBTI_NAMES);
 export function normalizeSocial(value,zodiac){
  if(value===undefined||value===null)return undefined;
  if(!value||typeof value!=='object'||Array.isArray(value)||(zodiac!==undefined&&!ZODIAC_TAGS[zodiac]))throw Error('投稿情報の形式が不正です');

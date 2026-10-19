@@ -1,5 +1,6 @@
-import {promptConfig,requestedFormats} from './presentation.mjs?v=tarot-brand-20261019';
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=tarot-brand-20261019';
+import {subjectKind} from './subjects.mjs?v=mbti-20261019';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=mbti-20261019';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=mbti-20261019';
 
 const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -31,7 +32,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     const title=tarotTitle(config.tarot);
     if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
     return [
-      '次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。星座名の字幕と冒頭タイトルはひらがな（例: おうし座、いて座）で表示する。読み上げ原稿は変更しない。',
+      subjectKind(config)==='mbti'?'次の原稿を月間MBTIタロットのscene JSONへ分割する。原稿を変更しない。MBTIタイプ名は英大文字のまま。性格を断定しない。':'次のナレーション原稿を、月間星座タロットの動画用JSONにしてください。JSONのみ出力。原稿の言葉を変更・追加・要約しない。星座名の字幕と冒頭タイトルはひらがな（例: おうし座、いて座）で表示する。読み上げ原稿は変更しない。',
       'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
       `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚のカードIDと向き（upright=正位置、reversed=逆位置）は人間が確定した結果です。変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。原稿にない正逆の読み上げは追加しないこと。`,
       JSON.stringify(config.tarot,null,2),

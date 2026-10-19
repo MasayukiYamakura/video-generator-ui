@@ -1,3 +1,4 @@
+import {subjects,subjectMeta} from './builder/subjects.mjs?v=mbti-20261019';
 import {stableVisuals} from './builder/tarot-visual.mjs?v=visual-20261016';
 const WORKFLOW='generate_ai_json.yml';
 const SIGNS=['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
@@ -15,8 +16,9 @@ function ctaEnabled(){return Boolean($('pb_cta_enabled')?.checked);}
 function aiBgm(){return ['ai','category'].includes($('pb_bgm_mode')?.value)&&($('pb_bgm_mode')?.value==='ai'||$('pb_bgm_category')?.value==='ai');}
 function targeted(prompt,zodiac,kind){
   const label=kind==='source'?'占い結果':'動画用scene JSON';
-  return `重要: 次の依頼全体のうち zodiac=${zodiac} の1星座だけを生成してください。他の星座は生成しません。Structured Outputsのスキーマに厳密に従い、${label}を返してください。\n\n${prompt}`;
+  return `重要: 次の依頼全体のうち zodiac=${zodiac} の1対象だけを生成してください。他の対象は生成しません。Structured Outputsのスキーマに厳密に従い、${label}を返してください。\n\n${prompt}`;
 }
+const subjectConfig=()=>window.videoConfigurator?.previewConfig();
 function batchDetails(){return [...document.querySelectorAll('#pbBatchEntries details')];}
 function requestedBatchSigns(){
   return batchDetails().filter(d=>d.querySelector('.batch-select')?.checked&&!d.querySelector('summary')?.textContent.includes('AI出力取込済')).map(d=>d.dataset.sign);
@@ -42,7 +44,7 @@ export function buildSingleRequest(){
   const prompt=$('pbPrompt')?.value||'';
   if(!prompt)throw Error('先に月間星座タロットの入力内容を確認してください');
   const tarot=window.videoConfigurator?.previewConfig()?.video.template==='tarot_monthly';
-  return {version:1,kind:'single-scenes',prompt,tarot,cta_enabled:tarot&&ctaEnabled(),cta_text:tarot?$('pbTarotCtaText')?.value.trim()||'':'',allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[]};
+  return {version:1,kind:'single-scenes',...subjectMeta(subjectConfig()),prompt,tarot,cta_enabled:tarot&&ctaEnabled(),cta_text:tarot?$('pbTarotCtaText')?.value.trim()||'':'',allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[]};
 }
 export function buildBatchScenesRequest(){
   $('pbBatchBuild')?.click();
@@ -51,15 +53,16 @@ export function buildBatchScenesRequest(){
   const signs=requestedBatchSigns();
   if(!signs.length)throw Error('AI出力が必要な星座がありません');
   const bySign=Object.fromEntries(batchDetails().map(d=>[d.dataset.sign,d]));
-  return {version:1,kind:'batch-scenes',allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[],items:signs.map(zodiac=>({zodiac,prompt:targeted(prompt,zodiac,'scenes'),cards:expectedCards(bySign[zodiac]),cta_enabled:ctaEnabled(),cta_text:batchCta(bySign[zodiac])}))};
+  return {version:1,kind:'batch-scenes',...subjectMeta(subjectConfig()),allowed_bgm_categories:aiBgm()?BGM_CATEGORIES:[],items:signs.map(zodiac=>({zodiac,prompt:targeted(prompt,zodiac,'scenes'),cards:expectedCards(bySign[zodiac]),cta_enabled:ctaEnabled(),cta_text:batchCta(bySign[zodiac])}))};
 }
 export function buildBatchSourceRequest(){
   $('pbBatchSourcePromptBuild')?.click();
   const prompt=$('pbBatchSourcePrompt')?.value||'';
   if(!prompt)throw Error('占い結果用の入力内容を確認してください');
   const year=Number($('pbBatchYear')?.value),month=Number($('pbBatchMonth')?.value),period=$('pbBatchPeriod')?.value;
+  const SIGNS=Object.keys(subjects(subjectConfig()));
   const visuals=stableVisuals(SIGNS,prompt);
-  return {version:1,kind:'batch-source',year,month,period,cta_enabled:ctaEnabled(),shared_cta:$('pbBatchCta')?.value.trim()||'',items:SIGNS.map(zodiac=>({zodiac,visual:visuals[zodiac],prompt:targeted(prompt,zodiac,'source')+'\nこの星座のvisualは全体で偏りなくランダム割当済みです。次の値を変更せず出力してください：'+JSON.stringify(visuals[zodiac])}))};
+  return {version:1,kind:'batch-source',...subjectMeta(subjectConfig()),year,month,period,cta_enabled:ctaEnabled(),shared_cta:$('pbBatchCta')?.value.trim()||'',items:SIGNS.map(zodiac=>({zodiac,visual:visuals[zodiac],prompt:targeted(prompt,zodiac,'source')+'\nこの星座のvisualは全体で偏りなくランダム割当済みです。次の値を変更せず出力してください：'+JSON.stringify(visuals[zodiac])}))};
 }
 
 async function submit(request){
@@ -125,7 +128,7 @@ function apply(kind,data){
     status('Gemini Structured Outputsの結果をscript.jsonへ反映しました。内容を確認して動画生成できます。');return;
   }
   if(kind==='batch-source'){
-    $('pbBatchSource').value=JSON.stringify(data,null,2);$('pbBatchSourceImport').click();status('12星座の占い結果を取り込みました。内容を確認してください。');return;
+    $('pbBatchSource').value=JSON.stringify(data,null,2);$('pbBatchSourceImport').click();status((subjectConfig()?.video.tarot_subject==='mbti'?'16タイプ':'12星座')+'の占い結果を取り込みました。内容を確認してください。');return;
   }
   if(kind==='batch-scenes'){
     $('pbBatchResponse').value=JSON.stringify(data,null,2);$('pbBatchImport').click();status('Gemini生成シーンを取り込みました。内容を確認してください。');return;

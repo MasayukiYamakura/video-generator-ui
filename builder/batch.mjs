@@ -1,7 +1,8 @@
+import {subjects,subjectKind,subjectMeta,MBTI_NAMES} from './subjects.mjs?v=mbti-20261019';
 import {normalizeVisual} from './tarot-visual.mjs?v=visual-20261016';
-import {normalizeSocial} from './social-data.mjs?v=batch-social-20261016';
+import {normalizeSocial} from './social-data.mjs?v=mbti-20261019';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=tarot-brand-20261019';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=mbti-20261019';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
@@ -9,6 +10,8 @@ export const CTA_PHRASES=['コメントで感想教えてね','見返せるよ�
 const cardIds=new Set(TAROT_CARDS.map(card=>card.id));
 const cardNames=new Map(TAROT_CARDS.map(card=>[card.id,card.name]));
 export function batchConfig(shared, zodiac, entry) {
+  const TAROT_SIGNS=subjects(shared);
+  if(!TAROT_SIGNS[zodiac])throw Error('対象IDが不正です');
   if(!Number.isInteger(entry.year)||entry.year<2000||entry.year>2100
     ||!Number.isInteger(entry.month)||entry.month<1||entry.month>12
     ||!['full','first','second'].includes(entry.period))throw Error('占う年・月・期間を確認してください');
@@ -18,13 +21,14 @@ export function batchConfig(shared, zodiac, entry) {
   if(cards.some(card=>!['upright','reversed'].includes(card.orientation)))
     throw Error(`${TAROT_SIGNS[zodiac]}のカードの向きを確認してください`);
   const c=structuredClone(shared);
-  c.tarot={year:entry.year,month:entry.month,period:entry.period,zodiac,cards,visual:normalizeVisual(entry.visual)};
+  c.tarot={...subjectMeta(shared),year:entry.year,month:entry.month,period:entry.period,zodiac,cards,visual:normalizeVisual(entry.visual)};
   c.cta_text=entry.cta || entry.sharedCta;
   if(c.video.cta_enabled&&(!c.cta_text||Array.from(c.cta_text).length>40))
     throw Error(`${TAROT_SIGNS[zodiac]}のCTAは1〜40文字にしてください`);
   return c;
 }
 export function batchPrompt(shared, entries, bgmCatalog) {
+  const TAROT_SIGNS=subjects(shared);
   const tasks=entries.map(([zodiac,entry])=>{
     if(!entry.narration.trim())throw Error(`${TAROT_SIGNS[zodiac]}のナレーション原稿を入力してください`);
     const config=batchConfig(shared,zodiac,entry);
@@ -33,7 +37,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
   });
   const aiBgm=shared.video.bgm_mode==='ai';
   if(aiBgm&&!availableCategories(bgmCatalog).length)throw Error('AIでBGMを選ぶには登録一覧を読み込んでください');
-  return [
+  return subjectPrompt([
     '月間星座タロット動画のscene JSONを、次の各星座について独立して作成してください。',
     'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
     'JSONのみ出力。説明・Markdown・コードフェンスは不要。形式: {"videos":[{"zodiac":"aries","cards":[{"position":"overall","card_id":"...","orientation":"upright"},...],"scenes":[...]},...]}。cardsは確定データの4枚を順序・ID・orientationを変えずに写す。BGMをAIが選ぶ場合は各videoにbgm_categoryも付ける。',
@@ -48,10 +52,11 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     '途中で全件を返せない場合は完成した星座のみを、必ず閉じた有効なJSONとして返す。不足分は別の依頼で作成する。',
     '【星座別の確定データ】',
     JSON.stringify(tasks,null,2),
-  ].join('\n\n');
+  ].join('\n\n'),shared);
 }
 function plain(text) {return text.replaceAll('[[','').replaceAll(']]','').replace(/\s/g,'');}
 export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
+  const TAROT_SIGNS=subjects(shared);
   if(!selected.length||selected.some(sign=>!TAROT_SIGNS[sign])||new Set(selected).size!==selected.length)
     throw Error('制作する星座を選択してください');
   if(shared.video.voice_mode!=='tts'||shared.video.tarot_renderer!=='remotion'||shared.video.template!=='tarot_monthly')
@@ -71,9 +76,10 @@ export function compileBatch(shared, entries, responses, selected, bgmCatalog) {
   });
   const size=new TextEncoder().encode(JSON.stringify({version:1,videos})).length;
   if(size>1024*1024)throw Error('一括入力は1 MiBまでです');
-  return {version:1,videos};
+  return {version:1,...subjectMeta(shared),videos};
 }
 export function importBatch(text, requested, entries=null) {
+  const TAROT_SIGNS={...subjects(),...MBTI_NAMES};
   if(new TextEncoder().encode(text).length>1024*1024)throw Error('AIの回答は1 MiBまでです');
   let data;
   try{data=JSON.parse(text);}
@@ -109,11 +115,13 @@ function narrationWarnings(text, sign, period) {
   return warnings;
 }
 // This is a source-data import. The existing importBatch handles the later scenes response.
-export function importBatchSource(text) {
+export function importBatchSource(text,kind='zodiac') {
+  const TAROT_SIGNS=subjects(kind),SIGNS=Object.entries(TAROT_SIGNS);
   if(new TextEncoder().encode(text).length>1024*1024)throw Error('占い結果JSONは1 MiBまでです');
   let data;
   try{data=JSON.parse(text);}
   catch{throw Error('占い結果JSONが不正です。JSONのみを貼り付けてください');}
+  if(subjectKind(data)!==subjectKind(kind))throw Error('対象の種類が一致しません');
   if(data?.version!==1||!Number.isInteger(data.year)||data.year<2000||data.year>2100
     ||!Number.isInteger(data.month)||data.month<1||data.month>12
     ||!['full','first','second'].includes(data.period)
@@ -152,10 +160,11 @@ export function importBatchSource(text) {
   if(descriptions.length>1&&new Set(descriptions).size===1)warnings.push('全星座の投稿説明文が完全一致しています。星座ごとの内容を確認してください。');
   return {year:data.year,month:data.month,period:data.period,entries:found,warnings};
 }
-export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='') {
+export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='',kind='zodiac') {
+  const SIGNS=Object.entries(subjects(kind));
   if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12
     ||!['full','first','second'].includes(period))throw Error('占う年・月・対象期間を確認してください');
-  return [
+  return subjectPrompt([
     '次の12星座の占い結果を、画面への一括入力用JSONとして作成してください。JSONのみ。Markdown・説明・省略は不要。',
     'JSONのキーと文字列を囲む引用符は、必ずASCII半角のダブルクォート "（U+0022）を使う。“ ” ＂ などの装飾引用符に置き換えない。出力前にJSONとして解析可能か確認する。',
     `共通設定: year=${year}, month=${month}, period=${period} (full=月全体, first=前半, second=後半)。`,
@@ -173,7 +182,17 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     '各videoにsocial.description（星座名・対象期間と今回の原稿に基づく紹介を1〜2文、500文字以内）とsocial.hashtags（内容に関連するハッシュタグ2個の配列）を付ける。原稿にない結果は追加しない。説明文にタイトルの丸写し・ハッシュタグ・LINE誘導文は入れない。必須タグの #大阪 #占い #星座名 とLINE誘導文はシステムが付けるため生成不要。関連タグ2個は互いに異なり、必須タグと重複させない。',
     '各videoにvisualを付ける。形式は '+JSON.stringify(normalizeVisual())+'。background_themeはmidnight_blue/deep_purple/dark_green、shuffle_variant・cut_variant・spread_variantはそれぞれa/b/c、card_back_designはcelestial/geometric/botanical。5項目それぞれの選択肢を12星座中4回ずつ使い、星座への割当をランダムにする。5項目の組み合わせは重複させない。1本内で通常シャッフル→レボリューションカット→円形スプレッドをすべて使う。',
     'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
-  ].join('\n\n');
+  ].join('\n\n'),kind);
 }
 
 
+
+function subjectPrompt(text,value) {
+ if(subjectKind(value)!=='mbti')return text;
+ return text.replaceAll('12星座','16タイプ').replaceAll('星座','タイプ').replaceAll('"zodiac":"aries"','"zodiac":"intj"')
+ .replaceAll('16タイプ中4回ずつ','16タイプ中5〜6回ずつ')
+ .replace(/タイプ名は字幕に使うため、ひらがな表記（[^）]+）で書く。/g,'MBTIタイプ名は英大文字（INFJ等）で書く。')
+ .replace(/タイプ名をひらがな（例: おうし座、いて座）で表示し/g,'MBTIタイプ名を英大文字のまま表示し')
+ .replaceAll('"version":1,','"version":1,"subject_kind":"mbti",')
+ +'\n\nMBTI月間タロットです。対象は16タイプ。内部のzodiacキーにはタイプの小文字IDを入れ、表示は英大文字にする。subject_kindはmbti。性格や未来を断定せず、カードから生活のヒントを提案する。';
+}
