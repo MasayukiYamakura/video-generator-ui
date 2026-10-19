@@ -12,7 +12,7 @@ export const VIDEO_DEFAULTS = Object.freeze({
   voice_mode:'original', tts_voice:'hashimoto', tts_style:'natural', tts_pace:'normal', tts_custom_style:'', hook_band_enabled:false,
 });
 const ALL_VIDEO_PRESETS = [
-  {id:'tiktok_standard', name:'TikTok標準', default_layout:'portrait_standard', values:{
+  {id:'tiktok_standard', name:'思想語り', default_layout:'portrait_standard', values:{
     format:'vertical', template:'portrait_brand', hook_enabled:true,
     hook_orientation:'horizontal', intro_scenes:1, intro_caption:false,
     body_tags:true, body_visualizer:true, background_mode:'mixed',
@@ -36,7 +36,7 @@ const ALL_VIDEO_PRESETS = [
   {id:'youtube_landscape', name:'YouTube横型', default_layout:'landscape_standard', values:{}},
 ];
 // Retired IDs remain resolvable for saved presets and exact legacy rendering.
-export const COMPAT_VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>['tiktok_anonymous','tarot_monthly','tarot_monthly_batch','tiktok_vertical_hook'].includes(p.id));
+export const COMPAT_VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>['tiktok_anonymous','tarot_monthly','tarot_monthly_batch','tiktok_vertical_hook','youtube_landscape'].includes(p.id));
 export const VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>!COMPAT_VIDEO_PRESETS.includes(p));
 export const LAYOUT_DEFAULTS = Object.freeze({
   tag_x:36, tag_y:126, visualizer_x:960, visualizer_y:500,
@@ -79,6 +79,7 @@ export const SYSTEM = Object.freeze({
     max_bar_height_ratio:0.08, visualizer_opacity:0.95,
     visualizer_glow_strength:0.4, update_fps:20, background:'video'},
 });
+
 
 
 

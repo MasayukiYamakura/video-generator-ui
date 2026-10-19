@@ -1,5 +1,6 @@
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
-import {clone, assertObject} from './model.mjs?v=presentation-editor-20261019';
+import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=presentation-active-20261019';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=presentation-active-20261019';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=presentation-active-20261019';
 import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
@@ -65,7 +66,25 @@ export function tarotTitle(tarot) {
 export function availableCategories(bgmCatalog) {
   return CATEGORIES.filter(category=>bgmCatalog?.tracks?.some(t=>t.categories?.includes(category)));
 }
-export function applyConfig(script, config, bgmCatalog) {
+export function applyConfig(script, config, bgmCatalog, formatPass=false) {
+  if(!formatPass&&config.video.template!=='tarot_monthly') {
+    const slots={version:1},views={},formats=requestedFormats(config);
+    for(const format of formats) {
+      const c=formatConfig(config,format),slot=designDefaults(config,format);
+      const source={...script,scenes:script.scenes.map(s=>({...s,...(c.video.hook_enabled&&!s.hook_text?{hook_text:s.text}:{})}))};
+      views[format]=applyConfig(source,c,bgmCatalog,true);
+      slot.theme.title=views[format].global_settings.theme.title||slot.theme.title||views[format].scenes[0].hook_text||views[format].scenes[0].text;
+      slots[format]=slot;
+    }
+    const base=clone(views[formats[0]]);
+    base.global_settings.format=config.video.format;base.global_settings.output_mode=config.video.output_mode;
+    if(config.video.template==='portrait_brand')base.global_settings.template='portrait_brand';
+    validatePresentation(slots);
+    base.global_settings.presentation=slots;
+    const keys=['caption_enabled','category_tags','visualizer','theme_visible','subtitle_visible','hook_text','media_type','media_query'];
+    base.scenes.forEach((scene,i)=>{scene.presentation=Object.fromEntries(formats.map(format=>[format,Object.fromEntries(keys.filter(k=>Object.hasOwn(views[format].scenes[i],k)).map(k=>[k,views[format].scenes[i][k]]))]));});
+    return base;
+  }
   assertObject(script,'AI出力');
   if(!Array.isArray(script.scenes)||!script.scenes.length||script.scenes.length>1000) throw Error('空ではないscenes配列が必要です（最大1000）');
   const {video:v,ai}=config, g=fixedSettings(config);
@@ -81,8 +100,8 @@ export function applyConfig(script, config, bgmCatalog) {
   }
   if(g.theme.enabled) {
     const title=ai.theme==='manual' ? ai.theme_title : script.global_settings?.theme?.title ?? script.theme_title;
-    if(typeof title!=='string'||!title.trim()) throw Error('横型動画のテーマタイトルが必要です');
-    g.theme.title=title;
+    if((typeof title!=='string'||!title.trim())&&!config.design) throw Error('横型動画のテーマタイトルが必要です');
+    g.theme.title=title||config.design?.theme.title||script.scenes?.[0]?.hook_text||script.scenes?.[0]?.text||'';
   }
   if(v.template==='tarot_monthly') {
     if(!config.tarot) throw Error('占い設定がありません');

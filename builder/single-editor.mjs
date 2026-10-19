@@ -1,4 +1,4 @@
-import {TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=presentation-editor-20261019';
+import {TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=presentation-active-20261019';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 const $=id=>document.getElementById(id);

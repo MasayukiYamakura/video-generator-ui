@@ -1,26 +1,9 @@
 // Staged design editor: validates and saves metadata, never compiles a script.
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,validatePresentation,clone} from './model.mjs?v=presentation-editor-20261019';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,validatePresentation,clone} from './model.mjs?v=presentation-active-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
-import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=landscape-theme-20261019';
+import {designDefaults} from './presentation.mjs?v=presentation-active-20261019';
+export {designDefaults} from './presentation.mjs?v=presentation-active-20261019';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
-
-export function designDefaults(config,format) {
-  const w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;
-  const same=format===config.video.format;
-  const layout=same?{...config.layout}:{...LAYOUT_DEFAULTS,...LAYOUT_PRESETS.find(p=>p.id===(format==='vertical'?'portrait_standard':'landscape_standard')).values};
-  if(!same&&format==='landscape')Object.assign(layout,{hook_center_y:250,caption_center_y:690,tag_x:710,tag_y:55,
-    visualizer_x:1320,visualizer_y:900,visualizer_size:500,hook_font_size:config.video.template==='portrait_brand'?62:72,
-    caption_font_size:52,max_width_ratio:config.video.template==='portrait_brand'?0.52:0.84});
-  const slot={video:Object.fromEntries(PRESENTATION_VIDEO_KEYS.map(k=>[k,config.video[k]])),layout:{...layout,
-    caption_center_x:Math.round(w*(format==='landscape'&&config.video.template==='portrait_brand'?0.68:0.5)),
-    hook_center_x:Math.round(w*(format==='landscape'&&config.video.template==='portrait_brand'?0.68:0.5)),tag_font_size:40,tag_scale:1},
-    background:config.background,theme:{title:config.ai.theme_title||'',subtitle:'ハシモトの占いと思想'},
-    icon:{file:'icon.png',x:40,y:60,size:90,intro:false,body:false},
-    person:{file:config.background,x:36,y:0,width:Math.min(600,w),height:h,enabled:true},scenery_visibility:{}};
-  if(!same&&format==='landscape')slot.video.hook_orientation='horizontal';
-  const merged=mergePresentation({version:1,[format]:slot},config.presentation);
-  return clone(merged[format]);
-}
 
 export function mountPresentationEditor({root,getConfig,getFormat,setFormat,onChange}) {
   const errors=new Map(),controls=[];
@@ -89,7 +72,7 @@ export function mountPresentationEditor({root,getConfig,getFormat,setFormat,onCh
       if(section==='scenery_visibility')value=value===undefined?'inherit':value?'show':'hide';
       if(type==='checkbox')input.checked=Boolean(value);else input.value=value??'';
     }
-    message.textContent=`${format==='vertical'?'縦型':'横型'}の保存用デザインを編集中。動画・プレビューへの適用は準備中です。`;
+    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${getConfig().video.template==='tarot_monthly'?'タロットへの適用は準備中です。':'動画とプレビューに適用します。'}`;
   }
   function reset(){errors.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};

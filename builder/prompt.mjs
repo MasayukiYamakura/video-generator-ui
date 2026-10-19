@@ -1,4 +1,5 @@
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=presentation-editor-20261019';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=presentation-active-20261019';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
 
 const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -19,6 +20,8 @@ const commonRules = correctTypos => [
   '本人映像の明示指示がある場合のみ、media_type:local、指定されたファイル名media_query、text:""、開始・終了秒、media_startを記録する。',
 ];
 export function buildPrompt(config, transcript='', bgmCatalog=null, output='full') {
+  const formats=requestedFormats(config);
+  config=promptConfig(config);
   const {video:v,layout:l,ai}=config, settings=fixedSettings(config);
   const zodiac=v.template==='tarot_monthly'?config.tarot?.zodiac:undefined;
   const socialRule=`動画の原稿に基づく投稿用socialを必ずルートに付ける。形式は {"description":"紹介文","hashtags":[${zodiac?'"#関連語1","#関連語2"':'"#関連語1","#関連語2","#関連語3"'}]}。descriptionは原稿の要点を紹介する日本語1〜2文・500文字以内。原稿にない結果を加えず、タイトルの丸写しを避ける。descriptionにはハッシュタグとLINE案内を含めない。hashtagsは内容に関連する重複しない${zodiac?'2':'3'}個。#大阪、#占い${zodiac?'、#星座名':''}と「占い無料鑑定・無料コーチングはプロフィールの公式LINEから！」はシステムが追加するため、AIのsocialに含めない。`;
@@ -44,7 +47,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       ...(v.cta_enabled?['【最後に読むCTA文（上の原稿の続き）】',config.cta_text]:[]),
     ].join('\n\n');
   }
-  const correctTypos=v.format==='landscape'&&v.template==='standard';
+  const correctTypos=v.template!=='tarot_monthly';
   const rules=[...commonRules(correctTypos),
     `【動画設定】\n${v.format} / ${v.template}。字幕は1シーン${correctTypos?'20〜25':v.format==='vertical'?'20〜24':'30'}文字程度。`,
     `冒頭は最初の${v.intro_scenes}シーン。フック${v.hook_enabled?'ON':'OFF'}・${v.hook_orientation==='horizontal'?'横書き':'縦書き'}。`,
@@ -61,7 +64,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     ai.search==='manual'?`英語検索語は指定値 ${JSON.stringify(ai.search_text)} を使う。`:'素材検索語は内容を想像できる具体的な英語2〜4語。同じ語を連続させない。',
     ai.stock_scenes==='manual'&&v.background_mode==='mixed'?`動画を挿入する字幕シーン番号（1始まり）=${ai.stock_indices||'なし'}。それ以外へ動画を追加しない。`:'動画挿入箇所は上記の背景方針に従いAIが判断。',
   ];
-  rules.push('【投稿用説明文とハッシュタグ】',socialRule);
+  rules.push('縦横とも原稿・シーン・音声は共通。テーマを作る場合はルートのtheme_titleへ出力する。表示・配置は形式別設定をシステムが適用する。','【投稿用説明文とハッシュタグ】',socialRule);
   if(v.bgm_mode==='ai') {
     const categories=availableCategories(bgmCatalog);
     if(!categories.length) throw Error('BGM AI選択にはGitHubから登録一覧を読み込んでください');
@@ -69,7 +72,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       '未登録の曲ID・URLを捏造しない。音量・ダッキング・ループは確定値を守る。',
       '登録一覧: '+JSON.stringify(bgmCatalog.tracks.map(t=>({id:t.id,title:t.title,categories:t.categories}))));
   }
-  if(v.format==='landscape') rules.push(ai.theme==='manual'?`テーマタイトルは ${JSON.stringify(ai.theme_title)} を保持。`:'短いテーマtitleをAIが作成。subtitleは「ハシモトの占いと思想」で固定。');
+  if(formats.includes('landscape')) rules.push(ai.theme==='manual'?`テーマタイトルは ${JSON.stringify(ai.theme_title)} を保持。`:'短いテーマtitleをAIが作成。subtitleは「ハシモトの占いと思想」で固定。');
   rules.push('【確定設定（変更禁止）】',JSON.stringify(settings,null,2),'【JSON出力ルール】');
   if(output==='content') rules.push('内容だけ返す移行モード: {"scenes":[...],"social":{"description":"...","hashtags":[...]},"bgm_category":"AI選択時のみ","theme_title":"横型時のみ"}。global_settingsは返さない。画面が確定設定を合成する。');
   else if(v.voice_mode==='tts') rules.push('互換モード: {"global_settings":上記確定設定,"scenes":[...],"social":{"description":"...","hashtags":[...]}}。audio_fileは不要。BGM AI選択時のみbgm.category、横型AIテーマ時のみtheme.titleを補完。');

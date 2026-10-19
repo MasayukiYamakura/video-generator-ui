@@ -1,4 +1,4 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=presentation-active-20261019';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -174,7 +174,7 @@ export function validateBackground(file) {
 }
 export function catalog(registry,kind) {
   const list=kind==='background' ? [...BACKGROUNDS,...registry.backgrounds] : entries(registry,kind);
-  return kind==='video'?list.filter(p=>!COMPAT_VIDEO_PRESETS.some(old=>old.id===p.id)).map(p=>p.id==='tarot_monthly_remotion'?{...p,name:'月間星座タロット'}:p):list;
+  return kind==='video'?list.filter(p=>!COMPAT_VIDEO_PRESETS.some(old=>old.id===p.id)||(p.id==='youtube_landscape'&&registry.video_presets.some(q=>q.id===p.id))).map(p=>p.id==='tarot_monthly_remotion'?{...p,name:'月間星座タロット'}:p.id==='tiktok_standard'?{...p,name:'思想語り'}:p.id==='youtube_landscape'?{...p,name:'思想語り（保存済み横型互換）'}:p):list;
 }
 export function defaultLayout(registry,id) {
   const p=resolvePreset(registry,'video',id), v={...VIDEO_DEFAULTS,...p.values};
@@ -242,6 +242,12 @@ export function migrateRegistry(registry) {
     if(depends){const resolved=resolvePreset(registry,'video',p.id);delete resolved.extends;return resolved;}
     return p.id==='tarot_monthly_remotion'?{...p,name:'月間星座タロット'}:p;
   });
+  if(next.video_presets.some(p=>p.id==='youtube_landscape')) {
+    const old=resolveConfig(next,{video_preset:'youtube_landscape'});
+    const inherited={version:1,landscape:{video:Object.fromEntries(PRESENTATION_VIDEO_KEYS.map(k=>[k,old.video[k]])),layout:clone(old.layout),background:old.background}};
+    const target=next.video_presets.find(p=>p.id==='tiktok_standard');
+    if(target)target.presentation=mergePresentation(inherited,target.presentation);
+  }
   return validateRegistry(next);
 }
 

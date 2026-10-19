@@ -1,12 +1,18 @@
-import {tarotTitle} from './compiler.mjs?v=presentation-editor-20261019';
+import {tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
-  const {width:w,height:h,video:v,layout:l}=config;
+  const {width:w,height:h,layout:l}=config;
+  const v={...config.video},active=Boolean(config.design),design=config.design||{};
+  const visibility=config.scenery?design.scenery_visibility||{}:{};
+  for(const [key,flag] of Object.entries({caption:'caption',hook:'hook',tags:'tags',visualizer:'visualizer',theme:'theme',subtitle:'subtitle'})) {
+    if(visibility[key]===false){if(key==='hook')v.hook_enabled=false;else {v['intro_'+flag]=false;v['body_'+flag]=false;}}
+  }
+  if(config.scenery){for(const flag of ['tags','visualizer'])if(visibility[flag]!==true&&(flag==='tags'||v.stock_provider==='pexels')){v['intro_'+flag]=false;v['body_'+flag]=false;}}
   const scale=360/w; canvas.width=360; canvas.height=Math.round(h*scale);
   const c=canvas.getContext('2d'); c.scale(scale,scale);
   const tarot=v.template==='tarot_monthly';
   const rightColumn=v.template==='portrait_brand';
-  const pairedLandscape=v.format==='landscape'&&['vertical_horizontal','horizontal_only'].includes(v.output_mode);
+  const pairedLandscape=!active&&v.format==='landscape'&&['vertical_horizontal','horizontal_only'].includes(v.output_mode);
   c.fillStyle=tarot?'#141522':'#242e3d';c.fillRect(0,0,w,h);
   if(tarot) {
     c.fillStyle='#e3cd9c';
@@ -52,11 +58,15 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     c.drawImage(image,(w-iw)/2,(h-ih)/2,iw,ih);
     c.fillStyle='rgba(0,0,0,0.2)';c.fillRect(0,0,w,h);
   }
+  if(active&&config.scenery){c.fillStyle='#29394c';c.fillRect(0,0,w,h);}
+  if(active&&design.person?.enabled){const p=design.person;c.strokeStyle='#8bd6bd';c.lineWidth=3;c.strokeRect(p.x,p.y,p.width,p.height);}
+  if(active&&design.icon?.[intro?'intro':'body']&&visibility.icon!==false){const a=design.icon;c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(a.x,a.y,a.size,a.size);}
   function text(t,x,y,size) {c.fillStyle='white';c.font=`${size}px sans-serif`;c.textAlign='center';c.fillText(t,x,y);}
   if((v.template==='portrait_brand'||v.format==='landscape')&&(intro?v.intro_tags:v.body_tags)) {
     const x=pairedLandscape?710:l.tag_x,y=pairedLandscape?55:l.tag_y;
-    c.fillStyle='#804bb5';c.fillRect(x,y,720,92);
-    text('占い   コーチング   引き寄せ',x+360,y+60,40);
+    const scale=active?l.tag_scale:1,size=active?l.tag_font_size:40;
+    c.fillStyle='#804bb5';c.fillRect(x,y,720*scale,Math.max(92,Math.floor(size*1.7)+4)*scale);
+    text('占い   コーチング   引き寄せ',x+360*scale,y+60*scale,size*scale);
   }
   if(intro?v.intro_visualizer:v.body_visualizer) {
     const centerX=pairedLandscape?w*.68:l.visualizer_x,centerY=pairedLandscape?h*.83:l.visualizer_y;
@@ -67,7 +77,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       c.fillRect(centerX-width/2+i*width/40,centerY-height/2,width/60,height);
     }
   }
-  if(v.format==='landscape'&&!tarot) {
+  if((active||v.format==='landscape')&&!tarot) {
     const showTheme=intro?v.intro_theme:v.body_theme;
     const showSubtitle=intro?v.intro_subtitle:v.body_subtitle;
     if(showTheme) {
@@ -81,7 +91,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       c.fillStyle='white';c.fillText(label,l.theme_x+size*.4,l.theme_y+height/2,Math.max(1,width-size*.8));
     }
     if(showSubtitle) {
-      const size=l.subtitle_font_size,label='ハシモトの占いと思想';
+      const size=l.subtitle_font_size,label=design.theme?.subtitle??'ハシモトの占いと思想';
       c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
       const width=Math.min(w-l.subtitle_x,c.measureText(label).width+size*2.5),height=size*1.6;
       c.fillStyle='#b31827';c.beginPath();c.moveTo(l.subtitle_x,l.subtitle_y);c.lineTo(l.subtitle_x+width,l.subtitle_y);
@@ -90,7 +100,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     }
   }
   if(intro&&v.hook_enabled) {
-    const hookCenterX=pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?150:250):l.hook_center_y;
+    const hookCenterX=active?l.hook_center_x:pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?150:250):l.hook_center_y;
     if(pairedLandscape||v.hook_orientation==='horizontal') {
       const lines=(title||'タイトルを入力してください').replaceAll('[[','').replaceAll(']]','').split('\n');
       if(tarot&&v.tarot_renderer==='remotion') {
@@ -119,7 +129,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       [...(title||'タイトル').replaceAll('[[','').replaceAll(']]','').replaceAll('\n','')].forEach((t,i)=>c.fillText(t,w*(1-l.hook_margin_x)-l.hook_font_size/2,l.hook_top+(i+1)*l.hook_font_size));
     }
   }
-  if((intro?v.intro_caption:v.body_caption)&&!(tarot&&v.tarot_renderer==='remotion')) text('通常字幕の位置',pairedLandscape&&rightColumn?w*.68:w/2,pairedLandscape?h*.68:l.caption_center_y+l.caption_font_size/3,pairedLandscape?48:l.caption_font_size);
+  if((intro?v.intro_caption:v.body_caption)&&!(tarot&&v.tarot_renderer==='remotion')) text('通常字幕の位置',active?l.caption_center_x:pairedLandscape&&rightColumn?w*.68:w/2,pairedLandscape?h*.68:l.caption_center_y+l.caption_font_size/3,pairedLandscape?48:l.caption_font_size);
   if(safe&&v.format==='vertical') {
     c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(0,0,w,h*l.safe_top);c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);
     c.strokeStyle='#ffad99';c.lineWidth=3;c.setLineDash([12,10]);c.beginPath();c.moveTo(0,h*l.safe_top);c.lineTo(w,h*l.safe_top);c.moveTo(w*(1-l.safe_right),0);c.lineTo(w*(1-l.safe_right),h);c.moveTo(0,h*(1-l.safe_bottom));c.lineTo(w,h*(1-l.safe_bottom));c.stroke();
