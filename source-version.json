@@ -1,12 +1,12 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "6e397eb9fba4d07392b98012b567af4d92df470f",
+  "source_commit": "05ccb8efb41a0bc3bbe78f28fb6869d06341d086",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "1609dfaf8cb3fe7a564a221a9e515c903900f1bcd156dc66fe1660496075f997",
-    "README.md": "a490fa332284b798647247a6845537ab5bf590dc334bf2cb1a7e9fce40ed6ada",
+    "README.md": "ff29c8aa181f6d227963045983db91a9b9d4edcf9d45df35eac8bf6649f986c9",
     "ai-direct.mjs": "900edd01a58363b9fb28eede7d93520e843fdffc1725af78d197a88cb647e42d",
-    "app.js": "a47e2048b53a07be935e5fc54b215440b53924bb450f5cbf78c3e6a6eacf2335",
+    "app.js": "51e7d9232e5b178d118aaf9763c6ad8910ecb9e3cd1c897b67da80f8b935c49f",
     "builder-entry.js": "c7e7ac98e7bc170491cc9f69027fd8a13751fc188852a92d4386884929a3299d",
     "builder/batch-editor.mjs": "d3119bfe9d447c46b7bec07c86fbb8a145df76ce3fd959e6edb46aa7c8ed4e2d",
     "builder/batch.mjs": "b055de171aeb18e8100fd4e703853683cd7c238e6bab227c5b075272d281a4aa",
@@ -30,11 +30,12 @@
     "builder/tarot-visual.mjs": "21a078e1aff2b2b4af6c54808144c2167389118da8fbaaf023e050f1969e835b",
     "builder/ui.mjs": "32afa28016de05387accdc2a9bbb1bc15d35fba279238967d467a478764322ae",
     "history.mjs": "bceb7d087215a2e5bbc9abe2f9987395cc228720d4625fdc3e817c26fe3a2d6e",
-    "index.html": "a96326cedf8afc901b84b111a20caf90ba2e8dbe40f40696c9bf24c57654f314",
-    "social-entry.mjs": "fad106eed5f96b77db69cf50c90adbcaa37540f50e176c0c1a3297dfab83b524",
+    "index.html": "b4edc45e8625e976fc67d229bb0da220c5229ceb63e804b5a693c7a95803a6ba",
+    "social-entry.mjs": "b33abac509c41dc01e94c36c29db08fc74abc9b347b51efd8e8ce0b010752b6f",
     "social.mjs": "a0c1c2b3a7ffd5c595c6e277e4edd43a0c471bbbf319af55baa267a7310524f3",
     "studio-features.mjs": "9f050d4f03ee74dcb71770ad39fc61e86dce431d38e3fcbe7e04e069271d6bf9",
     "style.css": "64617efd71010123f193af694e55b279d7f43ef9d27a3f1110a6c5d7f4ad3406",
+    "youtube.mjs": "3f1cbb661e71a94d8f33e1bcf6f153a6a904eeadb5ba7a730c21e6be6d4b44f9",
     "zodiac-display.mjs": "87b9344cf4e01cb6bed6ea75e350e120150d4e78551bc8d290bfcf813d99bccb"
   }
 }

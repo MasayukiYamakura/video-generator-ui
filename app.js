@@ -88,6 +88,7 @@ function render() {
       const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)));
     }
     if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','投稿を準備する');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
+    if(['video','batch'].includes(h.kind)&&h.status==='completed'&&h.outputFormats?.includes('landscape')){const prepare=node('button','横型をYouTube投稿へ');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('youtube-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
     $('history').append(box);
   }
   controls();
