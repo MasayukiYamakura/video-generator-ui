@@ -1,5 +1,5 @@
-import {promptConfig,requestedFormats} from './presentation.mjs?v=presentation-active-20261019';
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=presentation-active-20261019';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=tarot-brand-20261019';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=tarot-brand-20261019';
 
 const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',

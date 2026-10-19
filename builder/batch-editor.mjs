@@ -1,11 +1,11 @@
 import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=presentation-active-20261019';
+import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=tarot-brand-20261019';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_POSITIONS} from './single-editor.mjs?v=presentation-active-20261019';
+import {TAROT_POSITIONS} from './single-editor.mjs?v=tarot-brand-20261019';
 import {el,options} from './dom.mjs?v=visual-20261016';
 const TAROT_SIGNS=SIGNS;
 const $=id=>document.getElementById(id);
-export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutputMode}) {
+export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutputMode,validateDesign}) {
   const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
   let batchResponses={},batchRequested=[],savedOutputMode=null;
   const BATCH_DRAFT='tarot-batch-draft-v1';
@@ -135,6 +135,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
   };
   $('pbBatchBuild').onclick=()=>{
     try{
+      validateDesign?.();
       const c=config(), signs=batchSelection();
       if(!signs.length)throw Error('制作する星座を選択してください');
       if(c.video.voice_mode!=='tts')throw Error('一括制作ではAI読み上げを選択してください');
@@ -166,6 +167,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
     }catch(e){status(e.message);}
   };
   function manifest(){
+    validateDesign?.();
     const c=config(), entries={};
     for(const [sign] of SIGNS) entries[sign]={...batchEntries[sign],year:Number($('pbBatchYear').value),month:Number($('pbBatchMonth').value),period:$('pbBatchPeriod').value,sharedCta:$('pbBatchCta').value.trim()};
     return compileBatch(c,entries,batchResponses,batchSelection(),getCatalog());

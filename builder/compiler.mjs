@@ -1,6 +1,7 @@
-import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=presentation-active-20261019';
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=presentation-active-20261019';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=presentation-active-20261019';
+import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=tarot-brand-20261019';
+import {tarotBrand} from './tarot-brand.mjs?v=tarot-brand-20261019';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-brand-20261019';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=tarot-brand-20261019';
 import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
@@ -150,6 +151,10 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
       }
       return out;
     });
+    if(v.tarot_renderer==='remotion'&&requestedFormats(config).includes('landscape')) {
+      g.presentation={version:1,...(requestedFormats(config).includes('vertical')?{vertical:{}}:{}),landscape:tarotBrand(config,title)};
+      validatePresentation(g.presentation);
+    }
     return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,tarot:clone(config.tarot),scenes,...(social?{social}:{})};
   }
   const manualIndices=new Set(ai.stock_indices.split(',').filter(x=>x.trim()).map(x=>Number(x.trim())-1));

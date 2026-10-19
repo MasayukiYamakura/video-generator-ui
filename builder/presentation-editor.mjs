@@ -1,8 +1,9 @@
 // Staged design editor: validates and saves metadata, never compiles a script.
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,validatePresentation,clone} from './model.mjs?v=presentation-active-20261019';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,validatePresentation,clone} from './model.mjs?v=tarot-brand-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
-import {designDefaults} from './presentation.mjs?v=presentation-active-20261019';
-export {designDefaults} from './presentation.mjs?v=presentation-active-20261019';
+import {designDefaults} from './presentation.mjs?v=tarot-brand-20261019';
+import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=tarot-brand-20261019';
+export {designDefaults} from './presentation.mjs?v=tarot-brand-20261019';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
 export function mountPresentationEditor({root,getConfig,getFormat,setFormat,onChange}) {
@@ -64,15 +65,17 @@ export function mountPresentationEditor({root,getConfig,getFormat,setFormat,onCh
   function render() {
     // Invalid text stays visible until corrected; save/mode changes are blocked.
     if(errors.size)return;
-    let format,slot;
-    try{format=getFormat();slot=designDefaults(getConfig(),format);}catch(e){message.textContent=e.message;return;}
+    let format,slot,tarot;
+    try{const config=getConfig();tarot=config.video.template==='tarot_monthly';format=getFormat();slot=tarot&&format==='landscape'?tarotBrand(config):designDefaults(config,format);}catch(e){message.textContent=e.message;return;}
     for(const [i,b] of tabButtons.entries())b.setAttribute('aria-pressed',String(format===['vertical','landscape'][i]));
     for(const {input,section,key,type} of controls){
+      input.parentElement.hidden=tarot&&(format==='vertical'||getConfig().video.tarot_renderer!=='remotion'||!(section==='video'&&TAROT_BRAND_VIDEO.includes(key)||section==='layout'&&TAROT_BRAND_LAYOUT.includes(key)||section==='theme'||section==='icon'||section==='scenery_visibility'&&['theme','subtitle','icon'].includes(key)));
       let value=section==='background'?slot.background:slot[section]?.[key];
+      if(tarot&&section==='theme'&&key==='title')value=getConfig().presentation?.landscape?.theme?.title??'';
       if(section==='scenery_visibility')value=value===undefined?'inherit':value?'show':'hide';
       if(type==='checkbox')input.checked=Boolean(value);else input.value=value??'';
     }
-    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${getConfig().video.template==='tarot_monthly'?'タロットへの適用は準備中です。':'動画とプレビューに適用します。'}`;
+    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${tarot?(format==='landscape'&&getConfig().video.tarot_renderer==='remotion'?'右上のテーマ・サブタイトル・アイコンを動画とプレビューに適用します。空欄のテーマは各星座の年月・星座名です。アイコンON時はmedia内の画像が必要です。':'タロットの縦型・カード・字幕・アニメーションは既存の固定レイアウトです。'):'動画とプレビューに適用します。'}`;
   }
   function reset(){errors.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};
