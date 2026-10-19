@@ -1,10 +1,10 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "7c3d3cb91f4dc17b40f29d9d3c658257db5cb515",
+  "source_commit": "d553bfd4d5fcdcb9ef008b101ce5ccce02abbbfd",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "1609dfaf8cb3fe7a564a221a9e515c903900f1bcd156dc66fe1660496075f997",
-    "README.md": "b5c7a6cb70fb2595d5ac8401b5d13f1f0a0b4994969321bd93ef788f939f5d12",
+    "README.md": "ba7901bf2bdd3ce06407a94aa1059ef15fc7494c63d638d698ed2099ffd2abbb",
     "ai-direct.mjs": "792c073c01739616304d964dce400506ca0f64ce22336f68ade55b06880fdadb",
     "app.js": "2a746497a7c3ca0ed296db94f65d85fdd917e10e89236cb0b7d73763195d6987",
     "builder-entry.js": "c68282accab6929a9336fc53af54a7d830b714c7e91e6a8dad165fbe4b459dd7",
