@@ -1,22 +1,23 @@
+import {mountPresentationEditor} from './presentation-editor.mjs?v=presentation-editor-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=presentation-contract-20261019';
-import {mountBatchEditor} from './batch-editor.mjs?v=presentation-contract-20261019';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-contract-20261019';
+import {mountSingleEditor} from './single-editor.mjs?v=presentation-editor-20261019';
+import {mountBatchEditor} from './batch-editor.mjs?v=presentation-editor-20261019';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-editor-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-contract-20261019';
-import {buildPrompt} from './prompt.mjs?v=presentation-contract-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-contract-20261019';
-import {decodeContent} from './storage.mjs?v=presentation-contract-20261019';
-import {drawPreview} from './preview.mjs?v=presentation-contract-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-editor-20261019';
+import {buildPrompt} from './prompt.mjs?v=presentation-editor-20261019';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-editor-20261019';
+import {decodeContent} from './storage.mjs?v=presentation-editor-20261019';
+import {drawPreview} from './preview.mjs?v=presentation-editor-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
   let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageRequest=0;
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
-  let batchEditor;
+  let batchEditor, presentationEditor;
   const status=text=>{$('builderStatus').textContent=text;};
   const connection=()=>{
     const expected=$('repo').value.trim();
@@ -117,6 +118,7 @@ export function mountBuilder(apiProvider) {
     $('pbThemeTitle').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
     if(batch){$('audioUpload').hidden=true;$('pb_voice_mode').value='tts';}
+    presentationEditor?.render();
     $('pbPreviewError').textContent=''; paint();
   }
   function lists() {
@@ -147,6 +149,9 @@ export function mountBuilder(apiProvider) {
     input.step=Number(input.max)===1?0.01:1;
     input.addEventListener('input',()=>{session.overrides.layout[key]=input.type==='number'?Number(input.value):input.value;invalidate();paint();});
   }
+  presentationEditor=mountPresentationEditor({root:$('pdEditor'),getConfig:config,
+    getFormat:()=>session.designFormat||resolvePreset(registry,'video',session.video_preset).values.format||VIDEO_DEFAULTS.format,
+    setFormat:format=>{session.designFormat=format;},onChange:value=>{session.presentation=value;}});
   const modeSessions=new Map();
   async function loadBackgroundPreview(announce=false) {
     const c=config();
@@ -165,9 +170,10 @@ export function mountBuilder(apiProvider) {
     if(loadedRepo===$('repo').value.trim())loadBackgroundPreview().catch(e=>status(e.message));
   }
   function selectPreset(id) {
+    try{presentationEditor.assertValid();}catch(e){status(e.message);$('pbVideo').value=visiblePreset(session.video_preset);$('pbTikTokStyle').value=config().video.tiktok_style;$('pbProductionMode').value=isBatch(config().video)?'batch':'single';return false;}
     modeSessions.set(session.video_preset,clone(session));
     if(modeSessions.has(id))session=clone(modeSessions.get(id));
-    else session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};
+    else {session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};delete session.presentation;delete session.designFormat;}
     if(id==='tarot_monthly_batch'&&!modeSessions.has(id)&&batchEditor.savedOutputMode())
       session.overrides.video.output_mode=batchEditor.savedOutputMode();
     image=null;
@@ -179,7 +185,7 @@ export function mountBuilder(apiProvider) {
   $('pbTikTokStyle').onchange=()=>selectPreset($('pbTikTokStyle').value==='legacy_vertical'?'tiktok_vertical_hook':'tiktok_standard');
   $('pbProductionMode').onchange=()=>{
     const batch=$('pbProductionMode').value==='batch';
-    selectPreset(batch?'tarot_monthly_batch':'tarot_monthly_remotion');
+    if(selectPreset(batch?'tarot_monthly_batch':'tarot_monthly_remotion')===false)return;
     if(batch && config().video.voice_mode!=='tts') {
       session.overrides.video.voice_mode='tts';renderFields();
     }
@@ -201,16 +207,18 @@ export function mountBuilder(apiProvider) {
     const api=connection(), expected=$('repo').value.trim();
     const {preset:r,bgm}=await loadPresetData(api);
     registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;
-    modeSessions.clear();
+    modeSessions.clear();delete session.presentation;
+    presentationEditor.reset();
     session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
     invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');refreshBackground();
   });
   async function save(kind, overwrite=false) {
+    presentationEditor.assertValid();
     if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済み設定を読込」を押してください');
     const c=config(), id=overwrite?session.video_preset:$('pbSaveId').value.trim(), name=overwrite?resolvePreset(registry,'video',session.video_preset).name:$('pbSaveName').value.trim();
     const written=await savePresetSettings({api:connection(),registry,sha,session,config:c,id,name,kind,overwrite});
     registry=written.registry;sha=written.sha;
-    if(kind==='video'){modeSessions.delete(id);session.video_preset=id;session.overrides.video={};session.background=resolvePreset(registry,'video',id).background||'background.png';}else{session.layout_preset=id;session.overrides.layout={};}
+    if(kind==='video'){modeSessions.delete(id);delete session.presentation;session.video_preset=id;session.overrides.video={};session.background=resolvePreset(registry,'video',id).background||'background.png';}else{session.layout_preset=id;session.overrides.layout={};}
     invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);refreshBackground();
   }
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
@@ -224,7 +232,7 @@ export function mountBuilder(apiProvider) {
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
     return applyConfig(script,snapshot,bgmCatalog);
   }
-  $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};invalidate();lists();});
+  $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};presentationEditor.reset();invalidate();lists();});
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }

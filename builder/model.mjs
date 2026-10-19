@@ -42,7 +42,7 @@ export function validateValues(values, kind) {
 }
 // Optional, versioned storage contract. Rendering/preview activation belongs to
 // the next PRs; absent values never manufacture or replace legacy defaults.
-const PRESENTATION_VIDEO_KEYS = new Set([
+export const PRESENTATION_VIDEO_KEYS = Object.freeze([
   'hook_enabled','hook_orientation','intro_scenes','intro_caption','body_caption',
   'intro_tags','body_tags','intro_visualizer','body_visualizer',
   'intro_theme','body_theme','intro_subtitle','body_subtitle',

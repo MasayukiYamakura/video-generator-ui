@@ -1,5 +1,5 @@
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
-import {clone, assertObject} from './model.mjs?v=presentation-contract-20261019';
+import {clone, assertObject} from './model.mjs?v=presentation-editor-20261019';
 import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
