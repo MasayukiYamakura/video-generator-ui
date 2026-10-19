@@ -1,6 +1,6 @@
 import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
-import {clone,resolvePreset,savePreset} from './model.mjs?v=landscape-theme-20261019';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=maintenance-20261016';
+import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=presentation-contract-20261019';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=presentation-contract-20261019';
 export async function loadPresetData(api) {
   const preset=await readRegistry(api),bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
   if(bgm.version!==1||!Array.isArray(bgm.tracks))throw Error('BGM登録一覧が不正です');
@@ -11,7 +11,12 @@ export async function savePresetSettings({api,registry,sha,session,config:c,id,n
   const values=kind==='video'?c.video:c.layout,defaults=kind==='video'?VIDEO_DEFAULTS:LAYOUT_DEFAULTS;
   const base={...defaults,...parent.values},delta=Object.fromEntries(Object.entries(values).filter(([k,value])=>value!==base[k]));
   const entry={id,name,...(overwrite?{}:{extends:parent.id}),values:overwrite?clone(values):delta,default_layout:session.layout_preset,layout:clone(c.layout),background:c.background};
+  if(kind==='video') {
+    const presentation=mergePresentation(parent.presentation,c.presentation);
+    if(presentation!==undefined)entry.presentation=presentation;
+  }
   const next=savePreset(registry,kind,entry,overwrite);
   return writeRegistry(api,next,sha);
 }
+
 

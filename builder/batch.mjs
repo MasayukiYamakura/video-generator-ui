@@ -1,7 +1,7 @@
 import {normalizeVisual} from './tarot-visual.mjs?v=visual-20261016';
 import {normalizeSocial} from './social-data.mjs?v=batch-social-20261016';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=maintenance-20261016';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=presentation-contract-20261019';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
@@ -175,4 +175,5 @@ export function batchSourcePrompt(year,month,period,ctaEnabled=false,sharedCta='
     'カード一覧: '+TAROT_CARDS.map(card=>`${card.id}=${card.name}`).join(', '),
   ].join('\n\n');
 }
+
 

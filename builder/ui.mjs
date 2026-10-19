@@ -1,15 +1,15 @@
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=maintenance-20261016';
-import {mountBatchEditor} from './batch-editor.mjs?v=single-social-20261016';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=maintenance-20261016';
+import {mountSingleEditor} from './single-editor.mjs?v=presentation-contract-20261019';
+import {mountBatchEditor} from './batch-editor.mjs?v=presentation-contract-20261019';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=presentation-contract-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=landscape-theme-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=landscape-theme-20261019';
-import {buildPrompt} from './prompt.mjs?v=landscape-prompt-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=landscape-theme-20261019';
-import {decodeContent} from './storage.mjs?v=maintenance-20261016';
-import {drawPreview} from './preview.mjs?v=landscape-theme-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=presentation-contract-20261019';
+import {buildPrompt} from './prompt.mjs?v=presentation-contract-20261019';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=presentation-contract-20261019';
+import {decodeContent} from './storage.mjs?v=presentation-contract-20261019';
+import {drawPreview} from './preview.mjs?v=presentation-contract-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -228,6 +228,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
+
 
 
 

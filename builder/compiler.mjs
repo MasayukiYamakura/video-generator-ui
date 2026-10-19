@@ -1,5 +1,5 @@
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=landscape-theme-20261019';
-import {clone, assertObject} from './model.mjs?v=landscape-theme-20261019';
+import {clone, assertObject} from './model.mjs?v=presentation-contract-20261019';
 import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
 
 export function fixedSettings(config) {
@@ -173,6 +173,7 @@ export function applyConfig(script, config, bgmCatalog) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
+
 
 
 
