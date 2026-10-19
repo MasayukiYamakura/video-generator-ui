@@ -1,7 +1,7 @@
 import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=presentation-contract-20261019';
+import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=presentation-editor-20261019';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_POSITIONS} from './single-editor.mjs?v=presentation-contract-20261019';
+import {TAROT_POSITIONS} from './single-editor.mjs?v=presentation-editor-20261019';
 import {el,options} from './dom.mjs?v=visual-20261016';
 const TAROT_SIGNS=SIGNS;
 const $=id=>document.getElementById(id);

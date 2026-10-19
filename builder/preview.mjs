@@ -1,4 +1,4 @@
-import {tarotTitle} from './compiler.mjs?v=presentation-contract-20261019';
+import {tarotTitle} from './compiler.mjs?v=presentation-editor-20261019';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,video:v,layout:l}=config;
