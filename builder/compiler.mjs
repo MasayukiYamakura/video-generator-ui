@@ -1,8 +1,9 @@
-import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=tarot-brand-20261019';
-import {tarotBrand} from './tarot-brand.mjs?v=tarot-brand-20261019';
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=tarot-brand-20261019';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=tarot-brand-20261019';
-import {normalizeSocial} from './social-data.mjs?v=single-social-20261016';
+import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=mbti-20261019';
+import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=mbti-20261019';
+import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-20261019';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=mbti-20261019';
+import {normalizeSocial} from './social-data.mjs?v=mbti-20261019';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -60,7 +61,7 @@ export function captionZodiac(text) {
 export function tarotTitle(tarot) {
   const period=tarot.period ?? 'full';
   if(!['full','first','second'].includes(period)) throw Error('対象期間が不正です');
-  const sign=TAROT_CAPTION_SIGNS[tarot.zodiac];
+  const sign=(subjectKind(tarot)==='mbti'?MBTI_NAMES:TAROT_CAPTION_SIGNS)[tarot.zodiac];
   if(!sign) throw Error('星座の指定が不正です');
   return `${tarot.year}年${tarot.month}月${period==='first'?'前半':period==='second'?'後半':''}\n${sign}の運勢`;
 }
@@ -106,6 +107,7 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
   }
   if(v.template==='tarot_monthly') {
     if(!config.tarot) throw Error('占い設定がありません');
+    if(subjectKind(config.tarot)!==subjectKind(config))throw Error('対象の種類が一致しません');
     const title=tarotTitle(config.tarot);
     const order=['intro','overall','relationships','work','advice','summary','cta'];
     if(v.cta_enabled&&(!config.cta_text||Array.from(config.cta_text).length>40))throw Error('CTA文は1〜40文字で入力してください');
@@ -131,7 +133,7 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
     const manualHooks=ai.manual_hook.split('\n---\n');
     const scenes=script.scenes.map(s=>{
       const intro=s.tarot_phase==='intro';
-      const captionText=s.tarot_phase==='cta'?s.text:captionZodiac(s.text);
+      const captionText=s.tarot_phase==='cta'||subjectKind(config)==='mbti'?s.text:captionZodiac(s.text);
       const out={text:captionText,tarot_phase:s.tarot_phase,
         caption_enabled:s.tarot_phase==='cta'?true:intro?v.intro_caption:v.body_caption,
         visualizer:intro?v.intro_visualizer:v.body_visualizer};

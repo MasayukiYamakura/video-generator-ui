@@ -1,14 +1,17 @@
+import {subjects,subjectKind} from './subjects.mjs?v=mbti-20261019';
 import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
-import {SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=tarot-brand-20261019';
+import {SIGNS as ZODIAC_SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=mbti-20261019';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_POSITIONS} from './single-editor.mjs?v=tarot-brand-20261019';
+import {TAROT_POSITIONS} from './single-editor.mjs?v=mbti-20261019';
 import {el,options} from './dom.mjs?v=visual-20261016';
-const TAROT_SIGNS=SIGNS;
+
 const $=id=>document.getElementById(id);
-export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutputMode,validateDesign}) {
-  const batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
+export function mountBatchEditor({config,status:baseStatus,getCatalog,getLoadedRepo,setOutputMode,validateDesign}) {
+  const status=text=>baseStatus(subject==='mbti'?text.replaceAll('12星座','16タイプ').replaceAll('星座','タイプ').replaceAll('48枚','64枚'):text);
+  let subject='zodiac',SIGNS=ZODIAC_SIGNS,TAROT_SIGNS=SIGNS;
+  let batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));
   let batchResponses={},batchRequested=[],savedOutputMode=null;
-  const BATCH_DRAFT='tarot-batch-draft-v1';
+  let BATCH_DRAFT='tarot-batch-draft-v1';
   options($('pbBatchMonth'),Array.from({length:12},(_,i)=>[String(i+1),`${i+1}月`]),String(new Date().getMonth()+1));
   $('pbBatchYear').value=new Date().getFullYear();
   const batchBox=$('pbBatchEntries');
@@ -42,6 +45,8 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
     svg.innerHTML=`<defs><radialGradient id="${id}"><stop stop-color="${colors[0]}"/><stop offset=".56" stop-color="${colors[1]}"/><stop offset="1" stop-color="${colors[2]}"/></radialGradient></defs><rect width="1080" height="1920" fill="url(#${id})"/>`+
       Array.from({length:12},(_,i)=>{const {x,y,angle}=motionPose(i,t*4,shuffle,cut,spread,gather,v);return `<g transform="translate(${x} ${y}) rotate(${angle} 110 187.5)"><rect width="220" height="375" rx="13" fill="#141729" stroke="#bc9b68" stroke-width="3"/><svg x="18" y="26" width="184" height="323" viewBox="0 0 220 350" color="#c6a979">${BACK_ART[v.card_back_design]}</svg></g>`;}).join('');
   }
+  function buildEntries(){
+    batchBox.replaceChildren();
   for(const [sign,name] of SIGNS) {
     const details=el('details'), summary=el('summary'), title=el('span',name+' · 未入力'), grid=el('div');
     title.className='batch-title';summary.append(title);
@@ -80,9 +85,11 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
     const note=el('p','簡易プレビュー：3種類の動き・背景色・裏面を確認できます。完成動画の尺は従来どおりです。');note.className='muted';
     details.append(transcriptLabel,ctaLabel,socialPreview,visuals,preview,play,note);batchBox.append(details);drawVisual(details,.75);
   }
+  }
+  buildEntries();
   function batchSelection(){return [...batchBox.querySelectorAll('details')].filter(d=>d.querySelector('.batch-select').checked).map(d=>d.dataset.sign);}
   function saveDraft(){
-    if(config().video.tarot_mode==='batch')savedOutputMode=config().video.output_mode;
+    if(subjectKind(config())===subject&&config().video.tarot_mode==='batch')savedOutputMode=config().video.output_mode;
     try{localStorage.setItem(BATCH_DRAFT,JSON.stringify({repo:$('repo').value.trim(),entries:batchEntries,responses:batchResponses,
       year:$('pbBatchYear').value,month:$('pbBatchMonth').value,period:$('pbBatchPeriod').value,cta:$('pbBatchCta').value,
       outputMode:savedOutputMode??'vertical_only',selected:batchSelection()}));}catch{status('端末の保存容量が不足しています。画面を閉じる前に入力を控えてください。');}
@@ -100,7 +107,7 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
   for(const id of ['pbBatchYear','pbBatchMonth','pbBatchPeriod','pbBatchCta'])$(id).addEventListener('input',()=>{batchResponses={};$('pbBatchSourcePrompt').value='';batchChanged();});
   $('pbBatchSourcePromptBuild').onclick=()=>{
     try {
-      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value,config().video.cta_enabled,$('pbBatchCta').value);
+      $('pbBatchSourcePrompt').value=batchSourcePrompt(Number($('pbBatchYear').value),Number($('pbBatchMonth').value),$('pbBatchPeriod').value,config().video.cta_enabled,$('pbBatchCta').value,subject);
       status('占い結果を作るためのプロンプトを用意しました');
     }catch(e){status(e.message);}
   };
@@ -111,12 +118,12 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
   };
   $('pbBatchSourceImport').onclick=()=>{
     try {
-      const result=importBatchSource($('pbBatchSource').value);
+      const result=importBatchSource($('pbBatchSource').value,subject);
       if(config().video.cta_enabled && Object.values(result.entries).some(e=>!e.cta.trim())
         && !$('pbBatchCta').value.trim())throw Error('個別CTAが空欄の星座があります。先に共通CTAを入力してください');
       // Validation completes before any of the existing controls or saved draft are touched.
       $('pbBatchYear').value=result.year;
-      $('pbBatchMonth').value=result.month;
+      $('pbBatchMonth').value=String(result.month);
       $('pbBatchPeriod').value=result.period;
       for(const d of batchBox.querySelectorAll('details')){
         const sign=d.dataset.sign,e=result.entries[sign];
@@ -200,12 +207,13 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
     status('12星座の入力と保存済みの下書きを消しました。最初から入力できます。');
   };
   $('pbBatchGenerate').onclick=()=>window.videoStudioSubmitBatch?.();
+  function restoreDraft(applyOutput=true){
   try{
     const draft=JSON.parse(localStorage.getItem(BATCH_DRAFT)||'null');
     if(draft?.repo===$('repo').value.trim()&&draft.entries){
       if(['vertical_only','vertical_horizontal','horizontal_only'].includes(draft.outputMode)){
         savedOutputMode=draft.outputMode;
-        setOutputMode?.(savedOutputMode);
+        if(applyOutput)setOutputMode?.(savedOutputMode);
       }
       for(const id of ['year','month','period','cta']) $('pbBatch'+id[0].toUpperCase()+id.slice(1)).value=draft[id]??'';
       batchResponses=draft.responses||{};
@@ -221,6 +229,13 @@ export function mountBatchEditor({config,status,getCatalog,getLoadedRepo,setOutp
       batchChanged();
     }
   }catch{}
-  return {changed:batchChanged,manifest,savedOutputMode:()=>savedOutputMode};
+  }
+  restoreDraft();
+  function setSubject(value){
+    const next=subjectKind(value);if(next===subject)return;saveDraft();subject=next;SIGNS=Object.entries(subjects(subject));TAROT_SIGNS=SIGNS;BATCH_DRAFT=subject==='mbti'?'mbti-batch-draft-v1':'tarot-batch-draft-v1';
+    batchEntries=Object.fromEntries(SIGNS.map(([sign])=>[sign,{cards:['','','',''],orientations:['upright','upright','upright','upright'],narration:'',cta:''}]));batchResponses={};batchRequested=[];savedOutputMode=null;
+    $('pbBatchYear').value=new Date().getFullYear();$('pbBatchMonth').value=String(new Date().getMonth()+1);$('pbBatchPeriod').value='full';$('pbBatchCta').value='';buildEntries();restoreDraft(false);
+  }
+  return {setSubject,changed:batchChanged,manifest,savedOutputMode:()=>savedOutputMode};
 }
 

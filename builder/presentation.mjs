@@ -1,5 +1,5 @@
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=tarot-brand-20261019';
-import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=tarot-brand-20261019';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=mbti-20261019';
+import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=mbti-20261019';
 
 export function designDefaults(config,format) {
   const w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;

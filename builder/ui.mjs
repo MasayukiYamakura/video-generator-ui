@@ -1,18 +1,19 @@
-import {formatConfig} from './presentation.mjs?v=tarot-brand-20261019';
-import {tarotBrand} from './tarot-brand.mjs?v=tarot-brand-20261019';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=tarot-brand-20261019';
+import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=mbti-20261019';
+import {formatConfig} from './presentation.mjs?v=mbti-20261019';
+import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=mbti-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=tarot-brand-20261019';
-import {mountBatchEditor} from './batch-editor.mjs?v=tarot-brand-20261019';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=tarot-brand-20261019';
-import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=maintenance-20261016';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=tarot-brand-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=tarot-brand-20261019';
-import {buildPrompt} from './prompt.mjs?v=tarot-brand-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-brand-20261019';
-import {decodeContent} from './storage.mjs?v=tarot-brand-20261019';
-import {drawPreview} from './preview.mjs?v=tarot-brand-20261019';
+import {mountSingleEditor} from './single-editor.mjs?v=mbti-20261019';
+import {mountBatchEditor} from './batch-editor.mjs?v=mbti-20261019';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=mbti-20261019';
+import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=mbti-20261019';
+import {buildPrompt} from './prompt.mjs?v=mbti-20261019';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=mbti-20261019';
+import {decodeContent} from './storage.mjs?v=mbti-20261019';
+import {drawPreview} from './preview.mjs?v=mbti-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -20,6 +21,18 @@ export function mountBuilder(apiProvider) {
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
   let batchEditor, presentationEditor;
+  const subjectLabels=new WeakMap();
+  function relabelSubject(kind){
+    $('pbBatchArea').setAttribute('aria-label',kind==='mbti'?'16タイプ一括制作':'12星座一括制作');
+    for(const root of [$('pbBatchArea'),$('pbTarotArea'),$('pbBatchRun'),$('pbProductionMode')]){
+      if(!root)continue;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
+      while((node=walker.nextNode())){if(['TEXTAREA','SCRIPT','STYLE'].includes(node.parentElement?.tagName))continue;
+        if(!subjectLabels.has(node))subjectLabels.set(node,node.nodeValue);const original=subjectLabels.get(node);
+        const next=kind==='mbti'?original.replaceAll('月間星座タロット','月間MBTIタロット').replaceAll('12星座','16タイプ').replaceAll('星座','タイプ').replaceAll('48枚','64枚'):original;
+        if(next!==node.nodeValue)node.nodeValue=next;
+      }
+    }
+  }
   const status=text=>{$('builderStatus').textContent=text;};
   const connection=()=>{
     const expected=$('repo').value.trim();
@@ -46,7 +59,7 @@ export function mountBuilder(apiProvider) {
       if(c.ai.hook==='manual')title=c.ai.manual_hook.split('\n---\n')[0];
       if(c.video.template==='tarot_monthly'){
         const batch=isBatch(config().video);
-        c.tarot={year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?'aries':$('pbTarotZodiac').value};
+        c.tarot={...subjectMeta(c),year:Number($(batch?'pbBatchYear':'pbTarotYear').value),month:Number($(batch?'pbBatchMonth':'pbTarotMonth').value),period:$(batch?'pbBatchPeriod':'pbTarotPeriod').value,zodiac:batch?Object.keys(subjects(c))[0]:$('pbTarotZodiac').value};
         title=tarotTitle(c.tarot);
       }
       const previewFormat=session.designFormat||(c.video.output_mode==='horizontal_only'?'landscape':c.video.output_mode==='vertical_horizontal'?$('pbPreviewFormat').value:c.video.format);
@@ -79,6 +92,8 @@ export function mountBuilder(apiProvider) {
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
+    if(tarot){singleTarot.setSubject(v.tarot_subject);batchEditor?.setSubject(v.tarot_subject);}
+    $('pbTarotZodiac').parentElement.firstChild.textContent=v.tarot_subject==='mbti'?'MBTIタイプ':'星座';
     for(const key of ['intro_theme','body_theme','intro_subtitle','body_subtitle']) $('pb_'+key).parentElement.hidden=v.format!=='landscape';
     for(const key of ['theme_x','theme_y','theme_font_size','subtitle_x','subtitle_y','subtitle_font_size']) $('pb_'+key).parentElement.hidden=v.format!=='landscape';
     const pairedOutputTarget=v.format==='vertical'&&(['standard','portrait_brand'].includes(v.template)||v.tiktok_style==='legacy_vertical'||tarot);
@@ -124,6 +139,7 @@ export function mountBuilder(apiProvider) {
     $('pbThemeTitle').parentElement.hidden=tarot;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
     if(batch){$('audioUpload').hidden=true;$('pb_voice_mode').value='tts';}
+    relabelSubject(v.tarot_subject);
     presentationEditor?.render();
     $('pbPreviewError').textContent=''; paint();
   }
@@ -178,10 +194,12 @@ export function mountBuilder(apiProvider) {
   }
   function selectPreset(id) {
     try{presentationEditor.assertValid();}catch(e){status(e.message);$('pbVideo').value=visiblePreset(session.video_preset);$('pbTikTokStyle').value=config().video.tiktok_style;$('pbProductionMode').value=isBatch(config().video)?'batch':'single';return false;}
+    const previous={...VIDEO_DEFAULTS,...resolvePreset(registry,'video',session.video_preset).values,...session.overrides.video};
+    if(previous.template==='tarot_monthly'&&!isBatch(previous))singleTarot.capture();
     modeSessions.set(session.video_preset,clone(session));
     if(modeSessions.has(id))session=clone(modeSessions.get(id));
     else {session={...session,video_preset:id,overrides:{video:{},layout:{}},layout_preset:defaultLayout(registry,id),background:resolvePreset(registry,'video',id).background||'background.png'};delete session.presentation;delete session.designFormat;}
-    if(id==='tarot_monthly_batch'&&!modeSessions.has(id)&&batchEditor.savedOutputMode())
+    if(['tarot_monthly_batch','mbti_monthly_batch'].includes(id)&&!modeSessions.has(id)&&batchEditor.savedOutputMode())
       session.overrides.video.output_mode=batchEditor.savedOutputMode();
     image=null;
     // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
@@ -192,7 +210,7 @@ export function mountBuilder(apiProvider) {
   $('pbTikTokStyle').onchange=()=>selectPreset($('pbTikTokStyle').value==='legacy_vertical'?'tiktok_vertical_hook':'tiktok_standard');
   $('pbProductionMode').onchange=()=>{
     const batch=$('pbProductionMode').value==='batch';
-    if(selectPreset(batch?'tarot_monthly_batch':'tarot_monthly_remotion')===false)return;
+    if(selectPreset(subjectKind(config())==='mbti'?(batch?'mbti_monthly_batch':'mbti_monthly_remotion'):(batch?'tarot_monthly_batch':'tarot_monthly_remotion'))===false)return;
     if(batch && config().video.voice_mode!=='tts') {
       session.overrides.video.voice_mode='tts';renderFields();
     }

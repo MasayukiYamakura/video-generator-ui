@@ -1,6 +1,7 @@
 // Display families are independent of the IDs retained for old saved settings.
 export function visiblePreset(id) {
   if(['tiktok_vertical_hook','tiktok_anonymous'].includes(id))return 'tiktok_standard';
+  if(id==='mbti_monthly_batch')return 'mbti_monthly_remotion';
   if(['tarot_monthly','tarot_monthly_batch'].includes(id))return 'tarot_monthly_remotion';
   return id;
 }
