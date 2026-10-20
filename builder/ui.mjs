@@ -17,7 +17,7 @@ import {drawPreview} from './preview.mjs?v=mbti-20261019';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
-  let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageRequest=0;
+  let registry=emptyRegistry(), sha=null, registryRepo=null, bgmCatalog=null, image=null, imageFile=null, imageFormat=null, imageRequest=0;
   let session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};
   let snapshot=null, loadedRepo='', working=false;
   let batchEditor, presentationEditor;
@@ -68,7 +68,7 @@ export function mountBuilder(apiProvider) {
       if(c.video.template==='tarot_monthly'&&c.video.tarot_renderer==='remotion'&&previewFormat==='landscape')preview.tarotBrand=tarotBrand(c,title);
       const script=(()=>{try{return JSON.parse($('script').value);}catch{return {};}})();
       const themeTitle=preview.design?.theme.title|| (c.ai.theme==='manual'?c.ai.theme_title:(script.global_settings?.theme?.title||script.theme_title||'テーマタイトル'));
-      drawPreview($('pbCanvas'),preview,image,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset,themeTitle);$('pbPreviewError').textContent='';}
+      drawPreview($('pbCanvas'),preview,imageFile===preview.background&&imageFormat===preview.video.format?image:null,$('pbPreviewIntro').checked,$('pbSafe').checked,title,session.video_preset,themeTitle);$('pbPreviewError').textContent='';}
     catch(e){$('pbPreviewError').textContent=e.message;}
   }
   function renderFields() {
@@ -88,7 +88,8 @@ export function mountBuilder(apiProvider) {
     $('pbSearchText').disabled=$('pbSearchMode').value!=='manual'||v.background_mode==='fixed';
     $('pbStockPercent').disabled=$('pbStockMode').value!=='ai'||v.background_mode!=='mixed';
     $('pbStockIndices').disabled=$('pbStockMode').value!=='manual'||v.background_mode!=='mixed';
-    $('pbThemeTitle').disabled=$('pbThemeMode').value!=='manual'||v.format!=='landscape';
+    const hasLandscapeOutput=v.format==='landscape'||['vertical_horizontal','horizontal_only'].includes(v.output_mode);
+    $('pbThemeTitle').disabled=!hasLandscapeOutput||$('pbThemeMode').value!=='manual';
     $('pbTtsFields').hidden=v.voice_mode!=='tts';$('pbTtsDetails').hidden=v.voice_mode!=='tts';
     $('pbDspHelp').hidden=v.voice_mode!=='anonymous';
     const tarot=v.template==='tarot_monthly';
@@ -135,8 +136,8 @@ export function mountBuilder(apiProvider) {
        : '左上を原点とする動画のピクセル座標。入力値をJSONへ反映します。縦書きフックは中心Yではなく上端Yを使用します。タグは人物画像またはYouTube横型で表示します。';
     $('pbBackgroundPreview').hidden=tarot;
     $('pb_intro_scenes').parentElement.hidden=tarot; // Tarot intro is delimited by tarot_phase.
-    $('pbThemeMode').parentElement.hidden=tarot;
-    $('pbThemeTitle').parentElement.hidden=tarot;
+    $('pbThemeMode').parentElement.hidden=tarot||!hasLandscapeOutput;
+    $('pbThemeTitle').parentElement.hidden=tarot||!hasLandscapeOutput;
     if($('pbApplyOnSend').checked||!$('script').value.trim()) $('audioUpload').hidden=v.voice_mode==='tts';
     if(batch){$('audioUpload').hidden=true;$('pb_voice_mode').value='tts';}
     relabelSubject(v.tarot_subject);
@@ -174,7 +175,7 @@ export function mountBuilder(apiProvider) {
   }
   presentationEditor=mountPresentationEditor({root:$('pdEditor'),getConfig:config,
     getFormat:()=>session.designFormat||resolvePreset(registry,'video',session.video_preset).values.format||VIDEO_DEFAULTS.format,
-    setFormat:format=>{session.designFormat=format;$('pbPreviewFormat').value=format;paint();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background)image=null;invalidate();paint();}});
+    setFormat:format=>{session.designFormat=format;$('pbPreviewFormat').value=format;paint();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background){image=null;imageFile=null;imageFormat=null;refreshBackground();}invalidate();paint();}});
   const modeSessions=new Map();
   async function loadBackgroundPreview(announce=false) {
     const c=previewConfig();
@@ -186,7 +187,7 @@ export function mountBuilder(apiProvider) {
     const bytes=Uint8Array.from(decoded,char=>char.charCodeAt(0));
     const url=URL.createObjectURL(new Blob([bytes])),img=new Image();
     try {await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('背景画像をプレビューできません'));img.src=url;});
-      if(file===previewConfig().background&&format===previewConfig().video.format){image=img;paint();if(announce)status('背景画像を読み込みました');}
+      if(file===previewConfig().background&&format===previewConfig().video.format){image=img;imageFile=file;imageFormat=format;paint();if(announce)status('背景画像を読み込みました');}
     }finally{URL.revokeObjectURL(url);}
   }
   function refreshBackground() {
