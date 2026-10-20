@@ -1,5 +1,5 @@
 import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=mbti-20261019';
-import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=mbti-20261019';
+import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=caption-center-20261021';
 import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-20261019';
 import {clone, assertObject,validatePresentation} from './model.mjs?v=mbti-20261019';
