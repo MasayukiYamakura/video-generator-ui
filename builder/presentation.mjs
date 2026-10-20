@@ -9,7 +9,7 @@ export function designDefaults(config,format) {
     visualizer_x:1320,visualizer_y:900,visualizer_size:500,hook_font_size:config.video.template==='portrait_brand'?62:72,
     caption_font_size:52,max_width_ratio:config.video.template==='portrait_brand'?0.52:0.84});
   const slot={video:Object.fromEntries(PRESENTATION_VIDEO_KEYS.map(k=>[k,config.video[k]])),layout:{...layout,
-    caption_center_x:Math.round(w*(format==='landscape'&&config.video.template==='portrait_brand'?0.68:0.5)),
+    caption_center_x:Math.round(w*0.5),
     hook_center_x:Math.round(w*(format==='landscape'&&config.video.template==='portrait_brand'?0.68:0.5)),tag_font_size:40,tag_scale:1},
     background:config.background,theme:{title:config.ai.theme_title||'',subtitle:'ハシモトの占いと思想'},
     icon:{file:'icon.png',x:40,y:60,size:90,intro:false,body:false},

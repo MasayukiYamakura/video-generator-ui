@@ -1,9 +1,9 @@
 // Staged design editor: validates and saves metadata, never compiles a script.
 import {PRESENTATION_VIDEO_KEYS,mergePresentation,validatePresentation,clone} from './model.mjs?v=mbti-20261019';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
-import {designDefaults} from './presentation.mjs?v=mbti-20261019';
+import {designDefaults} from './presentation.mjs?v=caption-center-20261021';
 import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=mbti-20261019';
-export {designDefaults} from './presentation.mjs?v=mbti-20261019';
+export {designDefaults} from './presentation.mjs?v=caption-center-20261021';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
 export function mountPresentationEditor({root,getConfig,getFormat,setFormat,onChange}) {

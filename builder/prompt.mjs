@@ -1,5 +1,5 @@
 import {subjectKind} from './subjects.mjs?v=mbti-20261019';
-import {promptConfig,requestedFormats} from './presentation.mjs?v=mbti-20261019';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=caption-center-20261021';
 import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=mbti-20261019';
 
 const commonRules = correctTypos => [

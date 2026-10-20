@@ -1,7 +1,7 @@
 import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=mbti-20261019';
-import {formatConfig} from './presentation.mjs?v=mbti-20261019';
+import {formatConfig} from './presentation.mjs?v=caption-center-20261021';
 import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=mbti-20261019';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=caption-center-20261021';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=mbti-20261019';
@@ -10,8 +10,8 @@ import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=mbti-
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
 import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout} from './model.mjs?v=mbti-20261019';
-import {buildPrompt} from './prompt.mjs?v=mbti-20261019';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=mbti-20261019';
+import {buildPrompt} from './prompt.mjs?v=caption-center-20261021';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=caption-center-20261021';
 import {decodeContent} from './storage.mjs?v=mbti-20261019';
 import {drawPreview} from './preview.mjs?v=mbti-20261019';
 
