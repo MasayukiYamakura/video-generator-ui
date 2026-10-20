@@ -44,9 +44,10 @@ export function mountYouTube(){
   }
   if(state.videos?.[selected])$('youtubeVideo').value=selected;else $('youtubeVideo').selectedIndex=0;
   const category=$('youtubeCategory').value;
+  const categories=Array.isArray(state.categories)?state.categories:[];
   $('youtubeCategory').replaceChildren();
-  for(const c of state.categories||[]){const option=node('option',c.name);option.value=c.id;$('youtubeCategory').append(option);}
-  if((state.categories||[]).some(c=>c.id===(category||'24')))$('youtubeCategory').value=category||'24';
+  for(const c of categories){const option=node('option',c.name);option.value=c.id;$('youtubeCategory').append(option);}
+  if(categories.some(c=>c.id===(category||'24')))$('youtubeCategory').value=category||'24';
   $('youtubeUploads').replaceChildren();
   for(const post of Object.values(state.uploads||{})){
    const box=node('article');box.className='item';box.append(node('strong',post.metadata?.snippet?.title||post.source_id),node('p',LABEL[post.status]||'状態を確認してください'));
