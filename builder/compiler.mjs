@@ -6,7 +6,7 @@ import {clone, assertObject,validatePresentation} from './model.mjs?v=stock-plan
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 
 export function fixedSettings(config) {
-  const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
+  const {video:v,layout:l}=config, branded=v.template==='portrait_brand', thoughtLandscape=Boolean(v.thought_caption);
   const g={format:v.format, output_mode:v.output_mode, overlay_opacity:SYSTEM.overlay[v.template],
     voice_mode:v.voice_mode, theme:{enabled:v.format==='landscape',title:'',
       subtitle:'ハシモトの占いと思想',icon:'icon.png',font_size:l.theme_font_size,x:l.theme_x,y:l.theme_y,
@@ -23,10 +23,10 @@ export function fixedSettings(config) {
         position:{top:l.hook_top,margin_x:l.hook_margin_x},text_color:'white',
         highlight_color:branded?'white':'#FFC857',stroke_color:'black',stroke_width:branded?6:3,
         shadow:{opacity:0.65,blur:12,offset_x:4,offset_y:7}}},
-    caption:{enabled:v.body_caption,style:v.format==='landscape'?'box':'outline',
-      font:branded?'serif':'sans',font_weight:branded?'medium':'bold',font_size:l.caption_font_size,
+    caption:{enabled:v.body_caption,style:v.format==='landscape'&&!thoughtLandscape?'box':'outline',
+      font:branded||thoughtLandscape?'serif':'sans',font_weight:branded||thoughtLandscape?'medium':'bold',font_size:l.caption_font_size,
       max_width_ratio:l.max_width_ratio,y_center:l.caption_center_y,text_color:'white',
-      highlight_color:branded?'white':'#FFC857',stroke_color:'black',stroke_width:branded?4:3,
+      highlight_color:branded||thoughtLandscape?'white':'#FFC857',stroke_color:'black',stroke_width:branded||thoughtLandscape?4:3,
       box_color:[12,22,48],box_opacity:0.78,shadow:{opacity:0.55,blur:8,offset_x:3,offset_y:5}},
     visualizer:{...SYSTEM.visualizer,enabled:v.intro_visualizer||v.body_visualizer,
       x:l.visualizer_x,y:l.visualizer_y,size:l.visualizer_size,
@@ -104,7 +104,10 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
     }
     const base=clone(views[formats[0]]);
     base.global_settings.format=config.video.format;base.global_settings.output_mode=config.video.output_mode;
-    if(config.video.template==='portrait_brand')base.global_settings.template='portrait_brand';
+    if(config.video.template==='portrait_brand') {
+      base.global_settings.template='portrait_brand';
+      if(formats.includes('landscape'))base.global_settings.landscape_caption_style='serif_outline';
+    }
     validatePresentation(slots);
     base.global_settings.presentation=slots;
     const keys=['caption_enabled','category_tags','visualizer','theme_visible','subtitle_visible','hook_text','media_type','media_query'];

@@ -23,7 +23,7 @@ export function designDefaults(config,format) {
 export function formatConfig(config,format) {
   const slot=designDefaults(config,format),video={...config.video,...slot.video,format};
   // The established landscape design uses the standard box-caption renderer.
-  if(format==='landscape'&&video.template==='portrait_brand')video.template='standard';
+  if(format==='landscape'&&video.template==='portrait_brand') {video.template='standard';video.thought_caption=true;}
   return {...config,presentation:undefined,video,layout:slot.layout,background:slot.background,
     width:format==='vertical'?1080:1920,height:format==='vertical'?1920:1080,
     ai:{...config.ai,theme:slot.theme.title?'manual':'ai',theme_title:slot.theme.title||''},
