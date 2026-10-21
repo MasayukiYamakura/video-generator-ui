@@ -13,6 +13,8 @@ const resumeAudioMessage=h=>h.kind==='batch'?'保存済み音声がある対象�
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
+$('autoLink').checked=saved.autoLink===true;
+$('autoLink').onchange=persist;
 const historyMigrated=saved.historyMigrated || {};
 const legacyHistory=history.slice();
 $('repo').value = saved.repo || $('repo').value; $('token').value = token; $('remember').checked = Boolean(saved.token);
@@ -22,7 +24,7 @@ function persist() {
   if(!historyMigrated[h.repo]||h.status!=='completed')return true;
   const count=(counts.get(h.repo)||0)+1;counts.set(h.repo,count);return count<=50;
  });
- localStorage.setItem(KEY,JSON.stringify({repo:$('repo').value.trim(),token:$('remember').checked?token:'',history:cached,historyMigrated,pending}));
+ localStorage.setItem(KEY,JSON.stringify({repo:$('repo').value.trim(),token:$('remember').checked?token:'',history:cached,historyMigrated,pending,autoLink:$('autoLink').checked}));
 }
 function repo() { const r = $('repo').value.trim(); if (!/^[\w.-]+\/[\w.-]+$/.test(r)) throw Error('リポジトリは owner/name 形式で指定してください'); if (pending && pending.repo !== r) throw Error('未受付の処理とリポジトリが異なります'); return r; }
 async function api(path, method='GET', body) {
@@ -87,8 +89,8 @@ function render() {
     if(h.status==='completed'&&h.resumeAvailable&&h.sha&&videoNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
       const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)));
     }
-    if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','縦型動画をSNS投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
-    if(['video','batch'].includes(h.kind)&&h.status==='completed'&&h.outputFormats?.includes('landscape')){const prepare=node('button','横型動画をYouTube投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('youtube-prepare',{detail:{runId:h.runId}}));box.append(prepare);}
+    if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','縦型動画をSNS投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
+    if(['video','batch'].includes(h.kind)&&h.status==='completed'&&h.outputFormats?.includes('landscape')){const prepare=node('button','横型動画をYouTube投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('youtube-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
     $('history').append(box);
   }
   controls();
@@ -185,6 +187,7 @@ $('jsonFile').onchange=async()=>{const f=$('jsonFile').files[0];if(f){if(f.size>
 async function submit(kind='video'){if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0];let script,ext,mode;
 if(kind==='batch'){if(!window.videoConfigurator?.batch?.active())throw Error('タロットの複数星座モードを選択してください');script=window.videoConfigurator.batch.manifest();mode='tts';}
 else if(kind==='title-preview'){if(new TextEncoder().encode($('script').value).length>1024*1024)throw Error('JSONは1 MiBまでです');script=JSON.parse($('script').value);if(window.videoConfigurator)script=window.videoConfigurator.prepareScript(script);if(!script.scenes?.length)throw Error('タイトルを含むJSONが必要です');mode='title-preview';}else{({script,ext,mode}=validate(file,$('script').value));if(kind==='audio-preview'&&mode==='tts')throw Error('試聴は添付録音・匿名加工音声に対応しています');}
+script.auto_link=$('autoLink').checked;
 const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const connection=await api('');if(!connection.private)throw Error('音声の保存先は非公開リポジトリにしてください');if((await listRuns()).some(run=>run.status!=='completed'))throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();const settings=script.global_settings||script.videos?.[0]?.script?.global_settings||{};const formats=settings.output_mode==='vertical_horizontal'?['vertical','landscape']:settings.output_mode==='horizontal_only'?['landscape']:settings.format==='landscape'?['landscape']:['vertical'];pending={id,repo:repo(),kind,signs:kind==='batch'?script.videos.map(video=>video.zodiac):undefined,subjectKind:kind==='batch'?script.subject_kind:script.tarot?.subject_kind,outputMode:settings.output_mode,pairedOutput:settings.format==='vertical'&&Boolean(settings.output_mode),outputFormats:formats,audio:kind==='batch'?`${script.subject_kind==='mbti'?'16タイプ':'12星座'}一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let audioBlob=null;if(!['tts','title-preview'].includes(mode)){audioBlob=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const scriptBlob=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(audioBlob?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:audioBlob.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:scriptBlob.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(error){message(pending?`${error.message}。受付IDを保持しました。受付状況を確認してから再操作してください。`:error.message);}finally{busy=false;render();}}
 async function resumeGeneration(h){
  if(busy||pending)return;busy=true;controls();

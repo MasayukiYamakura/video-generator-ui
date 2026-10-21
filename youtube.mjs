@@ -19,7 +19,7 @@ export function mountYouTube(){
  const key=()=>`youtube-request-v1:${repo()}`;
  const load=()=>{try{pending=JSON.parse(localStorage.getItem(key())||'null');}catch{pending=null;}};
  const save=()=>{if(pending)localStorage.setItem(key(),JSON.stringify(pending));else localStorage.removeItem(key());};
- const say=text=>$('youtubeStatus').textContent=text;
+ const say=text=>{$('youtubeStatus').textContent=text;if(!$('productionPanel').hidden)$('status').textContent=text;};
  const api=(...args)=>{if(!window.videoStudioApi)throw Error('GitHubへ接続してください');if(busy&&pending&&pending.repo!==repo())throw Error('受付時のリポジトリに戻してください');return window.videoStudioApi(...args);};
  const decode=text=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(text.replace(/\s/g,'')),c=>c.charCodeAt(0))));
  const invalidate=()=>{review=null;$('youtubeReview').replaceChildren();controls();};
@@ -166,7 +166,7 @@ export function mountYouTube(){
  }catch(e){invalidate();say(e.message);}};
  $('youtubeSubmit').onclick=()=>{if(review)run({...review});};
  $('repo').addEventListener('change',()=>{state={videos:{},uploads:{},requests:{}};invalidate();load();render();polling();});
- window.addEventListener('youtube-prepare',e=>{document.querySelector('[data-studio-tab="social"]')?.click();panel.open=true;run({action:'import',run_id:e.detail.runId});});
+ window.addEventListener('youtube-prepare',e=>{if(e.detail.navigate!==false){document.querySelector('[data-studio-tab="social"]')?.click();panel.open=true;}run({action:'import',run_id:e.detail.runId});});
  document.querySelector('[data-studio-tab="social"]')?.addEventListener('click',()=>refresh().catch(e=>say(e.message)));
  load();render();polling();
 }
