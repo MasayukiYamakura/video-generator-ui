@@ -2,7 +2,7 @@
 import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=stock-plan-20261021';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
 import {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=tarot-display-20261021';
+import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=tarot-frame-20261021';
 export {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 

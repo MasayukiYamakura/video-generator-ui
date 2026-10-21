@@ -23,7 +23,7 @@ export function tarotBrandElements(slot,intro=false,scenery=false) {
     const text=kind==='theme'?t.title:t.subtitle;
     if(!v[prefix+kind]||!text||(scenery&&slot.scenery_visibility?.[kind]===false))continue;
     const x=l[kind+'_x'],y=l[kind+'_y'],size=l[kind+'_font_size'];
-    elements.push({kind,text:text.replaceAll('[[','').replaceAll(']]',''),x,y,size,width:Math.max(1,1920-x-54),height:size*(kind==='theme'?1.75:1.6)});
+    elements.push({kind,text:text.replaceAll('[[','').replaceAll(']]',''),x,y,size,maxWidth:Math.max(1,1920-x-54),height:size*(kind==='theme'?1.75:1.6)});
   }
   if(slot.icon?.[intro?'intro':'body']&&!(scenery&&slot.scenery_visibility?.icon===false)) {
     const a=slot.icon;elements.push({kind:'icon',...a,width:a.size,height:a.size});
@@ -38,4 +38,38 @@ export function tarotTitleFontSize(title,format,desired=130,fit=false) {
  if(!fit&&format!=='landscape')return Math.min(desired,limit);
  const units=Math.max(1,...title.split('\n').map(line=>Array.from(line).reduce((n,c)=>n+(/^[ -~]$/.test(c)?.75:1.1),0)));
  return Math.min(format==='landscape'?100:desired,limit,Math.floor((format==='landscape'?1920:1080)*.74/units));
+}
+
+// Canvas and Remotion measure the same font, wrap the same lines, and use the
+// same padding/border dimensions. Text frames shrink; maxWidth is only a limit.
+export const TAROT_BRAND_FONT_FAMILY='"Noto Sans CJK JP", "Noto Sans CJK", sans-serif';
+export const tarotBrandFont=size=>`800 ${size}px ${TAROT_BRAND_FONT_FAMILY}`;
+export function layoutTarotBrandElements(elements,context) {
+  const result=elements.map(e=>{
+    if(e.kind==='icon')return {...e};
+    context.font=tarotBrandFont(e.size);
+    const border=e.kind==='theme'?2:0;
+    const paddingX=Math.min(e.size*.4,e.maxWidth/4),paddingY=e.size*.25;
+    const contentWidth=Math.max(1,e.maxWidth-2*(paddingX+border));
+    const lines=[];
+    for(const paragraph of e.text.replace(/\r\n?/g,'\n').split('\n')) {
+      let line='';
+      for(const character of Array.from(paragraph)) {
+        if(line&&context.measureText(line+character).width>contentWidth) {lines.push(line);line='';}
+        line+=character;
+      }
+      lines.push(line);
+    }
+    const lineHeight=e.size*1.25;
+    const width=Math.min(e.maxWidth,Math.ceil(Math.max(0,...lines.map(line=>context.measureText(line).width))+2*(paddingX+border)));
+    const height=Math.ceil(Math.max(e.height,lines.length*lineHeight+2*(paddingY+border)));
+    return {...e,width,height,lines,lineHeight,paddingX,paddingY,border};
+  });
+  // If a long theme grows into its subtitle, keep the requested subtitle position
+  // as a minimum and move it just below the theme. Other saved coordinates stay.
+  const theme=result.find(e=>e.kind==='theme'),subtitle=result.find(e=>e.kind==='subtitle');
+  if(theme&&subtitle&&theme.x<subtitle.x+subtitle.width&&subtitle.x<theme.x+theme.width&&subtitle.y>=theme.y&&subtitle.y<theme.y+theme.height) {
+    subtitle.y=theme.y+theme.height+Math.ceil(subtitle.size*.25);
+  }
+  return result;
 }
