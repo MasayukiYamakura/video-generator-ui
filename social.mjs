@@ -1,5 +1,5 @@
 import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v=video-list-20261021';
-import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
+import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
 const WORKFLOW='social_publish.yml';
@@ -155,6 +155,7 @@ export function mountSocial(){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
 
 
 

@@ -1,13 +1,19 @@
-// Horizontal tarot header only. Cards, captions, timing and vertical layout stay fixed.
+// Shared landscape coordinates for the video and its position preview.
+export const TAROT_LANDSCAPE_LAYOUT = Object.freeze({
+  format:"landscape",width:1920,height:1080,headerTop:54,
+  cardLeft:[280,660,1040,1420],cardTop:[350],cardWidth:220,cardHeight:365,
+  subtitleLeft:180,subtitleWidth:1560,subtitleCenterY:880,subtitleFontSize:54,
+});
+export const tarotCardPosition=(layout,i)=>({left:layout.cardLeft[layout.format==='landscape'?i:i%2],top:layout.cardTop[layout.format==='landscape'?0:Math.floor(i/2)]});
 export const TAROT_BRAND_VIDEO=['intro_theme','body_theme','intro_subtitle','body_subtitle'];
 export const TAROT_BRAND_LAYOUT=['theme_x','theme_y','theme_font_size','subtitle_x','subtitle_y','subtitle_font_size'];
 const pick=(value,keys)=>Object.fromEntries(keys.filter(k=>Object.hasOwn(value||{},k)).map(k=>[k,value[k]]));
 export function tarotBrand(config,title='月間星座タロット') {
   const saved=config.presentation?.landscape||{};
   return {video:{intro_theme:true,body_theme:true,intro_subtitle:true,body_subtitle:true,...pick(saved.video,TAROT_BRAND_VIDEO)},
-    layout:{theme_x:920,theme_y:54,theme_font_size:36,subtitle_x:920,subtitle_y:130,subtitle_font_size:28,...pick(saved.layout,TAROT_BRAND_LAYOUT)},
+    layout:{theme_x:174,theme_y:54,theme_font_size:36,subtitle_x:174,subtitle_y:130,subtitle_font_size:28,...pick(saved.layout,TAROT_BRAND_LAYOUT)},
     theme:{title:saved.theme?.title||title.replaceAll('\n',' · '),subtitle:saved.theme?.subtitle??'ハシモトの占いと思想'},
-    icon:{file:'icon.png',x:800,y:54,size:90,intro:false,body:false,...saved.icon},
+    icon:{file:'icon.png',x:54,y:54,size:90,intro:true,body:true,...saved.icon},
     scenery_visibility:pick(saved.scenery_visibility,['theme','subtitle','icon'])};
 }
 export function tarotBrandElements(slot,intro=false,scenery=false) {
@@ -23,4 +29,13 @@ export function tarotBrandElements(slot,intro=false,scenery=false) {
     const a=slot.icon;elements.push({kind:'icon',...a,width:a.size,height:a.size});
   }
   return elements;
+}
+
+
+// Fit long type names on one line without changing narration or line breaks.
+export function tarotTitleFontSize(title,format,desired=130,fit=false) {
+ const limit=format==='landscape'?100:140;
+ if(!fit&&format!=='landscape')return Math.min(desired,limit);
+ const units=Math.max(1,...title.split('\n').map(line=>Array.from(line).reduce((n,c)=>n+(/^[ -~]$/.test(c)?.75:1.1),0)));
+ return Math.min(format==='landscape'?100:desired,limit,Math.floor((format==='landscape'?1920:1080)*.74/units));
 }

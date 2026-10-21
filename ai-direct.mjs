@@ -1,4 +1,4 @@
-import {subjects,subjectMeta} from './builder/subjects.mjs?v=mbti-20261019';
+import {subjects,subjectMeta} from './builder/subjects.mjs?v=tarot-display-20261021';
 import {stableVisuals} from './builder/tarot-visual.mjs?v=visual-20261016';
 const WORKFLOW='generate_ai_json.yml';
 const SIGNS=['aries','taurus','gemini','cancer','leo','virgo','libra','scorpio','sagittarius','capricorn','aquarius','pisces'];
@@ -154,3 +154,4 @@ export function mountDirectAi(){
   addButton('pbAiGenerateSource','Geminiで12星座の占い結果を生成',$('pbBatchSourcePromptBuild'),()=>generate('source'));
   addButton('pbAiGenerateBatch','Geminiで未取込分のシーンを直接生成',$('pbBatchBuild'),()=>generate('batch'));
 }
+

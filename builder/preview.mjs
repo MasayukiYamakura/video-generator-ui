@@ -1,5 +1,5 @@
-import {tarotTitle} from './compiler.mjs?v=mbti-20261019';
-import {tarotBrandElements} from './tarot-brand.mjs?v=mbti-20261019';
+import {tarotTitle} from './compiler.mjs?v=tarot-display-20261021';
+import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize} from './tarot-brand.mjs?v=tarot-display-20261021';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -19,18 +19,18 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if(tarot) {
     c.fillStyle='#e3cd9c';
     if(v.tarot_renderer==='remotion') {
-      const cardLeft=pairedLandscape?[105,390]:[200,670],cardTop=pairedLandscape?[165,555]:[495,1105];
+      const cardLayout=pairedLandscape?TAROT_LANDSCAPE_LAYOUT:{format:'vertical',cardLeft:[200,670],cardTop:[495,1105]};
       const cardWidth=pairedLandscape?220:210,cardHeight=pairedLandscape?365:360;
       c.textAlign='center';
-      if(intro) {
+      if(intro&&!pairedLandscape) {
         c.fillStyle='#1c2948';c.fillRect(pairedLandscape?320:430,pairedLandscape?360:1010,220,375);
         c.strokeStyle='#c9aa6d';c.lineWidth=6;c.strokeRect(pairedLandscape?324:434,pairedLandscape?364:1014,212,367);
-      } else {
-        const centerX=brand.length?355:pairedLandscape?w*.5:w/2;
-        c.font=`${brand.length?24:32}px sans-serif`;c.fillText(config.tarot ? tarotTitle(config.tarot).replace('\n',' · ') : '対象年月・星座の運勢',centerX,pairedLandscape?65:365);
-        c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',centerX,pairedLandscape?116:427);
+      } else if(!intro) {
+        const centerX=w/2,header=pairedLandscape&&brand.some(e=>e.kind==='theme');
+        c.font='32px sans-serif';if(!header)c.fillText(config.tarot ? tarotTitle(config.tarot).replace('\n',' · ') : '対象年月・星座の運勢',centerX,pairedLandscape?65:365);
+        c.fillStyle='#c9aa76';c.font='42px sans-serif';c.fillText('恋愛・対人',centerX,pairedLandscape?(header?290:116):427);
         for(let i=0;i<4;i++){
-          const x=cardLeft[i%2],y=cardTop[Math.floor(i/2)];
+          const {left:x,top:y}=tarotCardPosition(cardLayout,i);
           c.fillStyle='#1c2948';c.fillRect(x,y,cardWidth,cardHeight);
           c.strokeStyle='#c9aa6d';c.lineWidth=5;c.strokeRect(x+3,y+3,cardWidth-6,cardHeight-6);
           if(i<2) {
@@ -38,8 +38,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
             c.fillStyle='#fff8e9';c.font='25px sans-serif';c.fillText(i?'カップの3':'星',x+cardWidth/2,y+cardHeight-17);
           }
         }
-        c.fillStyle='#fff9ec';c.font=`${pairedLandscape?54:52}px sans-serif`;c.fillText('本編字幕の表示位置',pairedLandscape?1305:w/2,pairedLandscape?545:995);
-        if(pairedLandscape)for(let i=0;i<4;i++){c.fillStyle=i<2?'#1c2948':'#312c3a';c.fillRect(95+i*76,940,48,80);c.strokeStyle=i===1?'#e2cead':'#c9aa6d';c.strokeRect(98+i*76,943,42,74);}
+        c.fillStyle='#fff9ec';c.font=`${pairedLandscape?54:52}px sans-serif`;c.fillText('本編字幕の表示位置',w/2,pairedLandscape?880:995);
       }
     } else {
       c.font='52px serif';c.textAlign='center';c.fillText('月間星座タロット',w/2,160);
@@ -102,14 +101,14 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     }
   }
   if(intro&&v.hook_enabled) {
-    const hookCenterX=brand.length?355:active?l.hook_center_x:pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?150:250):l.hook_center_y;
+    const hookCenterX=tarot&&pairedLandscape?w/2:active?l.hook_center_x:pairedLandscape&&rightColumn?w*.68:w/2,hookCenterY=pairedLandscape?(tarot?540:250):l.hook_center_y;
     if(pairedLandscape||v.hook_orientation==='horizontal') {
       const lines=(title||'タイトルを入力してください').replaceAll('[[','').replaceAll(']]','').split('\n');
       if(tarot&&v.tarot_renderer==='remotion') {
         // Match tarot-remotion/src/tarot.jsx: Intro has a fixed size (at most
         // 140px), 1.25 line height, and is centered 15px above hook_center_y.
         // The Python hook's auto-fit setting does not apply to this renderer.
-        const size=Math.min(l.hook_font_size||130,brand.length?48:pairedLandscape?78:140);
+        const size=tarotTitleFontSize(lines.join('\n'),v.format,l.hook_font_size||130,config.tarot?.subject_kind==='mbti');
         c.font=`900 ${size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;
         c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff8e9';
         c.shadowColor='#070a11';c.shadowBlur=27;c.shadowOffsetY=5;
@@ -158,6 +157,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
 }
+
 
 
 
