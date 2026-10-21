@@ -1,17 +1,17 @@
 import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=mbti-20261019';
-import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=settings-20261021';
+import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=stock-plan-20261021';
 import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=settings-20261021';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=stock-plan-20261021';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=mbti-20261019';
 import {mountBatchEditor} from './batch-editor.mjs?v=mbti-20261019';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=mbti-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=settings-20261021';
-import {buildPrompt} from './prompt.mjs?v=settings-20261021';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=settings-20261021';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=stock-plan-20261021';
+import {buildPrompt} from './prompt.mjs?v=stock-plan-20261021';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=stock-plan-20261021';
 import {decodeContent} from './storage.mjs?v=mbti-20261019';
 import {drawPreview} from './preview.mjs?v=mbti-20261019';
 
@@ -235,19 +235,20 @@ export function mountBuilder(apiProvider) {
   $('pbSaveMode').onchange=()=>{const fresh=$('pbSaveMode').value==='new';$('pbNewPresetFields').hidden=!fresh;$('pbSaveVideo').hidden=!fresh;$('pbOverwriteVideo').hidden=fresh;};
   $('pbSaveVideo').onclick=()=>run(()=>save('video'));
   $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
-  $('pbBuild').onclick=()=>{try{presentationEditor.assertValid();const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
+  $('pbBuild').onclick=()=>{try{presentationEditor.assertValid();const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;snapshot.stock_plan_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
     if(!$('pbApplyOnSend').checked)return script;
     if(!snapshot)throw Error('画面設定を適用するには、設定変更後にプロンプトを生成してください');
     if(snapshot.social_required&&!script.social)throw Error('AIのJSONに投稿用socialがありません。説明文と関連ハッシュタグを含めて生成し直してください');
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
-    presentationEditor.assertValid();return applyConfig(script,snapshot,bgmCatalog);
+    presentationEditor.assertValid();return applyConfig(snapshot.stock_plan_required&&promptConfig(snapshot).video.background_mode==='mixed'?{...script,stock_plan:1}:script,snapshot,bgmCatalog);
   }
   $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};presentationEditor.reset();invalidate();lists();});
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
+
 
 
 

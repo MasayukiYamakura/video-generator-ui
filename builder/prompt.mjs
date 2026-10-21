@@ -1,5 +1,5 @@
 import {subjectKind} from './subjects.mjs?v=mbti-20261019';
-import {promptConfig,requestedFormats} from './presentation.mjs?v=settings-20261021';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=stock-plan-20261021';
 import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=mbti-20261019';
 
 const commonRules = correctTypos => [
@@ -54,7 +54,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     `冒頭は最初の${v.intro_scenes}シーン。フック${v.hook_enabled?'ON':'OFF'}・${v.hook_orientation==='horizontal'?'横書き':'縦書き'}。`,
     `冒頭: 字幕=${v.intro_caption}, タグ=${v.intro_tags}, 波形=${v.intro_visualizer}。本編: 字幕=${v.body_caption}, タグ=${v.body_tags}, 波形=${v.body_visualizer}。`,
     'Pexels動画が取得できたシーンは波形非表示。portrait_brandのPexels/Pixabay動画ではタグ非表示（レンダラーの既存動作）。',
-    `背景=${v.background_mode}。${v.background_mode==='stock'?'全字幕シーンに動画素材。':v.background_mode==='mixed'?(ai.stock_scenes==='manual'?'背景画像を基本に手動指定のシーンだけ動画素材。':`背景画像を基本に全シーン数の約${ai.stock_percent}%を動画素材にする。目標シーン数は全シーン数×${ai.stock_percent}/100を四捨五入する。0%は動画なし、100%は全編動画。割合を優先し、可能な範囲で動画シーンを分散させる。`):'全字幕シーンに固定画像。素材検索は不要。'}`,
+    `背景=${v.background_mode}。${v.background_mode==='stock'?'全字幕シーンに動画素材。':v.background_mode==='mixed'?(ai.stock_scenes==='manual'?'背景画像を基本に手動指定のシーンだけ動画素材。':`冒頭${v.intro_scenes}シーンを除いた本編を対象に、シーン数の${ai.stock_percent}%を外部映像にする（再生時間の割合ではない）。本編シーン数×${ai.stock_percent}/100を四捨五入し、0%は0件、0%超で本編があれば最低1件、本編シーン数を上限とする。100%も冒頭は背景画像を維持し、本編だけ全件を外部映像にする。可能な範囲で分散させる。`):'全字幕シーンに固定画像。素材検索は不要。'}`,
     `素材提供元=${v.stock_provider}。${v.format==='vertical'?'縦向き優先。':'横向き優先。'}`,
     v.template==='portrait_brand'?'フック・字幕は明朝体、白文字・黒縁・影。[[ ]]の強調色を使わない。タグは占い／コーチング／引き寄せ。':'強調は最大1箇所・2〜8文字を[[ ]]で囲む。不要なら省略。',
     `位置は制作者が確定済み。右${Math.round(l.safe_right*100)}%・下${Math.round(l.safe_bottom*100)}%のガイドはプレビュー専用。AIは座標・サイズを変更しない。`,
@@ -65,6 +65,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     ai.search==='manual'?`英語検索語は指定値 ${JSON.stringify(ai.search_text)} を使う。`:'素材検索語は内容を想像できる具体的な英語2〜4語。同じ語を連続させない。',
     ai.stock_scenes==='manual'&&v.background_mode==='mixed'?`動画を挿入する字幕シーン番号（1始まり）=${ai.stock_indices||'なし'}。それ以外へ動画を追加しない。`:'動画挿入箇所は上記の背景方針に従いAIが判断。',
   ];
+  if(v.background_mode==='mixed')rules.push('【背景画像＋外部映像の必須ルール】ルートにstock_plan:1を必ず付ける。冒頭として設定された全シーンは各形式の設定済み背景画像を使い、media_type/media_queryを付けない。手動指定でも冒頭への外部映像は禁止。本編の外部映像シーンだけにmedia_type（pexelsまたはpixabay）と具体的な英語media_queryを付ける。縦横の切替シーンは共通。出力前に冒頭の素材指定がないこと、外部映像件数が計算結果と一致すること、全対象に提供元と検索語があることを確認し、違反があれば修正する。');
   rules.push('縦横とも原稿・シーン・音声は共通。テーマを作る場合はルートのtheme_titleへ出力する。表示・配置は形式別設定をシステムが適用する。','【投稿用説明文とハッシュタグ】',socialRule);
   if(v.bgm_mode==='ai') {
     const categories=availableCategories(bgmCatalog);
@@ -84,6 +85,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+
 
 
 

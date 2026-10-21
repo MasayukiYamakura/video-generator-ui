@@ -25,7 +25,7 @@ export const VIDEO_FIELDS=[
   ['intro_visualizer','冒頭の波形'],['body_visualizer','本編の波形'],
   ['intro_theme','冒頭のテーマ'],['intro_subtitle','冒頭のサブタイトル'],
   ['body_theme','本編のテーマ'],['body_subtitle','本編のサブタイトル'],
-  ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','背景画像＋一部動画'],['stock','全編AI動画素材']]],
+  ['background_mode','背景素材',[['fixed','固定画像のみ'],['mixed','背景画像＋一部外部映像'],['stock','全編AI動画素材']]],
   ['stock_provider','動画素材提供元',[['pexels','Pexels'],['pixabay','Pixabay']]],
   ['hook_band_enabled','横書きフックの黒帯'],
 ];
@@ -38,4 +38,5 @@ export const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上�
   caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
   max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
   hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_top:'上ガイド比率',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
+
 
