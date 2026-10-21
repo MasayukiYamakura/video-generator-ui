@@ -1,5 +1,5 @@
 import {tarotTitle} from './compiler.mjs?v=tarot-frame-20261021';
-import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=tarot-frame-20261021';
+import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,mbtiVerticalIntroRows,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=tarot-frame-20261021';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -108,11 +108,16 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
         // Match tarot-remotion/src/tarot.jsx: Intro has a fixed size (at most
         // 140px), 1.25 line height, and is centered 15px above hook_center_y.
         // The Python hook's auto-fit setting does not apply to this renderer.
+        const mbtiRows=!pairedLandscape&&config.tarot?.subject_kind==='mbti'?mbtiVerticalIntroRows(lines.join('\n')):null;
         const size=tarotTitleFontSize(lines.join('\n'),v.format,l.hook_font_size||130,config.tarot?.subject_kind==='mbti');
         c.font=`900 ${size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;
         c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff8e9';
         c.shadowColor='#070a11';c.shadowBlur=27;c.shadowOffsetY=5;
-        lines.forEach((line,i)=>c.fillText(line,hookCenterX,hookCenterY-(pairedLandscape?0:15)+(i-(lines.length-1)/2)*size*1.25));
+        if(mbtiRows){
+          const heights=mbtiRows.map(row=>row.size*1.18),total=heights.reduce((sum,h)=>sum+h,0)+16;
+          let y=hookCenterY-total/2;
+          mbtiRows.forEach((row,i)=>{c.font=`900 ${row.size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;c.fillText(row.text,hookCenterX,y+heights[i]/2);y+=heights[i]+8;});
+        } else lines.forEach((line,i)=>c.fillText(line,hookCenterX,hookCenterY-(pairedLandscape?0:15)+(i-(lines.length-1)/2)*size*1.25));
         c.shadowColor='transparent';c.shadowBlur=0;c.shadowOffsetY=0;
       } else {
       const bandWidth=w*(pairedLandscape ? Math.min(l.hook_band_width_ratio,rightColumn?0.54:0.84) : l.hook_band_width_ratio), limit=Math.min(bandWidth,w*(pairedLandscape ? (rightColumn?0.54:0.84) : l.hook_max_width_ratio));
