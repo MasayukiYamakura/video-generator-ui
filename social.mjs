@@ -1,3 +1,4 @@
+import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v=video-list-20261021';
 import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
@@ -62,20 +63,21 @@ export function mountSocial(){
   if(!state.channels.length)$('socialChannels').append(el('p','Secrets登録後、「投稿先を取得」を押してください。'));
   $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：未設定（場所なしで予約できます）';
   $('socialVideos').replaceChildren();
-  const completedVideos=el('details'),completedVideoList=el('div');
-  const withdrawnVideos=el('details'),withdrawnVideoList=el('div');
-  let completedVideoCount=0,availableVideoCount=0,withdrawnVideoCount=0;
-  for(const v of Object.values(state.videos).reverse()){
-   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed;input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',CLOUD[v.cloud.status]||v.cloud.status));
+  let availableVideoCount=0;
+  for(const v of newest(state.videos)){
+   const group=v.cloud.status==='withdrawn'?'withdrawn':v.archived_at?'archived':isCompletedVideo(v,state.posts,state.channels)?'completed':'active';
+   if(!matches(v,$('socialSearch').value)||($('socialFilter').value!=='all'&&$('socialFilter').value!==group))continue;
+   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed||Boolean(v.archived_at);input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',identity(v)),el('p',v.archived_at?'一覧から取り下げ済み':CLOUD[v.cloud.status]||v.cloud.status));
+   const href=previewLink(v)||sourceLink(v,$('repo').value.trim());
+   if(href){const a=el('a',previewLink(v)?'動画をプレビュー':'元動画をダウンロードして確認');a.href=href;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
+   const archive=el('button',v.archived_at?'一覧に戻す':'一覧から取り下げる');archive.className='secondary';archive.dataset.socialAction='archive';
+   archive.onclick=()=>run({action:'archive',video_id:v.id,archived:!v.archived_at});box.append(archive);
    if(v.cloud.error)box.append(el('p',v.cloud.error));if(v.cloud.delete_error)box.append(el('p',v.cloud.delete_error));
    if(['error','setup_required','pending'].includes(v.cloud.status)){const retry=el('button','この動画の生成結果から転送を再試行');retry.className='secondary';retry.dataset.socialAction='import';retry.onclick=()=>run({action:'import',run_id:v.run_id});box.append(retry);}
-   if(canWithdrawVideo(v,state.posts)){const withdraw=el('button','投稿せず動画を取り下げる');withdraw.className='secondary';withdraw.dataset.socialAction='withdraw';withdraw.onclick=()=>{if(!confirm('この動画を投稿一覧から取り下げ、Cloudinary上のファイルを削除します。元に戻せません。実行しますか？'))return;run({action:'withdraw',video_id:v.id});};box.append(withdraw);}
-   if(v.cloud.status==='withdrawn'){withdrawnVideoList.append(box);withdrawnVideoCount++;}
-   else if(completed){completedVideoList.append(box);completedVideoCount++;}
-   else{$('socialVideos').append(box);availableVideoCount++;}
+   if(canWithdrawVideo(v,state.posts)){const withdraw=el('button','投稿せずCloudinaryのファイルを削除する');withdraw.className='secondary';withdraw.dataset.socialAction='withdraw';withdraw.onclick=()=>{if(!confirm('この動画を投稿一覧から取り下げ、Cloudinary上のファイルを削除します。元に戻せません。実行しますか？'))return;run({action:'withdraw',video_id:v.id});};box.append(withdraw);}
+   $('socialVideos').append(box);if(!input.disabled)availableVideoCount++;
   }
-  if(completedVideoCount){completedVideos.append(el('summary',`投稿完了した動画（${completedVideoCount}件）を表示`),completedVideoList);$('socialVideos').append(completedVideos);}
-  if(withdrawnVideoCount){withdrawnVideos.append(el('summary',`取り下げ済みの動画（${withdrawnVideoCount}件）を表示`),withdrawnVideoList);$('socialVideos').append(withdrawnVideos);}
+  if(!$('socialVideos').children.length)$('socialVideos').append(el('p','該当する動画はありません。'));
   $('socialSelectAll').disabled=!availableVideoCount;
   if(!Object.keys(state.videos).length)$('socialVideos').append(el('p','新しく生成した動画は、生成完了後にここへ登録されます。生成履歴の「縦型動画をSNS投稿管理へ取り込む」からも取り込めます。'));
   $('socialPosts').replaceChildren();
@@ -84,6 +86,7 @@ export function mountSocial(){
   for(const p of Object.values(state.posts).reverse()){
    if(p.status==='withdrawn')continue;
    const box=el('article');box.className='item';box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
+   if(state.videos[p.video_id])box.append(el('p',identity(state.videos[p.video_id])));
    const c=state.channels.find(c=>c.id===p.channel_id);if(c)box.append(el('p',c.name));
    if(p.error&&['failed','unknown','waiting','expired'].includes(p.status))box.append(el('p',p.error));
    if((['failed','expired'].includes(p.status)||(['ready','waiting'].includes(p.status)&&!p.buffer_id))&&state.videos[p.video_id]?.cloud.status==='uploaded'){const retry=el('button',p.buffer_id?'この投稿先だけ再予約':'日時・投稿文を確認して追加予約');retry.className='secondary';retry.dataset.socialAction='retry';retry.onclick=()=>{if(busy||pending)return;rows=[{...p,...(p.buffer_id?{retry_buffer_id:p.buffer_id}:{})}];renderRows();$('socialReview').scrollIntoView({behavior:'smooth'});};box.append(retry);}
@@ -134,6 +137,8 @@ export function mountSocial(){
   }catch(e){say(e.message+'。受付情報を保持しました。確認後に同じ受付IDで再依頼できます。');}
   finally{busy=false;control();renderRows();if(pending&&!poll)poll=setInterval(()=>{if(!document.hidden)refresh().catch(e=>say(e.message));},15000);}
  }
+ $('socialSearch').oninput=render;
+ $('socialFilter').onchange=render;
  $('socialLocationImport').onclick=()=>run({action:'location'});
  $('socialConnect').onclick=()=>run({action:'connect'});
  $('socialSync').onclick=()=>run({action:'sync'});

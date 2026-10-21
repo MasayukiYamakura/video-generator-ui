@@ -1,3 +1,4 @@
+import {identity,matches,newest,youtubeGroup,sourceLink} from './video-list.mjs?v=video-list-20261021';
 import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
 import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=youtube-publish-20261019';
 const $=id=>document.getElementById(id);
@@ -32,6 +33,7 @@ export function mountYouTube(){
  }
  function selectVideo(){
   invalidate();const video=state.videos[$('youtubeVideo').value];
+  $('youtubeSelected').textContent=video?`選択中：${video.filename} ／ ${identity(video)}`:'未送信の動画を一覧から選択してください';
   $('youtubeTitle').value=video?.filename?.replace(/\.mp4$/i,'')||'';
   try{$('youtubeDescription').value=video?socialBody(video.social,video.tarot?.zodiac,''):'';}catch{$('youtubeDescription').value='';}
  }
@@ -40,17 +42,19 @@ export function mountYouTube(){
   const selected=$('youtubeVideo').value;
   $('youtubeVideo').replaceChildren();
   for(const video of Object.values(state.videos||{})){
-   const option=node('option',video.filename);option.value=video.id;$('youtubeVideo').append(option);
+   const option=node('option',`${video.filename} ／ ${identity(video)}`);option.value=video.id;$('youtubeVideo').append(option);
   }
-  if(state.videos?.[selected])$('youtubeVideo').value=selected;else $('youtubeVideo').selectedIndex=0;
+  if(state.videos?.[selected]&&youtubeGroup(state.videos[selected],state.uploads)==='active')$('youtubeVideo').value=selected;else $('youtubeVideo').value=newest(state.videos).find(v=>youtubeGroup(v,state.uploads)==='active')?.id||'';
+  renderVideos();
   const category=$('youtubeCategory').value;
   const categories=Array.isArray(state.categories)?state.categories:[];
   $('youtubeCategory').replaceChildren();
   for(const c of categories){const option=node('option',c.name);option.value=c.id;$('youtubeCategory').append(option);}
   if(categories.some(c=>c.id===(category||'24')))$('youtubeCategory').value=category||'24';
   $('youtubeUploads').replaceChildren();
+  const completed=node('details'),completedList=node('div');let completedCount=0;
   for(const post of Object.values(state.uploads||{})){
-   const box=node('article');box.className='item';box.append(node('strong',post.metadata?.snippet?.title||post.source_id),node('p',LABEL[post.status]||'状態を確認してください'));
+   const box=node('article');box.className='item';if(state.videos?.[post.source_id])box.append(node('p',identity(state.videos[post.source_id])));box.append(node('strong',post.metadata?.snippet?.title||post.source_id),node('p',LABEL[post.status]||'状態を確認してください'));
    if(post.error)box.append(node('p',post.error));
    if(/^[\w-]{11}$/.test(post.video_id||'')){
     const link=node('a','YouTube Studioで確認');link.href=`https://studio.youtube.com/video/${post.video_id}/edit`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
@@ -65,9 +69,28 @@ export function mountYouTube(){
     const button=node('button','同じ送信の状態確認・再開');button.className='secondary';button.disabled=busy||Boolean(pending)||!post.can_resume;
     button.onclick=()=>{review={action:'resume',confirmed:true,source_id:post.source_id,channel_id:post.channel_id};$('youtubeReview').replaceChildren(node('p',`${post.metadata?.snippet?.title} ／ ${post.channel_id} ／ 非公開の同じ送信のみ確認・再開します。新規アップロードは作りません。`));controls();};box.append(button);if(!post.can_resume)box.append(node('p','送信情報を確認できません。YouTube Studioで確認してください。新規送信は保留します。'));
    }
-   $('youtubeUploads').append(box);
+   if(['published','unlisted'].includes(post.remote?.state)&&!['unknown','needs_review','rejected','overdue'].includes(post.publication?.status)){completedList.append(box);completedCount++;}else $('youtubeUploads').append(box);
   }
-  if(!state.videos?.[selected])selectVideo();controls();
+  if(completedCount){completed.append(node('summary',`公開完了の履歴（${completedCount}件）`),completedList);$('youtubeUploads').append(completed);}
+  if($('youtubeVideo').value!==selected)selectVideo();controls();
+ }
+ function renderVideos(){
+  const list=$('youtubeVideos');list.replaceChildren();
+  const labels={active:'未送信',sent:'送信記録あり（下の送信結果で確認）',expired:'保存期限切れ',archived:'一覧から取り下げ済み'};
+  for(const video of newest(state.videos)){
+   const group=youtubeGroup(video,state.uploads);
+   if(($('youtubeFilter').value!=='all'&&$('youtubeFilter').value!==group)||!matches(video,$('youtubeSearch').value))continue;
+   const box=node('article');box.className='item';
+   box.append(node('strong',video.filename),node('p',identity(video)),node('p',labels[group]));
+   const href=sourceLink(video,repo());if(href){const a=node('a','元動画をダウンロードして確認');a.href=href;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
+   if(group==='active'){
+    const label=node('label'),input=node('input');label.className='check';input.type='radio';input.name='youtube-source';input.checked=$('youtubeVideo').value===video.id;
+    input.onchange=()=>{$('youtubeVideo').value=video.id;selectVideo();};label.append(input,node('span','この動画を投稿準備に選択'));box.append(label);
+   }
+   const archive=node('button',video.archived_at?'一覧に戻す':'一覧から取り下げる');archive.className='secondary';archive.dataset.youtubeOperation='archive';
+   archive.onclick=()=>run({action:'archive',source_id:video.id,archived:!video.archived_at});box.append(archive);list.append(box);
+  }
+  if(!list.children.length)list.append(node('p','該当する動画はありません。'));
  }
  function publicationControls(box,post){
   const field=(label,input)=>{const l=node('label',label);l.append(input);box.append(l);return input;};
@@ -124,6 +147,8 @@ export function mountYouTube(){
   }catch(e){say(e.message+'。受付情報がある場合は同じIDで確認してください。');}
   finally{busy=false;controls();polling();}
  }
+ $('youtubeSearch').oninput=()=>{renderVideos();controls();};
+ $('youtubeFilter').onchange=()=>{renderVideos();controls();};
  $('youtubeConnect').onclick=()=>run({action:'connect'});
  $('youtubeSync').onclick=()=>run({action:'sync'});
  $('youtubeRefresh').onclick=()=>refresh().catch(e=>say(e.message));
@@ -133,6 +158,7 @@ export function mountYouTube(){
  for(const id of ['youtubeTitle','youtubeDescription','youtubeCategory','youtubeKids','youtubeSynthetic'])$(id).addEventListener('input',invalidate);
  $('youtubeBuild').onclick=()=>{try{
   const video=state.videos[$('youtubeVideo').value];
+  if(!video||youtubeGroup(video,state.uploads)!=='active')throw Error('未送信の動画を一覧から選択してください。送信記録がある場合は下の記録で確認してください');
   if(Object.values(state.uploads||{}).some(p=>p.source_id===video?.id&&p.channel_id===state.channel?.id))throw Error('この動画には送信記録があります。下の記録から確認してください');
   if(!$('youtubeKids').value||!$('youtubeSynthetic').value)throw Error('子ども向け・合成コンテンツを選択してください');
   review=privateUpload(video,state.channel,{title:$('youtubeTitle').value,description:$('youtubeDescription').value,category_id:$('youtubeCategory').value,made_for_kids:$('youtubeKids').value==='yes',contains_synthetic_media:$('youtubeSynthetic').value==='yes'});
