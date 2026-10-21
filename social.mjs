@@ -41,7 +41,7 @@ export function mountSocial(){
  let state={videos:{},posts:{},channels:[],settings:{}},rows=[],busy=false,pending=null,poll=null;
  const api=(...args)=>{if(!window.videoStudioApi)throw Error('GitHubへ接続してください');return window.videoStudioApi(...args);};
  const key=()=>`social-request-v1:${$('repo').value.trim()}`;
- const say=t=>$('socialStatus').textContent=t;
+ const say=t=>{$('socialStatus').textContent=t;if(!$('productionPanel').hidden)$('status').textContent=t;};
  const savePending=()=>{if(pending)localStorage.setItem(key(),JSON.stringify(pending));else localStorage.removeItem(key());};
  const loadPending=()=>{try{pending=JSON.parse(localStorage.getItem(key())||'null');}catch{pending=null;}};
  const control=()=>{for(const b of panel.querySelectorAll('button[data-social-action]'))b.disabled=busy||Boolean(pending);$('socialSubmit').disabled=!rows.length||busy||Boolean(pending);$('socialResume').hidden=!pending;$('socialResume').disabled=busy;};
@@ -150,7 +150,7 @@ export function mountSocial(){
  $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all,state.posts);const skipped=all.length-rows.length;renderRows();const descriptions=videos.map(v=>v.social?.description).filter(Boolean);const duplicate=descriptions.length>1&&new Set(descriptions).size===1?'全動画の説明文が完全一致しています。内容を確認してください。 ':'';say(`${duplicate}各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
  $('socialSubmit').onclick=()=>{if(rows.length)run({action:'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id})=>({video_id,channel_id,title,body,due_at,retry_buffer_id}))});};
  $('socialStart').value=jstInput(new Date(Date.now()+3600000).toISOString());
- window.addEventListener('social-prepare',e=>{navigate('social');run({action:'import',run_id:e.detail.runId});});
+ window.addEventListener('social-prepare',e=>{if(e.detail.navigate!==false)navigate('social');run({action:'import',run_id:e.detail.runId});});
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];loadPending();render();renderRows();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
