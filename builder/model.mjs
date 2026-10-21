@@ -180,7 +180,7 @@ export function defaultLayout(registry,id) {
   const p=resolvePreset(registry,'video',id), v={...VIDEO_DEFAULTS,...p.values};
   return p.default_layout || (v.format==='vertical'?(v.template==='portrait_brand'?'portrait_standard':'vertical_legacy'):'landscape_standard');
 }
-export function resolveConfig(registry, session) {
+export function resolveConfig(registry, session, {draft=false}={}) {
   validateRegistry(registry);
   const video=resolvePreset(registry,'video',session.video_preset);
   const layout=resolvePreset(registry,'layout',session.layout_preset || defaultLayout(registry,session.video_preset));
@@ -196,8 +196,8 @@ export function resolveConfig(registry, session) {
   if(v.template==='portrait_brand'&&l.caption_font_size<72) throw Error('portrait_brandの字幕サイズは既存描画に合わせ72以上にしてください');
   if(v.template!=='portrait_brand'&&v.format!=='landscape'&&(v.intro_tags||v.body_tags)) throw Error('カテゴリタグはportrait_brandまたは横型専用です');
   if(v.background_mode==='mixed'&&v.template!=='portrait_brand'&&!(v.template==='standard'&&v.format==='landscape')) throw Error('一部動画＋背景画像はTikTok標準またはYouTube横型で選択してください');
-  if(v.bgm_mode==='category'&&!CATEGORIES.includes(v.bgm_category)) throw Error('手動BGMカテゴリを選択してください');
-  if(v.bgm_mode==='track'&&!v.bgm_track) throw Error('手動BGM曲を選択してください');
+  if(!draft&&v.bgm_mode==='category'&&!CATEGORIES.includes(v.bgm_category)) throw Error('手動BGMカテゴリを選択してください');
+  if(!draft&&v.bgm_mode==='track'&&!v.bgm_track) throw Error('手動BGM曲を選択してください');
   const w=v.format==='vertical'?1080:1920, h=v.format==='vertical'?1920:1080;
   for(const k of ['tag_x','visualizer_x','theme_x','subtitle_x']) if(l[k]>w) throw Error(`${k}が画面の外です`);
   for(const k of ['tag_y','visualizer_y','caption_center_y','hook_top','theme_y','subtitle_y']) if(l[k]>h) throw Error(`${k}が画面の外です`);
@@ -208,11 +208,13 @@ export function resolveConfig(registry, session) {
   if(!Number.isInteger(ai.stock_percent)||ai.stock_percent<0||ai.stock_percent>100) throw Error('AI自動の動画シーン割合は0〜100%の整数です');
   for(const k of ['hook','search','stock_scenes','theme']) if(!['ai','manual'].includes(ai[k])) throw Error(`AI設定 ${k} が不正です`);
   for(const k of ['manual_hook','search_text','stock_indices']) if(typeof ai[k]!=='string') throw Error(`${k}は文字列にしてください`);
-  if((v.format==='landscape'||['vertical_horizontal','horizontal_only'].includes(v.output_mode))&&ai.theme==='manual'&&(typeof ai.theme_title!=='string'||!ai.theme_title.trim())) throw Error('手動テーマタイトルを入力してください');
-  if(v.template!=='tarot_monthly'&&v.hook_enabled&&ai.hook==='manual'&&!ai.manual_hook.trim()) throw Error('手動フック文章を入力してください');
-  if(v.background_mode!=='fixed'&&ai.search==='manual'&&!ai.search_text.trim()) throw Error('手動の英語検索語を入力してください');
-  if(ai.stock_scenes==='manual'&&ai.stock_indices.trim()&&!/^\d+(\s*,\s*\d+)*$/.test(ai.stock_indices.trim())) throw Error('素材シーンは1から始まる番号をカンマで指定してください');
+  if(!draft&&(v.format==='landscape'||['vertical_horizontal','horizontal_only'].includes(v.output_mode))&&ai.theme==='manual'&&(typeof ai.theme_title!=='string'||!ai.theme_title.trim())) throw Error('手動テーマタイトルを入力してください');
   const presentation=mergePresentation(video.presentation,session.presentation);
+  const formats=v.format==='landscape'||v.output_mode==='horizontal_only'?['landscape']:v.output_mode==='vertical_horizontal'?['vertical','landscape']:['vertical'];
+  const effective=formats.map(f=>({...v,...presentation?.[f]?.video}));
+  if(!draft&&v.template!=='tarot_monthly'&&effective.some(x=>x.hook_enabled)&&ai.hook==='manual'&&!ai.manual_hook.trim())throw Error('手動フック文章を入力してください');
+  if(!draft&&effective.some(x=>x.background_mode!=='fixed')&&ai.search==='manual'&&!ai.search_text.trim())throw Error('手動の英語検索語を入力してください');
+  if(ai.stock_scenes==='manual'&&ai.stock_indices.trim()&&!/^\d+(\s*,\s*\d+)*$/.test(ai.stock_indices.trim())) throw Error('素材シーンは1から始まる番号をカンマで指定してください');
   return {video:v, layout:l, ai, background, width:w, height:h,...(presentation===undefined?{}:{presentation})};
 }
 export function savePreset(registry, kind, entry, overwrite=false) {
@@ -251,5 +253,6 @@ export function migrateRegistry(registry) {
   }
   return validateRegistry(next);
 }
+
 
 

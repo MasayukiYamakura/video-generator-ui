@@ -1,5 +1,5 @@
 import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
-import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=mbti-20261019';
+import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=settings-20261021';
 import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=mbti-20261019';
 export async function loadPresetData(api) {
   const preset=await readRegistry(api),bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
@@ -18,5 +18,6 @@ export async function savePresetSettings({api,registry,sha,session,config:c,id,n
   const next=savePreset(registry,kind,entry,overwrite);
   return writeRegistry(api,next,sha);
 }
+
 
 
