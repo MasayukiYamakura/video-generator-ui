@@ -1,4 +1,4 @@
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=mbti-20261019';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=settings-20261021';
 import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=mbti-20261019';
 
 export function designDefaults(config,format) {
@@ -26,7 +26,7 @@ export function formatConfig(config,format) {
   if(format==='landscape'&&video.template==='portrait_brand')video.template='standard';
   return {...config,presentation:undefined,video,layout:slot.layout,background:slot.background,
     width:format==='vertical'?1080:1920,height:format==='vertical'?1920:1080,
-    ai:{...config.ai,...(slot.theme.title?{theme:'manual',theme_title:slot.theme.title}:{})},
+    ai:{...config.ai,theme:slot.theme.title?'manual':'ai',theme_title:slot.theme.title||''},
     design:slot};
 }
 export function requestedFormats(config) {
@@ -40,3 +40,4 @@ export function promptConfig(config) {
   return {...config,video:{...config.video,background_mode,hook_enabled:views.some(c=>c.video.hook_enabled),
     intro_scenes:Math.max(...views.map(c=>c.video.intro_scenes))}};
 }
+

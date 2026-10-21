@@ -1,5 +1,5 @@
 import {subjectKind} from './subjects.mjs?v=mbti-20261019';
-import {promptConfig,requestedFormats} from './presentation.mjs?v=caption-center-20261021';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=settings-20261021';
 import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=mbti-20261019';
 
 const commonRules = correctTypos => [
@@ -84,5 +84,6 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+
 
 
