@@ -1,8 +1,8 @@
 import {subjects,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
 import {VISUAL_FIELDS,normalizeVisual,PALETTES,BACK_ART,motionPose} from './tarot-visual.mjs?v=visual-20261016';
-import {SIGNS as ZODIAC_SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=tarot-display-20261021';
+import {SIGNS as ZODIAC_SIGNS,POSITIONS,batchConfig,batchPrompt,compileBatch,importBatch,importBatchSource,batchSourcePrompt} from './batch.mjs?v=tarot-frame-20261021';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_POSITIONS} from './single-editor.mjs?v=tarot-display-20261021';
+import {TAROT_POSITIONS} from './single-editor.mjs?v=tarot-frame-20261021';
 import {el,options} from './dom.mjs?v=visual-20261016';
 
 const $=id=>document.getElementById(id);

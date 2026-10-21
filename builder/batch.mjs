@@ -2,7 +2,7 @@ import {subjects,subjectKind,subjectMeta,MBTI_NAMES} from './subjects.mjs?v=taro
 import {normalizeVisual} from './tarot-visual.mjs?v=visual-20261016';
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=tarot-display-20261021';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=tarot-frame-20261021';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];

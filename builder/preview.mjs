@@ -1,5 +1,5 @@
-import {tarotTitle} from './compiler.mjs?v=tarot-display-20261021';
-import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize} from './tarot-brand.mjs?v=tarot-display-20261021';
+import {tarotTitle} from './compiler.mjs?v=tarot-frame-20261021';
+import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=tarot-frame-20261021';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -131,12 +131,14 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
     }
   }
   if((intro?v.intro_caption:v.body_caption)&&!(tarot&&v.tarot_renderer==='remotion')) text('通常字幕の位置',active?l.caption_center_x:pairedLandscape&&rightColumn?w*.68:w/2,pairedLandscape?h*.68:l.caption_center_y+l.caption_font_size/3,pairedLandscape?48:l.caption_font_size);
-  for(const e of brand) {
+  for(const e of layoutTarotBrandElements(brand,c)) {
     if(e.kind==='icon'){c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(e.x,e.y,e.width,e.height);continue;}
     c.fillStyle=e.kind==='theme'?'rgba(4,7,17,.85)':'#9f2435';c.fillRect(e.x,e.y,e.width,e.height);
-    if(e.kind==='theme'){c.strokeStyle='#c9aa76';c.lineWidth=2;c.strokeRect(e.x,e.y,e.width,e.height);}
-    c.font=`800 ${e.size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';c.fillStyle='#fff9ec';
-    c.fillText(e.text,e.x+e.size*.4,e.y+e.height/2);
+    if(e.border){c.strokeStyle='#c9aa76';c.lineWidth=e.border;c.strokeRect(e.x+e.border/2,e.y+e.border/2,e.width-e.border,e.height-e.border);}
+    c.font=tarotBrandFont(e.size);c.textAlign='left';c.textBaseline='middle';c.fillStyle='#fff9ec';
+    c.save();c.beginPath();c.rect(e.x,e.y,e.width,e.height);c.clip();
+    e.lines.forEach((line,i)=>c.fillText(line,e.x+e.border+e.paddingX,e.y+e.border+e.paddingY+e.lineHeight*(i+.5)));
+    c.restore();
   }
   if(safe&&v.format==='vertical') {
     c.fillStyle='rgba(255,130,110,0.27)';c.fillRect(0,0,w,h*l.safe_top);c.fillRect(w*(1-l.safe_right),0,w*l.safe_right,h);c.fillRect(0,h*(1-l.safe_bottom),w,h*l.safe_bottom);

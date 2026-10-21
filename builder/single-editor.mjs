@@ -1,5 +1,5 @@
 import {subjects,subjectMeta,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
-import {TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=tarot-display-20261021';
+import {TAROT_SIGNS as SIGN_NAMES} from './compiler.mjs?v=tarot-frame-20261021';
 import {TAROT_CARDS} from './tarot-cards.mjs';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 const $=id=>document.getElementById(id);
