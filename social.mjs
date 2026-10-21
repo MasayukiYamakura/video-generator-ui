@@ -77,7 +77,7 @@ export function mountSocial(){
   if(completedVideoCount){completedVideos.append(el('summary',`投稿完了した動画（${completedVideoCount}件）を表示`),completedVideoList);$('socialVideos').append(completedVideos);}
   if(withdrawnVideoCount){withdrawnVideos.append(el('summary',`取り下げ済みの動画（${withdrawnVideoCount}件）を表示`),withdrawnVideoList);$('socialVideos').append(withdrawnVideos);}
   $('socialSelectAll').disabled=!availableVideoCount;
-  if(!Object.keys(state.videos).length)$('socialVideos').append(el('p','新しく生成した動画は、生成完了後にここへ登録されます。生成履歴の「投稿を準備する」からも取り込めます。'));
+  if(!Object.keys(state.videos).length)$('socialVideos').append(el('p','新しく生成した動画は、生成完了後にここへ登録されます。生成履歴の「縦型動画をSNS投稿管理へ取り込む」からも取り込めます。'));
   $('socialPosts').replaceChildren();
   const completedPosts=el('details'),completedPostList=el('div');
   let completedPostCount=0;
@@ -150,5 +150,6 @@ export function mountSocial(){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
 
 

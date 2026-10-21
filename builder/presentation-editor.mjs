@@ -1,9 +1,9 @@
 // One editor per format. Legacy common settings remain read-only fallbacks.
-import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=settings-20261021';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=landscape-theme-20261019';
-import {designDefaults} from './presentation.mjs?v=settings-20261021';
+import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=stock-plan-20261021';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
+import {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
 import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=mbti-20261019';
-export {designDefaults} from './presentation.mjs?v=settings-20261021';
+export {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
 export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setFormat,onChange,onInvalid}) {
@@ -18,7 +18,7 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
   const message=el('p');message.id='pdStatus';message.setAttribute('role','status');root.append(message);
   const content=el('div');root.append(content);
   function group(title,open=false) {const d=el('details'),grid=el('div');d.open=open;grid.className='builder-grid';d.append(el('summary',title),grid);content.append(d);groups.push({d,grid});return grid;}
-  const grids=Object.fromEntries([['caption','字幕'],['hook','フック'],['tags','タグ'],['visualizer','波形'],['theme','テーマ'],['subtitle','サブタイトル'],['background','背景'],['icon','アイコン'],['person','人物']].map(([k,t])=>[k,group(t,k==='caption')]));
+  const grids=Object.fromEntries([['caption','字幕'],['hook','フック'],['tags','タグ'],['visualizer','波形'],['theme','テーマ'],['subtitle','サブタイトル'],['background','背景画像'],['icon','アイコン'],['person','人物画像を別に重ねる']].map(([k,t])=>[k,group(t,k==='caption')]));
   function target(key) {
     if(key.startsWith('safe_'))return guideRoot;
     if(key==='background_mode'||key==='stock_provider')return grids.background;
@@ -67,9 +67,10 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
   };
   add(grids.theme,'theme','title','手動テーマタイトル');add(grids.subtitle,'theme','subtitle','サブタイトル');
   for(const [kind,fields] of [['icon',{intro:'冒頭のアイコン',body:'本編のアイコン',file:'アイコン画像',x:'アイコン X',y:'アイコン Y',size:'アイコンサイズ'}],
-    ['person',{enabled:'人物を表示',file:'人物画像',x:'人物 X',y:'人物 Y',width:'人物の幅',height:'人物の高さ'}]]) {
+    ['person',{enabled:'人物画像を別に重ねる',file:'人物画像',x:'人物 X',y:'人物 Y',width:'人物の幅',height:'人物の高さ'}]]) {
     for(const [key,label] of Object.entries(fields))add(grids[kind],kind,key,label,{type:key==='file'?'text':['intro','body','enabled'].includes(key)?'checkbox':'number',min:0,step:1});
   }
+  document.getElementById('pd_person_enabled').parentElement.append(el('span','（背景画像に人物が写っている場合、別に重ねる必要はありません）'));
   for(const [key,label] of Object.entries({caption:'字幕',hook:'フック',tags:'タグ',visualizer:'波形',theme:'テーマ',subtitle:'サブタイトル',icon:'アイコン'}))
     add(grids[key],'scenery_visibility',key,'外部映像中の'+label,{items:[['inherit','標準の動作'],['show','表示'],['hide','非表示']]});
   function assertValid(){
@@ -118,3 +119,4 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
   function reset(){errors.clear();themeModes.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};
 }
+

@@ -1,8 +1,8 @@
 import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=mbti-20261019';
-import {designDefaults,formatConfig,requestedFormats} from './presentation.mjs?v=settings-20261021';
+import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=stock-plan-20261021';
 import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-20261019';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=settings-20261021';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=stock-plan-20261021';
 import {normalizeSocial} from './social-data.mjs?v=mbti-20261019';
 
 export function fixedSettings(config) {
@@ -68,7 +68,31 @@ export function tarotTitle(tarot) {
 export function availableCategories(bgmCatalog) {
   return CATEGORIES.filter(category=>bgmCatalog?.tracks?.some(t=>t.categories?.includes(category)));
 }
+// New prompt responses opt in; saved/legacy JSON retains its established contract.
+export function validateStockPlan(script, config) {
+  if(script.stock_plan===undefined||config.video.template==='tarot_monthly')return;
+  if(script.stock_plan!==1)throw Error('stock_planは1を指定してください');
+  const {video:v,ai}=promptConfig(config);
+  if(v.background_mode!=='mixed')return;
+  if(!Array.isArray(script.scenes)||!script.scenes.length)throw Error('scenesが必要です');
+  const intro=Math.min(v.intro_scenes,script.scenes.length),body=script.scenes.length-intro;
+  const manual=new Set(ai.stock_indices.split(',').filter(x=>x.trim()).map(x=>Number(x.trim())-1));
+  if(ai.stock_scenes==='manual'&&[...manual].some(i=>!Number.isInteger(i)||i<intro||i>=script.scenes.length))throw Error('外部映像の手動シーン番号は冒頭を除く本編を指定してください');
+  const selected=[];
+  script.scenes.forEach((s,i)=>{
+    if(!s||typeof s!=='object')throw Error(`シーン${i+1}が不正です`);
+    if(i<intro&&s.media_type)throw Error(`シーン${i+1}は冒頭です。外部映像を外して背景画像にしてください`);
+    if(i>=intro&&s.media_type){
+      if(!['pexels','pixabay'].includes(s.media_type)||typeof s.media_query!=='string'||!s.media_query.trim())throw Error(`シーン${i+1}の外部映像にはPexels/Pixabayと素材検索語が必要です`);
+      selected.push(i);
+    }
+  });
+  const expected=ai.stock_scenes==='manual'?manual.size:ai.stock_percent===0?0:Math.min(body,Math.max(1,Math.round(body*ai.stock_percent/100)));
+  if(selected.length!==expected)throw Error(`本編${body}シーンの外部映像は${expected}件必要です（現在${selected.length}件）。冒頭を除いてJSONを修正してください`);
+  if(ai.stock_scenes==='manual'&&selected.some(i=>!manual.has(i)))throw Error('外部映像のシーン番号が手動指定と一致しません');
+}
 export function applyConfig(script, config, bgmCatalog, formatPass=false) {
+  if(!formatPass)validateStockPlan(script,config);
   if(!formatPass&&config.video.template!=='tarot_monthly') {
     const slots={version:1},views={},formats=requestedFormats(config);
     for(const format of formats) {
@@ -199,6 +223,7 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
+
 
 
 
