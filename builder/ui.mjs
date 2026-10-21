@@ -1,19 +1,19 @@
-import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=mbti-20261019';
+import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=tarot-display-20261021';
 import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=stock-plan-20261021';
+import {tarotBrand} from './tarot-brand.mjs?v=tarot-display-20261021';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=tarot-display-20261021';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=mbti-20261019';
-import {mountBatchEditor} from './batch-editor.mjs?v=mbti-20261019';
+import {mountSingleEditor} from './single-editor.mjs?v=tarot-display-20261021';
+import {mountBatchEditor} from './batch-editor.mjs?v=tarot-display-20261021';
 import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=mbti-20261019';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
 import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
 import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=stock-plan-20261021';
-import {buildPrompt} from './prompt.mjs?v=stock-plan-20261021';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=stock-plan-20261021';
+import {buildPrompt} from './prompt.mjs?v=tarot-display-20261021';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=tarot-display-20261021';
 import {decodeContent} from './storage.mjs?v=mbti-20261019';
-import {drawPreview} from './preview.mjs?v=mbti-20261019';
+import {drawPreview} from './preview.mjs?v=tarot-display-20261021';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -248,6 +248,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
+
 
 
 

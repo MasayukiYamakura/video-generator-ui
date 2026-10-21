@@ -1,9 +1,9 @@
-import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=mbti-20261019';
+import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
 import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand} from './tarot-brand.mjs?v=mbti-20261019';
+import {tarotBrand} from './tarot-brand.mjs?v=tarot-display-20261021';
 import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-20261019';
 import {clone, assertObject,validatePresentation} from './model.mjs?v=stock-plan-20261021';
-import {normalizeSocial} from './social-data.mjs?v=mbti-20261019';
+import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 
 export function fixedSettings(config) {
   const {video:v,layout:l}=config, branded=v.template==='portrait_brand';
@@ -223,6 +223,7 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
+
 
 
 

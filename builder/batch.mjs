@@ -1,8 +1,8 @@
-import {subjects,subjectKind,subjectMeta,MBTI_NAMES} from './subjects.mjs?v=mbti-20261019';
+import {subjects,subjectKind,subjectMeta,MBTI_NAMES} from './subjects.mjs?v=tarot-display-20261021';
 import {normalizeVisual} from './tarot-visual.mjs?v=visual-20261016';
-import {normalizeSocial} from './social-data.mjs?v=mbti-20261019';
+import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=mbti-20261019';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=tarot-display-20261021';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
@@ -191,8 +191,9 @@ function subjectPrompt(text,value) {
  if(subjectKind(value)!=='mbti')return text;
  return text.replaceAll('12星座','16タイプ').replaceAll('星座','タイプ').replaceAll('"zodiac":"aries"','"zodiac":"intj"')
  .replaceAll('16タイプ中4回ずつ','16タイプ中5〜6回ずつ')
- .replace(/タイプ名は字幕に使うため、ひらがな表記（[^）]+）で書く。/g,'MBTIタイプ名は英大文字（INFJ等）で書く。')
- .replace(/タイプ名をひらがな（例: おうし座、いて座）で表示し/g,'MBTIタイプ名を英大文字のまま表示し')
+ .replace(/タイプ名は字幕に使うため、ひらがな表記（[^）]+）で書く。/g,'MBTIタイプ名は英字4文字と日本語名（INFJ（提唱者）等）で書く。')
+ .replace(/タイプ名をひらがな（例: おうし座、いて座）で表示し/g,'MBTIタイプ名を英字4文字と日本語名で表示し')
  .replaceAll('"version":1,','"version":1,"subject_kind":"mbti",')
- +'\n\nMBTI月間タロットです。対象は16タイプ。内部のzodiacキーにはタイプの小文字IDを入れ、表示は英大文字にする。subject_kindはmbti。性格や未来を断定せず、カードから生活のヒントを提案する。';
+ +'\n\nMBTI月間タロットです。対象は16タイプ。内部のzodiacキーにはタイプの小文字IDを入れ、表示はINTJ（建築家）のように英字4文字と日本語名を併記する。対応表: '+Object.values(MBTI_NAMES).join('、')+'。subject_kindはmbti。性格や未来を断定せず、カードから生活のヒントを提案する。';
 }
+

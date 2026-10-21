@@ -2,7 +2,7 @@
 import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=stock-plan-20261021';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
 import {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=mbti-20261019';
+import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=tarot-display-20261021';
 export {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
@@ -114,9 +114,10 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
     modeWrap.hidden=tarot?(format!=='landscape'||config.video.tarot_renderer!=='remotion'):false;
     modeWrap.hidden ||= !on('theme');
     for(const {d,grid} of groups)d.hidden=Array.from(grid.children).every(e=>e.hidden);
-    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${tarot?(format==='landscape'&&config.video.tarot_renderer==='remotion'?'右上のテーマ・サブタイトル・アイコンを設定します。自動タイトルは各星座・タイプの年月と名前です。':'カード・本編字幕は固定配置です。変更できる共通設定は下にあります。'):'表示中の値がこの形式に適用されます。位置は動画のピクセル座標です。'}変更は「設定の保存」で保存できます。`;
+    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${tarot?(format==='landscape'&&config.video.tarot_renderer==='remotion'?'左上のテーマ・サブタイトル・アイコンを設定します。自動タイトルは各星座・タイプの年月と名前です。':'カード・本編字幕は固定配置です。変更できる共通設定は下にあります。'):'表示中の値がこの形式に適用されます。位置は動画のピクセル座標です。'}変更は「設定の保存」で保存できます。`;
   }
   function reset(){errors.clear();themeModes.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};
 }
+
 

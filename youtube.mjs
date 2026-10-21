@@ -1,6 +1,6 @@
 import {identity,matches,newest,youtubeGroup,sourceLink} from './video-list.mjs?v=video-list-20261021';
-import {socialBody} from './builder/social-data.mjs?v=mbti-20261019';
-import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=youtube-publish-20261019';
+import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
+import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 const LABEL={uploaded:'非公開アップロード済み（動画の処理完了はStudioで確認）',resumable:'一部送信済み・同じ送信から再開可能',unknown:'結果確認中・新規送信は保留'};
@@ -170,3 +170,4 @@ export function mountYouTube(){
  document.querySelector('[data-studio-tab="social"]')?.addEventListener('click',()=>refresh().catch(e=>say(e.message)));
  load();render();polling();
 }
+

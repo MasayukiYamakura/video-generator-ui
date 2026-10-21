@@ -1,4 +1,4 @@
-import {MBTI_NAMES} from './builder/subjects.mjs?v=mbti-20261019';
+import {MBTI_NAMES} from './builder/subjects.mjs?v=tarot-display-20261021';
 import {loadHistory,migrateHistory} from './history.mjs?v=mbti-20261019';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
@@ -248,6 +248,7 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
 
 
 
