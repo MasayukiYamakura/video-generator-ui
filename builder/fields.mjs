@@ -29,7 +29,7 @@ export const VIDEO_FIELDS=[
   ['stock_provider','動画素材提供元',[['pexels','Pexels'],['pixabay','Pixabay']]],
   ['hook_band_enabled','横書きフックの黒帯'],
 ];
-export const LAYOUT_LABELS={tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
+export const LAYOUT_LABELS={mbti_date_font_size:'MBTI縦型・冒頭の日付文字サイズ（固定 px）',mbti_type_font_size:'MBTI縦型・冒頭のタイプコード文字サイズ（固定 px）',mbti_name_font_size:'MBTI縦型・冒頭の日本語名文字サイズ（固定 px）',tag_x:'タグ X（左端）',tag_y:'タグ Y（上端）',
   theme_x:'テーマ X（左端）',theme_y:'テーマ Y（上端）',theme_font_size:'テーマ文字サイズ',
   subtitle_x:'サブタイトル X（左端）',subtitle_y:'サブタイトル Y（上端）',subtitle_font_size:'サブタイトル文字サイズ',
   visualizer_x:'波形 X（中心）',visualizer_y:'波形 Y（中心）',visualizer_size:'波形 size（キャンバス）',

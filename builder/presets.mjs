@@ -41,6 +41,7 @@ const ALL_VIDEO_PRESETS = [
 export const COMPAT_VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>['mbti_monthly_batch','tiktok_anonymous','tarot_monthly','tarot_monthly_batch','tiktok_vertical_hook','youtube_landscape'].includes(p.id));
 export const VIDEO_PRESETS = ALL_VIDEO_PRESETS.filter(p=>!COMPAT_VIDEO_PRESETS.includes(p));
 export const LAYOUT_DEFAULTS = Object.freeze({
+  mbti_date_font_size:96, mbti_type_font_size:136, mbti_name_font_size:78,
   tag_x:36, tag_y:126, visualizer_x:960, visualizer_y:500,
   visualizer_size:680, visualizer_width_ratio:0.28,
   hook_center_y:540, hook_top:230, hook_margin_x:0.16,

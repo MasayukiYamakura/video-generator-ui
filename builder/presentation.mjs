@@ -1,5 +1,5 @@
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=settings-20261021';
-import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=mbti-20261019';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=mbti-sizes-20261022';
+import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=mbti-sizes-20261022';
 
 export function designDefaults(config,format) {
   const w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;

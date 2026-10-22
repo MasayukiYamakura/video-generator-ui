@@ -1,9 +1,9 @@
 // One editor per format. Legacy common settings remain read-only fallbacks.
-import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=stock-plan-20261021';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=stock-plan-20261021';
-import {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=tarot-frame-20261021';
-export {designDefaults} from './presentation.mjs?v=stock-plan-20261021';
+import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=mbti-sizes-20261022';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=mbti-sizes-20261022';
+import {designDefaults} from './presentation.mjs?v=mbti-sizes-20261022';
+import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=mbti-sizes-20261022';
+export {designDefaults} from './presentation.mjs?v=mbti-sizes-20261022';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
 export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setFormat,onChange,onInvalid}) {
@@ -51,7 +51,7 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
   for(const [key,label,items,type] of VIDEO_FIELDS.filter(([key])=>PRESENTATION_VIDEO_KEYS.includes(key)))
     add(key==='intro_scenes'?grids.hook:target(key),'video',key,label,{items,type:items?'text':type||'checkbox',...(key==='intro_scenes'?{min:1,max:10,step:1}:{})});
   add(grids.background,'background','file','media内の背景ファイル名');
-  for(const [key,label] of Object.entries({...LAYOUT_LABELS,caption_center_x:'字幕 X（中心）',hook_center_x:'フック X（中心）',tag_font_size:'タグ文字サイズ',tag_scale:'タグ倍率'})) {
+  for(const [key,label] of Object.entries({...Object.fromEntries(Object.entries(LAYOUT_LABELS).filter(([key])=>!key.startsWith('mbti_'))),caption_center_x:'字幕 X（中心）',hook_center_x:'フック X（中心）',tag_font_size:'タグ文字サイズ',tag_scale:'タグ倍率'})) {
     const items=key==='hook_font_size_mode'?[['auto','自動調整（指定サイズが上限）'],['fixed','固定サイズ']]:undefined;
     const ratio=key.includes('ratio')||key.startsWith('safe_')||key==='hook_margin_x'||key==='hook_band_opacity';
     add(target(key),'layout',key,label,{items,type:items?'text':key==='hook_band_color'?'color':'number',
