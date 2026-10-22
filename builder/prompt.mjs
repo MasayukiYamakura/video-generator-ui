@@ -37,6 +37,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
       `対象: ${config.tarot.year}年${config.tarot.month}月${period==='first'?'前半':period==='second'?'後半':''} ${config.tarot.zodiac}。表示タイトル（改行も固定）: ${JSON.stringify(title)}。以下の4枚のカードIDと向き（upright=正位置、reversed=逆位置）は人間が確定した結果です。変更しないこと。解釈はナレーション原稿に従い、追加・言い換えをしないこと。原稿にない正逆の読み上げは追加しないこと。`,
       JSON.stringify(config.tarot,null,2),
       `scenes[].tarot_phase を ${phaseList} の順で付ける。intro〜adviceは各役割に最低1sceneを割り当て、同じ役割に複数sceneを割り当ててもよい。`,
+      '【introの割当】原稿冒頭のタイトルと、それに続く運勢の概要を伝える導入コメントの全体をtarot_phase:"intro"に割り当てる。タイトルだけでintroを終了せず、「全体運は、」からoverallを開始する。導入が複数sceneに分かれてもすべてintroを維持する。新しく作る原稿はタイトル込み約9〜10秒が目安だが、変換時は秒数に合わせて原稿を追加・削除・要約しない。導入コメントのない旧原稿は補作せず既存の内容だけを割り当てる。introの終了は読み上げ音声に追従させ、start_time/end_timeやシャッフル秒数の独自キーは出力しない。',
       ...(v.cta_enabled?[`CTAは最後の1sceneだけ。textは ${JSON.stringify(config.cta_text)} と完全一致させ、speech_textや[[ ]]装飾を付けない。CTA文を他のsceneへ重複させず、カード4枚を表示するため情景映像を指定しない。CTAの文言をAIが追加・変更しない。`]:[]),
       `空のsceneは作らない。各sceneのtextを順に連結するとナレーション原稿${v.cta_enabled?'と最後のCTA文':'のみ'}と同じ内容になるようにする。冒頭フック=${v.hook_enabled?'ON':'OFF'}。${v.hook_enabled?`introのhook_textは ${JSON.stringify(title)} にする。AIの別案や手動フック設定を使わず、改行位置も維持する。`:'hook_textは不要。'}ナレーション用textはタイトルで置き換えない。`,
       `冒頭の通常字幕=${v.intro_caption}、本編の通常字幕=${v.body_caption}、冒頭の波形=${v.intro_visualizer}、本編の波形=${v.body_visualizer}。字幕・フックの位置と文字サイズは画面の確定値を使う。`,
