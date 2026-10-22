@@ -1,6 +1,6 @@
-import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-20261019';
-import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=settings-20261021';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=mbti-20261019';
+import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-sizes-20261022';
+import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=mbti-sizes-20261022';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=mbti-sizes-20261022';
 export async function loadPresetData(api) {
   const preset=await readRegistry(api),bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
   if(bgm.version!==1||!Array.isArray(bgm.tracks))throw Error('BGM登録一覧が不正です');

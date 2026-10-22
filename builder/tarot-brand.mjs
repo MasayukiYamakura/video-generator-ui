@@ -34,12 +34,12 @@ export function tarotBrandElements(slot,intro=false,scenery=false) {
 
 // The vertical MBTI intro gives the type code its own prominent row. Keep the
 // existing two-line title in JSON, filenames, horizontal video and later phases.
-export function mbtiVerticalIntroRows(title) {
+export function mbtiVerticalIntroRows(title,sizes={}) {
  const [date,subject]=title.split('\n');
  const match=/^([A-Z]{4})（(.+)）の運勢$/u.exec(subject||'');
  if(!date||!match)return null;
- const fit=(text,desired)=>Math.min(desired,Math.floor(864/Math.max(1,Array.from(text).reduce((n,c)=>n+(/^[ -~]$/.test(c)?.75:1.1),0))));
- return [{text:date,size:fit(date,112)},{text:`${match[1]}の運勢`,size:fit(`${match[1]}の運勢`,150)},{text:`（${match[2]}）`,size:fit(`（${match[2]}）`,112)}];
+ const fixed=(key,fallback)=>Number.isFinite(sizes[key])&&sizes[key]>=1&&sizes[key]<=300?sizes[key]:fallback;
+ return [{text:date,size:fixed('date',96)},{text:`${match[1]}の運勢`,size:fixed('type',136)},{text:`（${match[2]}）`,size:fixed('name',78)}];
 }
 
 // Fit long type names on one line without changing narration or line breaks.

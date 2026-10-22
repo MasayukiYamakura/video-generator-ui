@@ -1,5 +1,5 @@
-import {tarotTitle} from './compiler.mjs?v=tarot-frame-20261021';
-import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,mbtiVerticalIntroRows,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=tarot-frame-20261021';
+import {tarotTitle} from './compiler.mjs?v=mbti-sizes-20261022';
+import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,mbtiVerticalIntroRows,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=mbti-sizes-20261022';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -108,7 +108,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
         // Match tarot-remotion/src/tarot.jsx: Intro has a fixed size (at most
         // 140px), 1.25 line height, and is centered 15px above hook_center_y.
         // The Python hook's auto-fit setting does not apply to this renderer.
-        const mbtiRows=!pairedLandscape&&config.tarot?.subject_kind==='mbti'?mbtiVerticalIntroRows(lines.join('\n')):null;
+        const mbtiRows=!pairedLandscape&&config.tarot?.subject_kind==='mbti'?mbtiVerticalIntroRows(lines.join('\n'),{date:l.mbti_date_font_size,type:l.mbti_type_font_size,name:l.mbti_name_font_size}):null;
         const size=tarotTitleFontSize(lines.join('\n'),v.format,l.hook_font_size||130,config.tarot?.subject_kind==='mbti');
         c.font=`900 ${size}px "Noto Serif CJK JP", "Noto Serif CJK", serif`;
         c.textAlign='center';c.textBaseline='middle';c.fillStyle='#fff8e9';

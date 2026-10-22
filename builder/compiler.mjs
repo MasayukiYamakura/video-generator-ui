@@ -1,8 +1,8 @@
 import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
-import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=stock-plan-20261021';
-import {tarotBrand} from './tarot-brand.mjs?v=tarot-frame-20261021';
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-20261019';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=stock-plan-20261021';
+import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=mbti-sizes-20261022';
+import {tarotBrand} from './tarot-brand.mjs?v=mbti-sizes-20261022';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-sizes-20261022';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=mbti-sizes-20261022';
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 
 export function fixedSettings(config) {
@@ -14,6 +14,7 @@ export function fixedSettings(config) {
       max_width_ratio:0.6,text_color:'white',highlight_color:'#FFC857',bg_color:'black',bg_opacity:0.85},
     hook:{enabled:v.hook_enabled, orientation:v.hook_orientation, scenes:v.intro_scenes,
       sides:['right','left'], visualizer:true,
+      ...(v.template==='tarot_monthly'&&v.tarot_subject==='mbti'?{mbti_title_sizes:{date:l.mbti_date_font_size,type:l.mbti_type_font_size,name:l.mbti_name_font_size}}:{}),
       band_opacity:v.hook_band_enabled?l.hook_band_opacity:0,
       band_color:l.hook_band_color, band_width_ratio:l.hook_band_width_ratio,
       band_padding_y:l.hook_band_padding_y, font_size_mode:l.hook_font_size_mode,
