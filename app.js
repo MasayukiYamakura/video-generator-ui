@@ -49,10 +49,24 @@ async function api(path, method='GET', body) {
   try { const r = await fetch(url, { method, headers: { Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal:controller.signal });
     if (!r.ok) { const error = Error(r.status===401 ? '認証期限切れ、またはトークンが無効です' : r.status===403 ? '権限不足、またはAPIの利用制限です' : `GitHubへの接続でエラー (${r.status})`); error.status=r.status; throw error; }
     return r.status===204 ? null : await r.json();
+  } catch(error) {
+    if(controller.signal.aborted||error.name==='AbortError'||/fetch is aborted/i.test(error.message))throw Error('GitHubへの通信が中断または時間切れになりました。通信を確認して再操作してください。');
+    throw error;
   } finally { clearTimeout(timer); }
 }
 const message = text => { $('status').textContent=text; };
-function controls() { const blocked=busy || Boolean(pending) || history.some(h=>h.repo===$('repo').value.trim() && h.status!=='completed'); $('generate').disabled=blocked; $('pbBatchGenerate').disabled=blocked; $('recover').hidden=!pending; $('retry').hidden=!pending?.sha; $('discard').hidden=!pending || Boolean(pending.dispatched); }
+// Cached history can still say queued after an interrupted refresh. The live
+// Actions check in submit/resumeGeneration is the authority for starting work.
+function controls() {
+  const blocked=busy || Boolean(pending);
+  $('generate').disabled=blocked;$('pbBatchGenerate').disabled=blocked;
+  $('recover').hidden=!pending;$('retry').hidden=!pending?.sha;
+  $('discard').hidden=!pending || Boolean(pending.dispatched);
+  const reason=$('generationBlockReason');
+  if(reason)reason.textContent=busy?'受付処理中です。完了までお待ちください。':pending
+    ?'前回の受付確認が必要です。下の「受付状況を確認」から確認してください。'
+    :'開始時にGitHubの実行状況を確認します。生成中の処理がある場合は開始しません。';
+}
 function node(tag,text) { const n=document.createElement(tag); n.textContent=text; return n; }
 function render() {
   $('history').replaceChildren();
@@ -97,14 +111,14 @@ function render() {
     });
     if(h.kind==='batch'&&h.status==='completed'&&h.resumeAvailable&&h.sha&&batchNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
       if(h.batchProgress?.control?.retry_at)box.append(node('p','再開目安：'+new Date(h.batchProgress.control.retry_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'（日本時間・上限解除は保証されません）'));
-      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(x=>x.repo===h.repo&&x.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)+' 結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
+      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending);resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)+' 結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
     }
     const videoNeedsResume=h.kind==='video'&&h.pairedOutput&&outputFormats(h).some(format=>{
       const artifact=h.artifacts?.find(item=>item.name===(format==='vertical'?h.verticalArtifact:h.horizontalArtifact));
       return !artifact||artifact.expired||Date.parse(artifact.expires_at)<=Date.now();
     });
     if(h.status==='completed'&&h.resumeAvailable&&h.sha&&videoNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
-      const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)));
+      const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending);resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)));
     }
     if(h.status==='completed'&&(batchNeedsResume||videoNeedsResume)&&h.resumeAvailable===false)box.append(node('p','この実行には再開用入力がありません（保存期限切れ・保存失敗）。再開元の履歴で再開できるか確認し、利用できなければ新規生成してください。'));
     if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','縦型動画をSNS投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
@@ -270,8 +284,3 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
-
-
-
-
-
