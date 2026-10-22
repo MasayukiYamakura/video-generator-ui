@@ -1,5 +1,5 @@
 import {MBTI_NAMES} from './builder/subjects.mjs?v=tarot-display-20261021';
-import {loadHistory,migrateHistory} from './history.mjs?v=mbti-20261019';
+import {loadHistory,migrateHistory} from './history.mjs?v=resume-20261022';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
@@ -10,6 +10,21 @@ const FORMAT_LABEL={vertical:'縦型',landscape:'横型'};
 const OUTPUT_STATUS={daily_limit:'日次上限・再開待ち',minute_limit:'分単位の制限・再開待ち',rate_limit_unknown:'制限到達（種別不明）',temporary_error:'一時エラー',result_unknown:'音声生成の結果不明・確認後に再開',needs_fix:'認証・入力等の修正が必要',not_started:'未着手・中断中',audio_ready:'音声生成済み・動画は未完了',failed:'描画失敗'};
 const outputFormats=h=>h.outputFormats||(h.outputMode==='vertical_horizontal'?['vertical','landscape']:h.outputMode==='horizontal_only'?['landscape']:['vertical']);
 const resumeAudioMessage=h=>h.kind==='batch'?'保存済み音声がある対象は再利用します（7日間）。期限切れ・未生成の対象はAI読み上げを生成します。':h.reusableAudioAvailable?'保存済み共通音声を再利用します（7日間）。':h.kind==='batch'||h.audioMode==='tts'?'保存済み音声の期限切れです。未完了分はAI読み上げを再生成します。':'録音の保存期限が切れています。元の録音を再度添付して新規生成してください。';
+const activeArtifact=a=>Boolean(a&&!a.expired&&Date.parse(a.expires_at)>Date.now());
+function resumeSummary(h) {
+ const counts={vertical:0,landscape:0};let targets=0,unknown=false;
+ for(const key of h.kind==='batch'?(h.signs||[]):['video']) {
+  let needed=false;
+  for(const format of outputFormats(h)) {
+   const a=h.artifacts?.find(a=>h.kind==='batch'?a.name?.endsWith(BATCH_SIGNS[key]):a.name===(format==='vertical'?h.verticalArtifact:h.horizontalArtifact));
+   const status=h.kind==='batch'?h.batchProgress?.signs?.[key]:h.outputStatus?.outputs;
+   const done=typeof status==='string'?status==='completed'&&outputFormats(h).length===1:status?.[format]==='completed';
+   if(!activeArtifact(a)||!done){counts[format]++;needed=true;if(activeArtifact(a)&&!status)unknown=true;}
+  }
+  if(needed)targets++;
+ }
+ return `${unknown?'再開対象の上限':'再開対象'}：${targets}対象・縦型${counts.vertical}本／横型${counts.landscape}本。保存済みの完成動画は再利用します。`;
+}
 let saved; try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { saved = {}; }
 let history = saved.history || [], pending = saved.pending || null, token = saved.token || '', busy = false, polling = false;
 
@@ -42,6 +57,8 @@ function node(tag,text) { const n=document.createElement(tag); n.textContent=tex
 function render() {
   $('history').replaceChildren();
   for (const h of history.filter(h=>h.repo===$('repo').value.trim())) { const box=node('article',''); box.className='item'; box.append(node('strong',h.audio),node('p',new Date(h.created).toLocaleString('ja-JP')));
+    if(h.resumeFrom){const parent=node('a','再開元の実行');parent.href=`https://github.com/${h.repo}/actions/runs/${h.resumeFrom}`;parent.target='_blank';parent.rel='noopener noreferrer';box.append(parent);}
+    if(h.preparationStatus==='failed')box.append(node('p','再開・入力準備で失敗しました。実行詳細で原因を確認してください。動画生成は開始していません。'));
     const batchDone=Object.values(h.batchProgress?.signs||{}).some(value=>value==='completed'||Object.values(value||{}).includes('completed'));
     const outputValues=Object.values(h.outputStatus?.outputs||{});
     const videoPartial=h.pairedOutput&&outputValues.includes('completed')&&outputValues.some(value=>value!=='completed');
@@ -80,15 +97,16 @@ function render() {
     });
     if(h.kind==='batch'&&h.status==='completed'&&h.resumeAvailable&&h.sha&&batchNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
       if(h.batchProgress?.control?.retry_at)box.append(node('p','再開目安：'+new Date(h.batchProgress.control.retry_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})+'（日本時間・上限解除は保証されません）'));
-      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(x=>x.repo===h.repo&&x.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)+' 結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
+      const resume=node('button','未完了分を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(x=>x.repo===h.repo&&x.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)+' 結果不明の音声はAPI側で使用量が計上されている可能性があります。'));
     }
     const videoNeedsResume=h.kind==='video'&&h.pairedOutput&&outputFormats(h).some(format=>{
       const artifact=h.artifacts?.find(item=>item.name===(format==='vertical'?h.verticalArtifact:h.horizontalArtifact));
       return !artifact||artifact.expired||Date.parse(artifact.expires_at)<=Date.now();
     });
     if(h.status==='completed'&&h.resumeAvailable&&h.sha&&videoNeedsResume&&!history.some(other=>other.id===h.id&&other.runId>h.runId&&other.resumeAvailable)){
-      const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(resume,node('p',resumeAudioMessage(h)));
+      const resume=node('button','未完了形式を再開');resume.className='secondary';resume.disabled=busy||Boolean(pending)||history.some(item=>item.repo===h.repo&&item.status!=='completed');resume.onclick=()=>resumeGeneration(h);box.append(node('p',resumeSummary(h)),resume,node('p',resumeAudioMessage(h)));
     }
+    if(h.status==='completed'&&(batchNeedsResume||videoNeedsResume)&&h.resumeAvailable===false)box.append(node('p','この実行には再開用入力がありません（保存期限切れ・保存失敗）。再開元の履歴で再開できるか確認し、利用できなければ新規生成してください。'));
     if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','縦型動画をSNS投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
     if(['video','batch'].includes(h.kind)&&h.status==='completed'&&h.outputFormats?.includes('landscape')){const prepare=node('button','横型動画をYouTube投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('youtube-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
     $('history').append(box);
@@ -100,7 +118,7 @@ async function recover() {
   if(!pending) return true;
   const runs=(await listRuns()).filter(r=>r.display_title===`Pages ${pending.id}`).filter(r=>!pending.resumeFrom||r.id>pending.resumeFrom).sort((a,b)=>a.id-b.id);
   if(!runs.length) { message('実行はまだ確認できません。少し後に「受付状況を確認」を押してください。再送も同じ受付IDを使います。'); return false; }
-  const r=runs[0]; if(!history.some(h=>h.runId===r.id)) history.unshift({repo:pending.repo,audio:pending.audio,created:pending.created,id:pending.id,runId:r.id,status:r.status,conclusion:r.conclusion,bgm:pending.bgm,kind:pending.kind||'video',signs:pending.signs,sha:pending.sha}); pending=null; persist(); render(); message('実行受付完了。画面を消したり、別アプリを開いたりしても生成が続きます。'); return true;
+  const r=runs[0]; if(!history.some(h=>h.runId===r.id)) history.unshift({...pending,resumeFrom:pending.resumeFrom,runId:r.id,status:r.status,conclusion:r.conclusion,kind:pending.kind||'video'}); pending=null; persist(); render(); message('実行受付完了。画面を消したり、別アプリを開いたりしても生成が続きます。'); return true;
 }
 async function refresh() {
  if(polling || document.hidden || !$('token').value.trim()) return;
@@ -193,7 +211,11 @@ async function resumeGeneration(h){
  if(busy||pending)return;busy=true;controls();
  try{
   if((await listRuns()).some(r=>r.status!=='completed'))throw Error('生成中の処理が完了してから再開してください');
-  pending={id:h.id,repo:h.repo,kind:h.kind,sha:h.sha,signs:h.signs,outputMode:h.outputMode,pairedOutput:h.pairedOutput,outputFormats:outputFormats(h),audio:h.audio,bgm:h.bgm,created:new Date().toISOString(),resumeFrom:h.runId};persist();
+  const source=await api(`actions/runs/${h.runId}`);
+  if(source.status!=='completed'||source.display_title!==`Pages ${h.id}`)throw Error('再開元の処理・受付IDを確認してください');
+  const checkpoints=(await api(`actions/runs/${h.runId}/artifacts?per_page=100`)).artifacts;
+  if(!checkpoints.some(a=>a.name===`${h.kind==='batch'?'batch':'video'}-input-${h.id}`&&activeArtifact(a)))throw Error('再開用入力がありません。保存期限切れ・保存失敗のため新規生成してください');
+  pending={id:h.id,repo:h.repo,kind:h.kind,sha:h.sha,signs:h.signs,subjectKind:h.subjectKind,audioMode:h.audioMode,verticalArtifact:h.verticalArtifact,horizontalArtifact:h.horizontalArtifact,outputMode:h.outputMode,pairedOutput:h.pairedOutput,outputFormats:outputFormats(h),audio:h.audio,bgm:h.bgm,created:new Date().toISOString(),resumeFrom:h.runId};persist();
   await dispatch();
  }catch(e){message(e.message+'。受付情報は保持しています。受付状況を確認してください。');}
  finally{busy=false;render();}
@@ -248,6 +270,7 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
 
 
 
