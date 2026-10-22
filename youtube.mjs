@@ -1,4 +1,4 @@
-import {identity,matches,newest,youtubeGroup,sourceLink} from './video-list.mjs?v=video-list-20261021';
+import {identity,matches,newest,youtubeGroup,sourceLink} from './video-list.mjs?v=posting-20261022';
 import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
 import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
@@ -28,6 +28,7 @@ export function mountYouTube(){
   for(const id of ['youtubeConnect','youtubeImport','youtubeBuild','youtubeSync'])$(id).disabled=busy||Boolean(pending)||(id==='youtubeBuild'&&(!state.setup||!state.channel));
   for(const button of panel.querySelectorAll('button[data-youtube-operation]'))button.disabled=busy||Boolean(pending);
   $('youtubeSubmit').disabled=!review||busy||Boolean(pending);
+  if(window.postingAdapters)$('youtubeSubmit').hidden=!review;
   $('youtubeSubmit').textContent=review?.action==='publish'?'確認した動画の公開設定を変更':'確認した内容で非公開送信・再開';
   $('youtubeRecover').hidden=!pending;$('youtubeRecover').disabled=busy;
  }
@@ -54,7 +55,7 @@ export function mountYouTube(){
   $('youtubeUploads').replaceChildren();
   const completed=node('details'),completedList=node('div');let completedCount=0;
   for(const post of Object.values(state.uploads||{})){
-   const box=node('article');box.className='item';if(state.videos?.[post.source_id])box.append(node('p',identity(state.videos[post.source_id])));box.append(node('strong',post.metadata?.snippet?.title||post.source_id),node('p',LABEL[post.status]||'状態を確認してください'));
+   const box=node('article');box.className='item';box.dataset.postingVideo=post.source_id;if(state.videos?.[post.source_id])box.append(node('p',identity(state.videos[post.source_id])));box.append(node('strong',post.metadata?.snippet?.title||post.source_id),node('p',LABEL[post.status]||'状態を確認してください'));
    if(post.error)box.append(node('p',post.error));
    if(/^[\w-]{11}$/.test(post.video_id||'')){
     const link=node('a','YouTube Studioで確認');link.href=`https://studio.youtube.com/video/${post.video_id}/edit`;link.target='_blank';link.rel='noopener noreferrer';box.append(link);
@@ -64,7 +65,7 @@ export function mountYouTube(){
     if(post.publication){box.append(node('p',PUBLICATION_LABEL[post.publication.status]||'公開設定を確認してください'));if(post.publication.error)box.append(node('p',post.publication.error));}
     const sync=node('button','この動画の公開状態を照合');sync.className='secondary';sync.dataset.youtubeOperation='sync';
     sync.onclick=()=>run({action:'sync_one',source_id:post.source_id,video_id:post.video_id,channel_id:post.channel_id});box.append(sync);
-    if(post.can_publish&&state.channel?.can_update)publicationControls(box,post);
+    if(post.can_publish&&state.channel?.can_update&&!state.videos?.[post.source_id]?.management?.decision?.match(/skipped|private_complete/)&&!state.videos?.[post.source_id]?.archived_at)publicationControls(box,post);
    }else{
     const button=node('button','同じ送信の状態確認・再開');button.className='secondary';button.disabled=busy||Boolean(pending)||!post.can_resume;
     button.onclick=()=>{review={action:'resume',confirmed:true,source_id:post.source_id,channel_id:post.channel_id};$('youtubeReview').replaceChildren(node('p',`${post.metadata?.snippet?.title} ／ ${post.channel_id} ／ 非公開の同じ送信のみ確認・再開します。新規アップロードは作りません。`));controls();};box.append(button);if(!post.can_resume)box.append(node('p','送信情報を確認できません。YouTube Studioで確認してください。新規送信は保留します。'));
@@ -73,6 +74,7 @@ export function mountYouTube(){
   }
   if(completedCount){completed.append(node('summary',`公開完了の履歴（${completedCount}件）`),completedList);$('youtubeUploads').append(completed);}
   if($('youtubeVideo').value!==selected)selectVideo();controls();
+  window.dispatchEvent(new window.Event('posting-state'));
  }
  function renderVideos(){
   const list=$('youtubeVideos');list.replaceChildren();
@@ -168,6 +170,9 @@ export function mountYouTube(){
  $('repo').addEventListener('change',()=>{state={videos:{},uploads:{},requests:{}};invalidate();load();render();polling();});
  window.addEventListener('youtube-prepare',e=>{if(e.detail.navigate!==false){document.querySelector('[data-studio-tab="social"]')?.click();panel.open=true;}run({action:'import',run_id:e.detail.runId});});
  document.querySelector('[data-studio-tab="social"]')?.addEventListener('click',()=>refresh().catch(e=>say(e.message)));
+ window.postingAdapters ||= {};
+ window.postingAdapters.youtube={snapshot:()=>state,refresh,manage:request=>run({action:'manage',...request}),select:id=>{ $('youtubeVideo').value=id;selectVideo();},busy:()=>busy||Boolean(pending)};
  load();render();polling();
 }
+
 

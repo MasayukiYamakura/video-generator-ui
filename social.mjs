@@ -1,4 +1,4 @@
-import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v=video-list-20261021';
+import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v=posting-20261022';
 import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
@@ -18,7 +18,9 @@ export function composeRows(videos,channels,body,start,interval){
 
 export function isCompletedVideo(video, posts, channels){
  if(video.cloud.status==='deleted')return true;
- return channels.length>0&&channels.every(channel=>Object.values(posts).some(post=>post.video_id===video.id&&post.channel_id===channel.id&&post.status==='published'));
+ const related=Object.values(posts).filter(p=>p.video_id===video.id);
+ const targets=video.management?.target_channels||[...new Set(related.map(p=>p.channel_id))];
+ return targets.length>0&&targets.every(id=>video.management?.skipped_channels?.includes(id)||related.some(p=>p.channel_id===id&&p.status==='published'));
 }
 
 export function canWithdrawVideo(video, posts){
@@ -67,7 +69,7 @@ export function mountSocial(){
   for(const v of newest(state.videos)){
    const group=v.cloud.status==='withdrawn'?'withdrawn':v.archived_at?'archived':isCompletedVideo(v,state.posts,state.channels)?'completed':'active';
    if(!matches(v,$('socialSearch').value)||($('socialFilter').value!=='all'&&$('socialFilter').value!==group))continue;
-   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed||Boolean(v.archived_at);input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',identity(v)),el('p',v.archived_at?'一覧から取り下げ済み':CLOUD[v.cloud.status]||v.cloud.status));
+   const box=el('article');box.className='item';const l=el('label'),input=el('input');input.type='checkbox';input.dataset.video=v.id;const completed=isCompletedVideo(v,state.posts,state.channels);input.disabled=v.cloud.status!=='uploaded'||completed||Boolean(v.archived_at)||['skipped','private_complete'].includes(v.management?.decision);input.checked=selected.has(v.id)&&!input.disabled;l.className='check';l.append(input,el('strong',v.title));box.append(l,el('p',identity(v)),el('p',v.archived_at?'一覧から取り下げ済み':CLOUD[v.cloud.status]||v.cloud.status));
    const href=previewLink(v)||sourceLink(v,$('repo').value.trim());
    if(href){const a=el('a',previewLink(v)?'動画をプレビュー':'元動画をダウンロードして確認');a.href=href;a.target='_blank';a.rel='noopener noreferrer';box.append(a);}
    const archive=el('button',v.archived_at?'一覧に戻す':'一覧から取り下げる');archive.className='secondary';archive.dataset.socialAction='archive';
@@ -85,7 +87,7 @@ export function mountSocial(){
   let completedPostCount=0;
   for(const p of Object.values(state.posts).reverse()){
    if(p.status==='withdrawn')continue;
-   const box=el('article');box.className='item';box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
+   const box=el('article');box.className='item';box.dataset.postingVideo=p.video_id;box.append(el('strong',p.title),el('p',`${MEDIA[p.service]} · ${LABELS[p.status]||p.status}`),el('p',`日本時間：${jstInput(p.remote_due_at||p.due_at).replace('T',' ')}`));
    if(state.videos[p.video_id])box.append(el('p',identity(state.videos[p.video_id])));
    const c=state.channels.find(c=>c.id===p.channel_id);if(c)box.append(el('p',c.name));
    if(p.error&&['failed','unknown','waiting','expired'].includes(p.status))box.append(el('p',p.error));
@@ -95,6 +97,7 @@ export function mountSocial(){
   }
   if(completedPostCount){completedPosts.append(el('summary',`投稿完了の履歴（${completedPostCount}件）を表示`),completedPostList);$('socialPosts').append(completedPosts);}
   control();
+  window.dispatchEvent(new window.Event('posting-state'));
  }
  function renderRows(){
   $('socialReview').replaceChildren();$('socialCount').textContent=`${new Set(rows.map(r=>r.video_id)).size}動画・${rows.length}投稿を確認中。予約枠不足の分は待機します。`;
@@ -111,7 +114,8 @@ export function mountSocial(){
   $('socialSubmit').disabled=!rows.length||busy||Boolean(pending);
  }
  async function refresh(){
-  try{state=decode((await api(STATE)).content);for(const v of Object.values(state.videos))v.title=filenameTitle(v.filename);}catch(e){if(e.status!==404)throw e;}
+  const repository=$('repo').value.trim();
+  try{const result=await api(STATE);if(repository!==$('repo').value.trim())return;state=decode(result.content);for(const v of Object.values(state.videos))v.title=filenameTitle(v.filename);}catch(e){if(e.status!==404)throw e;}
   if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
    if(['completed','failed'].includes(result.status)){pending=null;savePending();}
@@ -147,14 +151,17 @@ export function mountSocial(){
  $('socialSaveBody').onclick=()=>run({action:'settings',body:$('socialBody').value});
  $('socialLoadBody').onclick=()=>{$('socialBody').value=state.settings?.body||'';say('保存済み定型文を読み込みました');};
  $('socialSelectAll').onclick=()=>{for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=!input.disabled;};
- $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all,state.posts);const skipped=all.length-rows.length;renderRows();const descriptions=videos.map(v=>v.social?.description).filter(Boolean);const duplicate=descriptions.length>1&&new Set(descriptions).size===1?'全動画の説明文が完全一致しています。内容を確認してください。 ':'';say(`${duplicate}各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
+ $('socialBuild').onclick=()=>{try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all.filter(r=>!state.videos[r.video_id]?.management?.skipped_channels?.includes(r.channel_id)),state.posts);const skipped=all.length-rows.length;renderRows();const descriptions=videos.map(v=>v.social?.description).filter(Boolean);const duplicate=descriptions.length>1&&new Set(descriptions).size===1?'全動画の説明文が完全一致しています。内容を確認してください。 ':'';say(`${duplicate}各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
  $('socialSubmit').onclick=()=>{if(rows.length)run({action:'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id})=>({video_id,channel_id,title,body,due_at,retry_buffer_id}))});};
  $('socialStart').value=jstInput(new Date(Date.now()+3600000).toISOString());
  window.addEventListener('social-prepare',e=>{if(e.detail.navigate!==false)navigate('social');run({action:'import',run_id:e.detail.runId});});
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];loadPending();render();renderRows();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
+ window.postingAdapters ||= {};
+ window.postingAdapters.social={snapshot:()=>state,refresh,withdraw:id=>run({action:'withdraw',video_id:id}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
 
 
 

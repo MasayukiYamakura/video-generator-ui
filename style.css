@@ -27,3 +27,14 @@ audio{width:100%;margin:12px 0}#titleImage{max-width:100%;max-height:700px;displ
 #socialPanel textarea { min-height: 100px; }
 
 input[type=radio]{width:20px;height:20px;flex-shrink:0}#youtubeSelected{overflow-wrap:anywhere}
+
+
+.posting-tabs,.posting-tools{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.posting-tabs [aria-pressed="true"]{background:#315ea8;color:white}.posting-tools input{flex:1;min-width:200px}.posting-tools select{width:auto;max-width:100%}.posting-layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}.posting-card{border:1px solid #52617a;border-radius:12px;padding:14px;margin:10px 0;overflow-wrap:anywhere}.posting-card input{width:auto;margin-right:8px}.posting-title{background:transparent;color:inherit;text-align:left;font-weight:bold;border:0;font-size:1rem;padding:6px}.posting-card p{margin:5px 0;font-size:.9rem}.posting-card[data-group="skipped"]{opacity:.75}#postingInspector{position:sticky;top:12px;align-self:start;margin:0;padding:16px;overflow-wrap:anywhere}#postingWorkspace{border-top:1px solid #52617a;margin-top:16px;padding-top:16px}#postingSettings{margin-top:24px}#postingManager [hidden],#postingWorkspace [hidden]{display:none!important}@media(max-width:760px){.posting-layout{display:block}#postingInspector{position:static}.posting-tools>*{width:100%}.posting-tabs button{flex:1}.posting-card{padding:12px}}
+
+.posting-thumb{float:left;width:112px;height:72px;object-fit:cover;border-radius:8px;margin:0 12px 8px 0}.posting-card::after{content:"";display:block;clear:both}
+
+.posting-layout:has(#postingInspector[hidden]){grid-template-columns:1fr}#postingInspector input,#postingInspector select,#postingInspector textarea{max-width:100%;box-sizing:border-box}#postingInspector .item{overflow-wrap:anywhere}
+
+@media(min-width:761px){main:has(#socialPanel:not([hidden])){max-width:1280px}}
+
+.posting-tabs button{white-space:nowrap;min-width:0}#postingWorkspace>h2{display:none}@media(max-width:760px){.posting-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.posting-tabs button{width:100%;flex:initial}}
