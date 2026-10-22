@@ -46,6 +46,7 @@ export function batchPrompt(shared, entries, bgmCatalog) {
     '各scenes[].tarot_phaseは intro→overall→relationships→work→advice→（任意でsummary）'+(shared.video.cta_enabled?'→cta（最後に1scene）':'。ctaは出力しない')+'。intro〜adviceにはそれぞれ1scene以上を割り当て、同じ役割は複数sceneでもよい。空sceneは出力しない。',
     'ナレーションの語句を変更・要約・追加せず、scenesのtextを順に結合した内容が原稿と一致するように意味のまとまりで分割する。画面で確定する字幕では星座名をひらがな（例: おうし座、いて座）で表示し、読み上げの言葉は変更しない。改行はJSON文字列中の\\nで維持。speech_text、start_time、end_timeは出力しない。',
     '【introの割当】原稿冒頭のタイトルと、それに続く運勢の概要を伝える導入コメントの全体をtarot_phase:"intro"に割り当てる。タイトルだけでintroを終了せず、「全体運は、」からoverallを開始する。導入が複数sceneに分かれてもすべてintroを維持する。新しく作る原稿はタイトル込み約9〜10秒が目安だが、変換時は秒数に合わせて原稿を追加・削除・要約しない。導入コメントのない旧原稿は補作せず既存の内容だけを割り当てる。introの終了は読み上げ音声に追従させ、start_time/end_timeやシャッフル秒数の独自キーは出力しない。',
+    '【字幕の区切り】原稿の語句・情報量・話す順序を変えず、各scene.textを文末・読点・自然な文節で分ける。字幕のために原稿を短文化・要約しない。固定文字数で機械的に切らず、「よう。」「しょう。」「です。」「ます。」など語尾だけのsceneを作らない。動詞・助動詞のまとまり、カード名、正位置・逆位置、MBTIの英字4文字と日本語名は途中で分断しない。長い文は意味の通る箇所で複数sceneに分け、分割後も元のtarot_phaseを維持する。長さが異なっても自然さを優先し、単語途中に改行を入れない。textを順に連結した読み上げ内容が原稿と一致することを出力前に確認する。',
     'introのhook_textには指定のtitleを改行を含めて完全一致で入れる。introの読み上げtextをtitleで置き換えない。',
     shared.video.cta_enabled?'ctaは最後の1sceneだけ。textは指定されたctaと完全一致させ、[[ ]]装飾、speech_text、情景映像を付けず、他のsceneと重複させない。':'CTAは作らない。',
     'introとctaに情景映像を付けない。overall, relationships, work, adviceの各役割で少なくとも1sceneに tarot_visual:"scenery", media_type:"pexels" または "pixabay", media_query:原稿に合う英語の具体的な検索語 を付ける。カードを表に返してから情景映像へ切り替える。1役割が1sceneだけでもよい。',
@@ -198,4 +199,5 @@ function subjectPrompt(text,value) {
  .replaceAll('"version":1,','"version":1,"subject_kind":"mbti",')
  +'\n\nMBTI月間タロットです。対象は16タイプ。内部のzodiacキーにはタイプの小文字IDを入れ、表示はINTJ（建築家）のように英字4文字と日本語名を併記する。対応表: '+Object.values(MBTI_NAMES).join('、')+'。subject_kindはmbti。性格や未来を断定せず、カードから生活のヒントを提案する。';
 }
+
 
