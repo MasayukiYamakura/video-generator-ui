@@ -1,6 +1,6 @@
 import {generatedTime,sourceLink,previewLink} from './video-list.mjs?v=posting-20261022';
 const GROUP={attention:'要対応',progress:'進行中',completed:'完了',skipped:'見送り',all:'すべて'};
-const STATUS={rejected:'公開設定の変更が拒否されました',ready:'未送信',waiting:'予約枠待ち',unknown:'結果不明・照合が必要',scheduled:'予約済み',sending:'公開処理中',published:'公開済み',unlisted:'限定公開',failed:'失敗',expired:'期限切れ',approval_required:'承認待ち',manual_required:'手動投稿待ち',private_ready:'非公開・公開判断待ち',processing:'YouTube処理中',overdue:'予約時刻経過・未確認',needs_review:'状態確認が必要',unavailable:'状態を取得できません',uploaded:'非公開送信済み・要照合',resumable:'送信の確認・再開が必要',pending:'転送待ち',setup_required:'接続設定待ち',error:'転送失敗',deleted:'配信用ファイル削除済み',withdrawn:'取り下げ済み'};
+const STATUS={rejected:'公開設定の変更が拒否されました',ready:'未送信',waiting:'予約枠待ち',api_wait:'API利用上限による保留',channel_wait:'投稿先の対応待ち',unknown:'結果不明・照合が必要',scheduled:'予約済み',sending:'公開処理中',published:'公開済み',unlisted:'限定公開',failed:'失敗',expired:'期限切れ',approval_required:'承認待ち',manual_required:'手動投稿待ち',private_ready:'非公開・公開判断待ち',processing:'YouTube処理中',overdue:'予約時刻経過・未確認',needs_review:'状態確認が必要',unavailable:'状態を取得できません',uploaded:'非公開送信済み・要照合',resumable:'送信の確認・再開が必要',pending:'転送待ち',setup_required:'接続設定待ち',error:'転送失敗',deleted:'配信用ファイル削除済み',withdrawn:'取り下げ済み'};
 const MEDIA={youtube:'YouTubeショート',instagram:'Instagramリール',tiktok:'TikTok'};
 const $=id=>document.getElementById(id);
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
@@ -14,7 +14,7 @@ export function postingRows(adapters){
    const skipped=video.management?.skipped_channels||[];
    const relevant=posts.filter(p=>!skipped.includes(p.channel_id));
    const status=p=>kind==='youtube'?(p.publication&&['unknown','needs_review','rejected','overdue'].includes(p.publication.status)?p.publication.status:p.remote?.state||p.status):p.status;
-   const unresolved=posts.some(p=>['unknown','failed','expired','unavailable','needs_review','overdue','rejected','resumable','approval_required','manual_required'].includes(status(p)));
+   const unresolved=posts.some(p=>['unknown','failed','expired','unavailable','needs_review','overdue','rejected','resumable','channel_wait','approval_required','manual_required'].includes(status(p)));
    let group='attention';
    const decision=video.management?.decision;
    if(decision==='skipped'||video.archived_at||video.cloud?.status==='withdrawn')group='skipped';
@@ -46,6 +46,7 @@ export function mountPostingManager(){
  const refresh=el('button','画面を更新');refresh.className='secondary';const sync=el('button','投稿先の最新状態を確認');sync.className='secondary';
  const message=el('p');message.id='postingMessage';message.setAttribute('role','status');
  tools.append(search,format,type,service,refresh,sync);manager.append(title,tabs,tools,message);
+ const refillPanel=$('socialRefillPanel');if(refillPanel)manager.append(refillPanel);
  const bulk=el('div');bulk.className='actions';const all=el('button','表示中の動画を全選択'),skip=el('button','選択した動画を見送る'),restore=el('button','選択した動画を作業に戻す'),prepare=el('button','選択した縦型の投稿を準備');
  for(const b of [all,skip,restore,prepare]){b.className='secondary';bulk.append(b);}manager.append(bulk);
  const layout=el('div');layout.className='posting-layout';const list=el('div');list.id='postingList';const inspector=el('section');inspector.id='postingInspector';inspector.hidden=true;const back=el('button','一覧に戻る');back.className='secondary';const detail=el('div');inspector.append(back,detail);layout.append(list,inspector);manager.append(layout);
