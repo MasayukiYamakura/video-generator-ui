@@ -1,4 +1,4 @@
-# Dance Studioの使い方
+# D-Generatorの使い方
 
 専用画面: https://masayukiyamakura.github.io/video-generator-ui/dance/
 
