@@ -1,10 +1,10 @@
 {
-  "source_commit": "51ecce05717a7151ee5697204b26f827eb4e3ef2",
+  "source_commit": "3a53a94a3accfa884b09af453165a81a9ab3596f",
   "files": {
-    "index.html": "2a0f32d14b2463589fdd1afd5469cae78833d20a0689a7777ace70afd5c26254",
+    "index.html": "87c79695cc2fdc0846b3f0b0f5109b456d420c1eba4b9a67aa2a86ab232a2ded",
     "style.css": "355f6668cfc0fb9438d4b861d4af9259d88d8bc18e361ed3f3884018d2e1ea8d",
-    "core.mjs": "bd14f11b995a44adb975c0b8a1395e672b02ce6acf1aa2e5e6cbeee49f2d058c",
-    "app.mjs": "5864bbc2cfc4925c5911ce61797997d526d9d51c6a8ff38b6d4624d735238fe6",
-    "README.md": "be41afe212abad9c3745f2bc5b18b941617a99d291311ef9e0883c2a8e11a3ba"
+    "core.mjs": "b268e86f62d5145397877893eb9997fd31b578c990f0e74a62f7e6a3d517063f",
+    "app.mjs": "5d0c1cdcb1a84ac06a742cee8752976d3dcef94705df8168480f27f8ae482a97",
+    "README.md": "cec6fc2992d828c923ab64febfcf63c924fbfb2d0feb07023700824c5f23a99d"
   }
 }
