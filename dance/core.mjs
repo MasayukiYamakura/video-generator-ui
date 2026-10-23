@@ -145,7 +145,7 @@ export function contentJSON(item) {
   );
 }
 export class GitHub {
-  constructor(repo, token, fetcher = fetch) {
+  constructor(repo, token, fetcher = (...args) => globalThis.fetch(...args)) {
     this.repo = validRepo(repo);
     this.token = token;
     this.fetcher = fetcher;
