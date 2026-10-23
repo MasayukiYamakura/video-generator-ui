@@ -1,3 +1,4 @@
+import {ReferencePanel,mergeReferences} from "./upload.mjs?v=20261023-materials-1";
 import {
   DEFAULT_REPO,
   WORKFLOW,
@@ -6,10 +7,9 @@ import {
   submitRequest,
   collectRequest,
   describe,
-  parseDataset,
   artifactLink,
   isAvailable,
-} from "./core.mjs?v=20261023-connection-2";
+} from "./core.mjs?v=20261023-materials-1";
 const $ = (id) => document.getElementById(id),
   storageKey = "dance-studio-v1",
   pendingKey = (repo) => "dance-pending:" + repo;
@@ -31,6 +31,13 @@ let client = null,
   globalRuns = [],
   review = null;
 const thumbCache = new Map();
+let legacyReferences = [];
+const references = new ReferencePanel(()=>client,index=>{
+  if(!catalog)return;
+  catalog.references=mergeReferences(legacyReferences,index);
+  refOptions();
+},message);
+references.onStateChange=updateButtons;
 function read(key) {
   try {
     return JSON.parse(localStorage.getItem(key) || "null");
@@ -65,6 +72,7 @@ function updateButtons() {
     e.disabled = !connected || busy;
   const locked =
     !!pending ||
+    references.busy || references.runs.some(r=>r.status!=="completed") ||
     globalRuns.length > 0 ||
     (!!active && active.collection !== "complete");
   $("generate").disabled = $("preview").disabled =
@@ -108,6 +116,7 @@ async function connect() {
     catalog = await client.json("config/dance-ui.json");
     if (catalog.version !== 1 || !Array.isArray(catalog.references))
       throw Error("画面設定の形式を確認してください。");
+    legacyReferences = catalog.references.slice();
     connected = true;
     remember();
     pending = read(pendingKey(client.repo));
@@ -126,9 +135,11 @@ async function connect() {
       $("character-placeholder").hidden = false;
       $("character-placeholder").textContent = 'キャラ画像の取得は未完了です。生成・履歴は利用できます。';
     }
+    await references.connect(await client.json("config/reference-policy.json", "main", true));
     await refresh();
   } catch (e) {
     connected = false;
+    references.controls(false);
     message(e.message, true);
     $("badge").textContent = "接続を確認";
     $("badge").classList.remove("on");
@@ -168,6 +179,7 @@ async function refresh() {
       }
     }
     await renderHistory();
+    await references.refresh();
     $("checked").textContent =
       "最終確認：" + new Date().toLocaleString("ja-JP");
     updateButtons();
@@ -373,60 +385,13 @@ async function dispatch(request, retry = false) {
     updateButtons();
   }
 }
-async function registerReference() {
-  if (!connected || busy) return;
-  busy = true;
-  updateButtons();
-  try {
-    const name = $("reference-name").value.trim(),
-      dataset = parseDataset($("dataset").value),
-      video_path = $("video-path").value.trim();
-    if (!name) throw Error("表示名を入力してください。");
-    if (
-      video_path &&
-      (!video_path.startsWith("/kaggle/input/") || video_path.includes(".."))
-    )
-      throw Error("動画パスは/kaggle/input/から指定してください。");
-    const file = await client.api("contents/config/dance-ui.json?ref=main");
-    const latest = await client.json("config/dance-ui.json");
-    if (
-      latest.references.some(
-        (r) => r.dataset === dataset && r.video_path === video_path,
-      )
-    )
-      throw Error("この参考動画は登録済みです。");
-    latest.references.push({ id: "ref-" + newId(), name, dataset, video_path });
-    const content = btoa(
-      String.fromCharCode(
-        ...new TextEncoder().encode(JSON.stringify(latest, null, 2) + "\n"),
-      ),
-    );
-    await client.api("contents/config/dance-ui.json", {
-      method: "PUT",
-      body: {
-        message: "Register private dance reference",
-        sha: file.sha,
-        content,
-        branch: "main",
-      },
-    });
-    catalog = latest;
-    refOptions();
-    $("reference").value = latest.references.at(-1).id;
-    message("参考動画を登録しました。動画生成はまだ起動していません。");
-  } catch (e) {
-    message(e.message, true);
-  } finally {
-    busy = false;
-    updateButtons();
-  }
-}
 $("connect").onclick = connect;
 $("forget").onclick = () => {
   if (busy || refreshing) return;
   localStorage.removeItem(storageKey);
   client = null;
   connected = false;
+  references.disconnect();
   $("token").value = "";
   $("remember").checked = false;
   $("badge").textContent = "未接続";
@@ -441,7 +406,6 @@ $("forget").onclick = () => {
   renderPending();
   updateButtons();
 };
-$("register").onclick = registerReference;
 $("refresh").onclick = refresh;
 $("check-pending").onclick = refresh;
 $("retry-pending").onclick = () => pending && dispatch(pending.request, true);
@@ -498,7 +462,7 @@ setInterval(() => {
   if (
     !document.hidden &&
     connected &&
-    (pending || runs.some((r) => r.status !== "completed") || globalRuns.length)
+    (references.pending || pending || runs.some((r) => r.status !== "completed") || globalRuns.length)
   )
     refresh();
 }, 30000);
