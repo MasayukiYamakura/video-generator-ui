@@ -153,7 +153,11 @@ export class GitHub {
   async api(path, { method = "GET", body, missing = false } = {}) {
     if (path.startsWith("/") || path.includes("..") || path.includes("://"))
       throw Error("不正なAPIパスです。");
-    const response = await this.fetcher(`${API}/repos/${this.repo}/${path}`, {
+    // The repository endpoint must not end with "/": its OPTIONS preflight returns 404.
+    const url = `${API}/repos/${this.repo}${path ? `/${path}` : ""}`;
+    let response;
+    try {
+      response = await this.fetcher(url, {
       method,
       cache: "no-store",
       signal: AbortSignal.timeout(20000),
@@ -164,7 +168,17 @@ export class GitHub {
         ...(body ? { "Content-Type": "application/json" } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
-    });
+      });
+    } catch (error) {
+      const timeout = error?.name === "TimeoutError" || error?.name === "AbortError";
+      const detail = timeout
+        ? "GitHub APIの応答が時間内に返りませんでした。"
+        : "GitHub APIへ通信できませんでした。ページを再読み込みし、通信環境やブラウザの通信制限を確認してください。";
+      const recovery = method === "GET"
+        ? "トークンの権限エラーとは区別して確認してください。"
+        : "送信が届いている可能性があります。状態を確認してから操作してください。";
+      throw Error(detail + recovery);
+    }
     if (response.status === 404 && missing) return null;
     if (!response.ok)
       throw Error(

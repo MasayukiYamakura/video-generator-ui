@@ -9,7 +9,7 @@ import {
   parseDataset,
   artifactLink,
   isAvailable,
-} from "./core.mjs";
+} from "./core.mjs?v=20261023-connection-2";
 const $ = (id) => document.getElementById(id),
   storageKey = "dance-studio-v1",
   pendingKey = (repo) => "dance-pending:" + repo;
