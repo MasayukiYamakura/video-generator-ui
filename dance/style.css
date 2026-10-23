@@ -456,3 +456,8 @@ dialog p {
     font-size: 10px;
   }
 }
+
+#upload-preview {max-width:100%; width:280px; max-height:320px; display:block; margin:12px 0; background:#101b25; border-radius:12px;}
+#upload-preview[hidden] {display:none;}
+progress {width:100%; accent-color:var(--accent, #31b6a5);}
+#reference-history .take {margin-top:12px;}

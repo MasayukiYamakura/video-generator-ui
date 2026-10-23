@@ -9,12 +9,12 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'"
+      content="default-src 'self'; connect-src 'self' https://api.github.com https://api.cloudinary.com https://*.workers.dev; media-src 'self' blob:; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'"
     />
     <meta name="theme-color" content="#101b25" />
     <title>D-Generator</title>
     <link rel="stylesheet" href="style.css" />
-    <script type="module" src="app.mjs?v=20261023-connection-2"></script>
+    <script type="module" src="app.mjs?v=20261023-materials-1"></script>
   </head>
   <body>
     <main>
@@ -71,38 +71,44 @@
             接続テスト（GPUなし）
           </button>
         </div>
-        <details class="reference-setup">
-          <summary>参考動画を登録する（初回・追加時）</summary>
-          <p class="muted">
-            Kaggleに登録済みのDatasetを指定します。YouTubeのURLやスマホからの直接アップロードにはまだ対応していません。
-          </p>
-          <label
-            >表示名<input
-              id="reference-name"
-              placeholder="例：Yes!東京・参考ダンス"
-              maxlength="100" /></label
-          ><label
-            >Kaggle DatasetのURL<input
-              id="dataset"
-              type="text"
-              autocapitalize="none"
-              spellcheck="false"
-              placeholder="https://www.kaggle.com/datasets/所有者/名前" /></label
-          ><label
-            >動画のパス（動画が1本なら空欄）<input
-              id="video-path"
-              autocapitalize="none"
-              placeholder="/kaggle/input/.../reference.mp4" /></label
-          ><button id="register" class="secondary connected" disabled>
-            参考動画を登録
-          </button>
-        </details>
         <p>
           <a href="README.md" target="_blank" rel="noopener noreferrer"
             >使い方・初回設定</a
           >
         </p>
       </details>
+      <section aria-labelledby="materials-title">
+        <div class="section-head"><div><p class="eyebrow">YOUR REFERENCES</p><h2 id="materials-title">参考動画を登録する</h2></div><span class="label">登録はCPUのみ</span></div>
+        <p class="muted">登録済み素材は下の「参考ダンス」から選べます。新しい素材は3つの方法で追加できます。</p>
+        <label>素材の指定方法<select id="source-type"><option value="upload">画面からの新規アップロード</option><option value="kaggle">Kaggle Dataset</option><option value="youtube">YouTube URL</option></select></label>
+        <label>表示名<input id="reference-name" maxlength="60" placeholder="例：Yes!東京・参考ダンス" /></label>
+        <div id="source-upload">
+          <label>動画ファイル<input id="reference-file" type="file" accept="video/mp4,video/quicktime,.mp4,.mov" /></label>
+          <p class="muted">MP4・MOV、80 MB・120秒まで。H.264／HEVCに対応。HDRは非対応です。</p>
+          <p id="file-info" class="muted"></p><video id="upload-preview" controls playsinline preload="metadata" hidden></video>
+          <progress id="upload-progress" max="100" value="0" hidden></progress><p id="upload-percent" class="muted"></p>
+          <details><summary>アップロードの初期設定</summary>
+            <p class="muted">本人専用のCloudflare Workerを初回だけ設定してください。設定手順は「使い方・初回設定」にあります。Cloudinaryの秘密鍵は画面に入力しません。</p>
+            <label>本人専用アップロードAPIのURL<input id="upload-api" type="url" autocapitalize="none" spellcheck="false" placeholder="https://d-generator-upload.本人のサブドメイン.workers.dev" /></label>
+            <button id="save-upload-api" class="secondary" disabled>接続先を保存</button>
+            <label class="check"><input id="upload-consent" type="checkbox" />本人が作成したWorkerであることを確認しました。このWorkerへGitHubトークンを送って本人確認することに同意します。</label>
+          </details>
+        </div>
+        <div id="source-kaggle" hidden>
+          <label>Kaggle DatasetのURL<input id="dataset" autocapitalize="none" spellcheck="false" placeholder="https://www.kaggle.com/datasets/所有者/名前" /></label>
+          <label>動画のパス（1本なら空欄）<input id="video-path" autocapitalize="none" placeholder="例：reference.mp4" /></label>
+          <p class="muted">登録時に動画をCPUで検査し、Datasetの版と対象ファイルを確定します。</p>
+        </div>
+        <div id="source-youtube" hidden>
+          <label>YouTube動画・ShortsのURL<input id="youtube-url" type="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/shorts/..." /></label>
+          <p id="youtube-note" class="muted">自動取得は確認前のため停止中です。URLを参考リンクとして保存し、動画ファイルを追加できます。</p>
+        </div>
+        <div class="actions"><button id="register" class="secondary" disabled>素材を登録（GPUなし）</button><button id="reference-refresh" class="secondary" disabled>登録状況を確認</button></div>
+        <p class="muted">動画転送と受付の確認が完了するまでは、この画面を開いてください。登録後もGPU生成は別の操作です。</p>
+        <div id="reference-pending" class="pending" hidden><h3>素材登録の受付</h3><p id="reference-pending-text"></p><p id="reference-pending-status" class="muted"></p>
+          <div class="actions"><button id="reference-resume" class="secondary">登録を再開</button><button id="reference-clear" class="secondary">受付表示を閉じる</button></div></div>
+        <details><summary>素材登録の履歴</summary><div id="reference-history"></div></details>
+      </section>
       <section class="production" aria-labelledby="create-title">
         <div class="section-head">
           <div>

@@ -27,12 +27,16 @@ export function submitRequest(values, catalog, id = newId()) {
     throw Error("開始秒と長さを確認してください。");
   if (
     mode !== "smoke" &&
-    !catalog.references.some((r) => r.id === values.reference_id)
+    !catalog.references.some((r) => r.id === values.reference_id && (!r.state || r.state === "ready"))
   )
     throw Error("登録済みの参考動画を選んでください。");
   if (!["reference", "mute"].includes(values.audio))
     throw Error("音声設定を確認してください。");
+  const reference = catalog.references.find(r=>r.id===values.reference_id);
+  if(mode!=="smoke" && reference?.duration_seconds && start+seconds>reference.duration_seconds)
+    throw Error("指定した区間が参考動画の長さを超えています。");
   return {
+    ...(mode!=="smoke" && reference?.revision ? {reference_revision:String(reference.revision)} : {}),
     request_id: id,
     operation: "submit",
     mode,
