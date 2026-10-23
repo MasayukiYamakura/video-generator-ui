@@ -1,0 +1,10 @@
+{
+  "source_commit": "5bc9be8dfb263cb20473fc3f2bcb9c890973943c",
+  "files": {
+    "index.html": "10164863b977b8e05847ac8ba45f030e3e7e171d5166632e94d4023996d81d4b",
+    "style.css": "355f6668cfc0fb9438d4b861d4af9259d88d8bc18e361ed3f3884018d2e1ea8d",
+    "core.mjs": "bd14f11b995a44adb975c0b8a1395e672b02ce6acf1aa2e5e6cbeee49f2d058c",
+    "app.mjs": "5864bbc2cfc4925c5911ce61797997d526d9d51c6a8ff38b6d4624d735238fe6",
+    "README.md": "13c69b42434d7498d33415abbab4bc9c8c26629a06bfdf6b837dda87d47b5d66"
+  }
+}

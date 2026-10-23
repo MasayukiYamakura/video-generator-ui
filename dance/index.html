@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src 'self' https://api.github.com; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'"
+    />
+    <meta name="theme-color" content="#101b25" />
+    <title>Dance Studio</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.mjs"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a class="back" href="../">← V-Generator</a>
+        <div class="headline">
+          <div>
+            <p class="eyebrow">YOUR MUSIC, YOUR MOVEMENT</p>
+            <h1>Dance Studio<span>ダンス制作スタジオ</span></h1>
+          </div>
+          <span class="connection-badge" id="badge">未接続</span>
+        </div>
+        <p class="lead">参考ダンスから、あなたのキャラクターの一本へ。</p>
+      </header>
+      <ol class="stages" aria-label="制作の流れ">
+        <li class="selected"><b>01</b> ダンスを作る</li>
+        <li><b>02</b> 音楽で仕上げる <small>今後対応</small></li>
+        <li><b>03</b> 投稿する <small>今後対応</small></li>
+      </ol>
+      <p id="message" class="notice" role="status" aria-live="polite">
+        最初にGitHubへ接続してください。接続後はスマホから実行できます。
+      </p>
+      <details id="connection" open>
+        <summary>接続・初回設定</summary>
+        <div class="fields">
+          <label
+            >生成リポジトリ<input
+              id="repo"
+              value="MasayukiYamakura/chibi-dance-generator"
+              autocapitalize="none"
+              spellcheck="false" /></label
+          ><label
+            >GitHubトークン<input
+              id="token"
+              type="password"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+          /></label>
+        </div>
+        <label class="check"
+          ><input
+            id="remember"
+            type="checkbox"
+          />この端末にトークンを保存</label
+        >
+        <p class="muted">
+          対象リポジトリのActions：読み書き、Contents：読み書きが必要です。保存は任意です。同じ公開サイト内のコードから読み取れるため、共有端末では保存しないでください。Kaggleのトークンはここへ入力しません。
+        </p>
+        <div class="actions">
+          <button id="connect">接続を確認</button
+          ><button class="secondary" id="forget">接続情報を削除</button
+          ><button class="secondary connected" id="smoke" disabled>
+            接続テスト（GPUなし）
+          </button>
+        </div>
+        <details class="reference-setup">
+          <summary>参考動画を登録する（初回・追加時）</summary>
+          <p class="muted">
+            Kaggleに登録済みのDatasetを指定します。YouTubeのURLやスマホからの直接アップロードにはまだ対応していません。
+          </p>
+          <label
+            >表示名<input
+              id="reference-name"
+              placeholder="例：Yes!東京・参考ダンス"
+              maxlength="100" /></label
+          ><label
+            >Kaggle DatasetのURL<input
+              id="dataset"
+              type="text"
+              autocapitalize="none"
+              spellcheck="false"
+              placeholder="https://www.kaggle.com/datasets/所有者/名前" /></label
+          ><label
+            >動画のパス（動画が1本なら空欄）<input
+              id="video-path"
+              autocapitalize="none"
+              placeholder="/kaggle/input/.../reference.mp4" /></label
+          ><button id="register" class="secondary connected" disabled>
+            参考動画を登録
+          </button>
+        </details>
+        <p>
+          <a href="README.md" target="_blank" rel="noopener noreferrer"
+            >使い方・初回設定</a
+          >
+        </p>
+      </details>
+      <section class="production" aria-labelledby="create-title">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">CREATE</p>
+            <h2 id="create-title">ダンスを作る</h2>
+          </div>
+          <span class="label">1–5秒の試作</span>
+        </div>
+        <div class="workspace">
+          <div class="character">
+            <div class="character-image">
+              <img id="character" alt="採用済みの大人頭身キャラクター" hidden />
+              <p id="character-placeholder">
+                接続すると<br />キャラクターを表示します
+              </p>
+            </div>
+            <p id="character-name">黒フード・グレーデニム</p>
+            <span class="muted">採用済みキャラ固定</span>
+          </div>
+          <div class="controls">
+            <label
+              >参考ダンス<select id="reference" disabled>
+                <option value="">接続後に選択できます</option>
+              </select></label
+            >
+            <div class="fields timing">
+              <label
+                >開始位置（秒）<input
+                  id="start"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="0"
+                  inputmode="decimal" /></label
+              ><label
+                >生成する長さ<select id="seconds">
+                  <option value="1">1秒・動作試験</option>
+                  <option value="2">2秒・品質確認</option>
+                  <option value="5">5秒・試作</option>
+                </select></label
+              >
+            </div>
+            <label
+              >音声<select id="audio">
+                <option value="reference">参考動画の音を使う</option>
+                <option value="mute">無音にする</option>
+              </select></label
+            >
+            <p class="muted">
+              参考動画に音声がない場合は無音です。独自の楽曲への差し替えは次段階で対応します。
+            </p>
+            <div class="actions generate-actions">
+              <button id="preview" class="secondary connected" disabled>
+                動きを確認（CPU）</button
+              ><button id="generate" class="connected" disabled>
+                ダンスを生成（GPU）
+              </button>
+            </div>
+            <p class="muted">
+              まず1秒から。GPU生成は品質検証中です。受付完了後は画面を閉じても処理が続きます。
+            </p>
+          </div>
+        </div>
+      </section>
+      <section id="pending-panel" class="pending" hidden>
+        <h2>受付状況の確認</h2>
+        <p id="pending-message"></p>
+        <div class="actions">
+          <button id="check-pending" class="secondary">受付状況を確認</button
+          ><button id="retry-pending" class="secondary">同じ依頼を再送</button>
+        </div>
+        <p class="muted">
+          再送でも受付IDは変えず、Kaggleへの二重送信を防ぎます。
+        </p>
+      </section>
+      <section aria-labelledby="history-title">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">YOUR TAKES</p>
+            <h2 id="history-title">実行状況・履歴</h2>
+          </div>
+          <button id="refresh" class="secondary connected" disabled>
+            状態を確認
+          </button>
+        </div>
+        <p id="checked" class="muted">まだ確認していません</p>
+        <div id="history">
+          <p class="empty">接続すると実行状況と最近の履歴が表示されます。</p>
+        </div>
+      </section>
+      <footer>
+        動画は7日、詳細ログは30日保存。期限前にダウンロードしてください。<br />新しい生成と結果の再取得は、別の操作です。
+      </footer>
+      <dialog id="review">
+        <h2 id="review-title">実行内容を確認</h2>
+        <p id="review-content"></p>
+        <p id="review-note" class="muted"></p>
+        <div class="actions">
+          <button id="confirm">この内容で実行</button
+          ><button id="cancel" class="secondary">戻る</button>
+        </div>
+      </dialog>
+    </main>
+  </body>
+</html>
