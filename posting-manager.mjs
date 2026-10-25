@@ -4,6 +4,22 @@ const STATUS={rejected:'公開設定の変更が拒否されました',ready:'�
 const MEDIA={youtube:'YouTubeショート',instagram:'Instagramリール',tiktok:'TikTok'};
 const $=id=>document.getElementById(id);
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
+export function fileStatus(kind,video){
+ if(kind==='social'){
+  const status=video.cloud?.status;
+  if(status==='withdrawn')return 'Cloudinary：削除済み（投稿せず）';
+  if(status==='deleted')return 'Cloudinary：削除済み（投稿完了後）';
+  if(status==='uploaded')return 'Cloudinary：保存中';
+  if(status==='pending')return 'Cloudinary：転送待ち';
+  if(status==='setup_required')return 'Cloudinary：未転送（設定待ち）';
+  if(status==='error')return 'Cloudinary：転送失敗';
+  return 'Cloudinary：状態未確認';
+ }
+ if(video.expires_at){
+  return Date.parse(video.expires_at)<=Date.now()?'元動画（GitHub成果物）：保存期限切れ':'元動画（GitHub成果物）：保存期限内';
+ }
+ return '元動画（GitHub成果物）：保存状態未確認';
+}
 export function postingRows(adapters){
  const result=[];
  for(const kind of ['social','youtube']){
@@ -25,8 +41,8 @@ export function postingRows(adapters){
    }else if(targets.length&&targets.every(id=>skipped.includes(id)||posts.some(p=>p.channel_id===id&&p.status==='published')))group='completed';
    else if(relevant.length&&!unresolved&&relevant.every(p=>['scheduled','sending','published'].includes(p.status)))group='progress';
    if(kind==='social'&&video.cloud?.status==='deleted'&&!unresolved)group='completed';
-   const lines=posts.map(p=>`${kind==='youtube'?'YouTube':MEDIA[p.service]||p.service}：${(status(p)==='private_ready'&&(decision==='skipped'||decision==='private_complete')?'非公開で保存済み':STATUS[status(p)]||status(p))}${skipped.includes(p.channel_id)?'（この投稿先は見送り）':''}`);
-   if(!lines.length)lines.push(kind==='youtube'?(video.expires_at&&Date.parse(video.expires_at)<=Date.now()?'元動画の保存期限切れ・再生成が必要':'YouTube：未送信'):STATUS[video.cloud?.status]||'投稿準備待ち');
+   const lines=[fileStatus(kind,video),...posts.map(p=>`${kind==='youtube'?'YouTube':MEDIA[p.service]||p.service}：${(status(p)==='private_ready'&&(decision==='skipped'||decision==='private_complete')?'非公開で保存済み':STATUS[status(p)]||status(p))}${skipped.includes(p.channel_id)?'（この投稿先は見送り）':''}`)];
+   if(!posts.length)lines.push(kind==='youtube'?'YouTube：未送信':'投稿先：未登録');
    result.push({key:`${kind}/${video.id}`,kind,video,posts,group,unresolved,lines,type:video.tarot?(video.tarot.subject_kind==='mbti'?'MBTI':'星座'):'思想'});
   }
  }
@@ -91,7 +107,7 @@ export function mountPostingManager(){
   for(const id of ['socialStatus','youtubeStatus','socialResume','youtubeRecover']){const n=$(id);if(n&&n.parentElement!==manager)manager.append(n);}
  }
  function renderDetail(r){
-  detail.replaceChildren(el('h3',r.video.filename),el('p',`${GROUP[r.group]}${r.unresolved?'・未解決の結果があります。投稿先を照合してください。':''}`));
+  detail.replaceChildren(el('h3',r.video.filename),el('p',`${GROUP[r.group]} ／ ${fileStatus(r.kind,r.video)}${r.unresolved?'・未解決の結果があります。投稿先を照合してください。':''}`));
   const href=previewLink(r.video)||sourceLink(r.video,$('repo').value.trim());if(href){const a=el('a','動画を確認・ダウンロード');a.href=href;a.target='_blank';a.rel='noopener noreferrer';detail.append(a);}
   const related=rows().filter(v=>v.key!==r.key&&v.video.receipt_id===r.video.receipt_id&&((v.video.target_id||v.video.id.split(':')[1])===(r.video.target_id||r.video.id.split(':')[1])));for(const other of related){const b=el('button',`関連する${other.kind==='youtube'?'横型':'縦型'}を開く`);b.className='secondary';b.onclick=()=>select(other);detail.append(b);}
   const actions=el('div');actions.className='actions';for(const [decision,label] of [['skipped',r.posts.length&&r.kind==='youtube'?'公開を見送る':'投稿を見送る'],['active','投稿作業に戻す'],...(r.kind==='youtube'?[['private_complete','非公開のまま完了する']]:[])]){const b=el('button',label);b.className='secondary';b.disabled=adapters[r.kind].busy();b.onclick=()=>manage([r],decision);actions.append(b);}detail.append(actions);
