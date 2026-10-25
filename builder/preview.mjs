@@ -61,7 +61,8 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   }
   if(active&&config.scenery){c.fillStyle='#29394c';c.fillRect(0,0,w,h);}
   if(active&&design.person?.enabled){const p=design.person;c.strokeStyle='#8bd6bd';c.lineWidth=3;c.strokeRect(p.x,p.y,p.width,p.height);}
-  if(active&&design.icon?.[intro?'intro':'body']&&visibility.icon!==false){const a=design.icon;c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(a.x,a.y,a.size,a.size);}
+  const panelHeader=active&&!tarot&&v.format==='landscape'&&design.icon?.[intro?'intro':'body']&&visibility.icon!==false&&(intro?v.intro_theme:v.body_theme);
+  if(active&&!panelHeader&&design.icon?.[intro?'intro':'body']&&visibility.icon!==false){const a=design.icon;c.strokeStyle='#e2cead';c.lineWidth=3;c.strokeRect(a.x,a.y,a.size,a.size);}
   function text(t,x,y,size) {c.fillStyle='white';c.font=`${size}px sans-serif`;c.textAlign='center';c.fillText(t,x,y);}
   if(!tarot&&(v.template==='portrait_brand'||v.format==='landscape')&&(intro?v.intro_tags:v.body_tags)) {
     const x=pairedLandscape?710:l.tag_x,y=pairedLandscape?55:l.tag_y;
@@ -81,7 +82,28 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   if((active||v.format==='landscape')&&!tarot) {
     const showTheme=intro?v.intro_theme:v.body_theme;
     const showSubtitle=intro?v.intro_subtitle:v.body_subtitle;
-    if(showTheme) {
+    if(panelHeader) {
+      const pad=12,a=design.icon,x=Math.min(l.theme_x,a.x),y=l.theme_y;
+      const label=(themeTitle||'テーマタイトル').replaceAll('[[','').replaceAll(']]','');
+      const sub=design.theme?.subtitle??'ハシモトの占いと思想';
+      const tx=pad*2+a.size,size=l.theme_font_size,subSize=l.subtitle_font_size;
+      c.font=`bold ${size}px sans-serif`;
+      const tw=Math.min(w-x-tx-pad*2,c.measureText(label).width+size),th=size*1.74;
+      c.font=`bold ${subSize}px sans-serif`;
+      const sw=showSubtitle&&sub?c.measureText(sub).width+subSize*3.04:0,sh=sw?subSize*1.6:0;
+      const width=tx+Math.max(tw,sw)+pad,height=Math.max(a.size,th+sh)+pad*2,top=y+(height-th-sh)/2;
+      c.fillStyle='rgba(4,7,17,.90)';c.fillRect(x,y,width,height);
+      c.strokeStyle='#c9aa6d';c.lineWidth=3;c.strokeRect(x,y,width,height);
+      c.beginPath();c.arc(x+pad+a.size/2,y+height/2,a.size/2,0,Math.PI*2);c.stroke();
+      c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
+      c.fillStyle='white';c.fillText(label,x+tx+size*.45,top+th/2,Math.max(1,tw-size*.9));
+      if(sw){
+        c.fillStyle='#b31827';c.beginPath();c.moveTo(x+tx,top+th);c.lineTo(x+tx+sw,top+th);
+        c.lineTo(x+tx+sw-sh*.9,top+th+sh);c.lineTo(x+tx,top+th+sh);c.closePath();c.fill();
+        c.font=`bold ${subSize}px sans-serif`;c.fillStyle='white';c.fillText(sub,x+tx+subSize*.8,top+th+sh/2);
+      }
+    }
+    if(showTheme&&!panelHeader) {
       const size=l.theme_font_size;
       c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
       const label=(themeTitle||'テーマタイトル').replaceAll('[[','').replaceAll(']]','');
@@ -91,7 +113,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
       c.strokeStyle='#dcdcdc';c.lineWidth=3;c.strokeRect(l.theme_x,l.theme_y,width,height);
       c.fillStyle='white';c.fillText(label,l.theme_x+size*.4,l.theme_y+height/2,Math.max(1,width-size*.8));
     }
-    if(showSubtitle) {
+    if(showSubtitle&&!panelHeader) {
       const size=l.subtitle_font_size,label=design.theme?.subtitle??'ハシモトの占いと思想';
       c.font=`bold ${size}px sans-serif`;c.textAlign='left';c.textBaseline='middle';
       const width=Math.min(w-l.subtitle_x,c.measureText(label).width+size*2.5),height=size*1.6;
@@ -164,6 +186,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
 }
+
 
 
 

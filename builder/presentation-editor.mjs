@@ -114,10 +114,11 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
     modeWrap.hidden=tarot?(format!=='landscape'||config.video.tarot_renderer!=='remotion'):false;
     modeWrap.hidden ||= !on('theme');
     for(const {d,grid} of groups)d.hidden=Array.from(grid.children).every(e=>e.hidden);
-    message.textContent=`${format==='vertical'?'縦型':'横型'}のデザインを編集中。${tarot?(format==='landscape'&&config.video.tarot_renderer==='remotion'?'左上のテーマ・サブタイトル・アイコンを設定します。自動タイトルは各星座・タイプの年月と名前です。':'カード・本編字幕は固定配置です。変更できる共通設定は下にあります。'):'表示中の値がこの形式に適用されます。位置は動画のピクセル座標です。'}変更は「設定の保存」で保存できます。`;
+    message.textContent=`${!tarot&&format==='landscape'?'テーマとアイコンを同時に表示する場面では一つのパネルになります。左端はテーマXとアイコンXの小さい方、上端はテーマYを使い、アイコンY・サブタイトルX/Yは自動配置します。 ':''}${format==='vertical'?'縦型':'横型'}のデザインを編集中。${tarot?(format==='landscape'&&config.video.tarot_renderer==='remotion'?'左上のテーマ・サブタイトル・アイコンを設定します。自動タイトルは各星座・タイプの年月と名前です。':'カード・本編字幕は固定配置です。変更できる共通設定は下にあります。'):'表示中の値がこの形式に適用されます。位置は動画のピクセル座標です。'}変更は「設定の保存」で保存できます。`;
   }
   function reset(){errors.clear();themeModes.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};
 }
+
 
 

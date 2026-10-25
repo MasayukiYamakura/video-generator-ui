@@ -1,6 +1,6 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "b8397ed7658d45456eaa22ee5f9fd20b83ac23bc",
+  "source_commit": "56265860152c334a0f39c3024369fafe21a7a037",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "fda75eee7cb03c52a3767d7e7ba5a8f8b003aeb5059100a782e42d63530e7399",
@@ -15,11 +15,11 @@
     "builder/fields.mjs": "9623ceee3fe43865032d3e26ea6734a19a34d826790e66ffa1765a3a99f5f7c2",
     "builder/model.mjs": "a9583311cbca160224ea899d0d1af31201d7ab45f1e5741eb1ca38070701e9ad",
     "builder/modes.mjs": "5a854d285b45129c320dc70663663e9cd81a4032bff6049124101805d8364406",
-    "builder/presentation-editor.mjs": "e1cdfdfa2bdf7d740b70fc2f5ff101d5645620f88c25458321593f00afa9b9bd",
+    "builder/presentation-editor.mjs": "66c1ea9e8c8d5375346107348effdf85c30bb409b24117918bce1e0ee98a8dae",
     "builder/presentation.mjs": "745199b8b3c8082fc7732b63024c15a62728c92c7e4b4ec248890008e8e36f25",
     "builder/preset-controller.mjs": "1e2468a44f7f4cc8cdd6b1f48296421520a97cbae1e3ed53a6b096a1e86a9f2e",
     "builder/presets.mjs": "7fd996db38ad72718a37db9f3767984c22978ef78c7595315d1acac415389342",
-    "builder/preview.mjs": "57b2582a99795007ec5a5ba6ee8c5048ff964d3bd2470224f9cb5f4204693358",
+    "builder/preview.mjs": "4560a7da22d3d454e8a5a9f1bcb1b209367f8c0b8456aa45e58cc38fcce7fe62",
     "builder/prompt.mjs": "e04ab76810ae846289fabda664c28b486f73c56bf9b92164f4dd3a09aa9a8645",
     "builder/single-editor.mjs": "273ac7d7415993708c9c4429ce75f7f8d4021118ce999aeddad2910e3866cf09",
     "builder/social-data.mjs": "cd50e75f05b2f2fa627bb1efdc91e1e3cf9767a88ceab7fd1a08f4382badc3e9",
