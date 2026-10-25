@@ -47,8 +47,8 @@ export function mountPostingManager(){
  const message=el('p');message.id='postingMessage';message.setAttribute('role','status');
  tools.append(search,format,type,service,refresh,sync);manager.append(title,tabs,tools,message);
  const refillPanel=$('socialRefillPanel');if(refillPanel)manager.append(refillPanel);
- const bulk=el('div');bulk.className='actions';const all=el('button','表示中の動画を全選択'),skip=el('button','選択した動画を見送る'),restore=el('button','選択した動画を作業に戻す'),prepare=el('button','選択した縦型の投稿を準備');
- for(const b of [all,skip,restore,prepare]){b.className='secondary';bulk.append(b);}manager.append(bulk);
+ const bulk=el('div');bulk.className='actions';const all=el('button','表示中の動画を全選択'),skip=el('button','選択した動画を見送る'),restore=el('button','選択した動画を作業に戻す'),prepare=el('button','選択した縦型の投稿を準備'),removeSelected=el('button','選択した縦型の配信用ファイルを削除');
+ for(const b of [all,skip,restore,prepare,removeSelected]){b.className='secondary';bulk.append(b);}manager.append(bulk);
  const layout=el('div');layout.className='posting-layout';const list=el('div');list.id='postingList';const inspector=el('section');inspector.id='postingInspector';inspector.hidden=true;const back=el('button','一覧に戻る');back.className='secondary';const detail=el('div');inspector.append(back,detail);layout.append(list,inspector);manager.append(layout);
  // Keep the existing, tested editors and request recovery controls as the detail workspace.
  const workspace=el('div');workspace.id='postingWorkspace';workspace.hidden=true;
@@ -86,7 +86,7 @@ export function mountPostingManager(){
   }
   if(!items.length)list.append(el('p','該当する動画はありません。'));
   const r=rows().find(r=>r.key===selected);if(r)renderDetail(r);else if(selected)close();
-  const busy=Object.values(adapters).some(a=>a.busy());for(const b of [skip,restore,prepare,sync])b.disabled=busy;
+  const busy=Object.values(adapters).some(a=>a.busy());for(const b of [skip,restore,prepare,removeSelected,sync])b.disabled=busy;
   // Recovery stays visible even when no video has been selected.
   for(const id of ['socialStatus','youtubeStatus','socialResume','youtubeRecover']){const n=$(id);if(n&&n.parentElement!==manager)manager.append(n);}
  }
@@ -119,6 +119,20 @@ export function mountPostingManager(){
  }
  all.onclick=()=>{checked=new Set(visible().map(r=>r.key));render();};
  skip.onclick=()=>manage(visible().filter(r=>checked.has(r.key)),'skipped');restore.onclick=()=>manage(visible().filter(r=>checked.has(r.key)),'active');
+ removeSelected.onclick=async()=>{
+  const chosen=visible().filter(r=>checked.has(r.key));
+  if(!chosen.length){message.textContent='動画を選択してください';return;}
+  const eligible=chosen.filter(r=>r.kind==='social'&&adapters.social.canWithdraw(r.video.id));
+  const excluded=chosen.length-eligible.length;
+  if(eligible.length>100){message.textContent='一度に削除できるのは100本までです。選択を分けてください';return;}
+  if(!eligible.length){message.textContent='削除できる縦型動画がありません。横型やBuffer登録済み・結果確認中の動画は対象外です。';return;}
+  if(adapters.social.busy()){message.textContent='受付中の処理結果を確認してから操作してください';return;}
+  const names=eligible.map(r=>r.video.filename||r.video.id).join('、');
+  if(!confirm(`Cloudinaryの配信用ファイルを${eligible.length}本削除します（対象外${excluded}本）。\n${names}\n元に戻せません。生成成果物やSNS上の動画は削除しません。実行しますか？`))return;
+  await adapters.social.withdrawBulk(eligible.map(r=>r.video.id));
+  message.textContent=`一括削除${eligible.length}本を受け付けました。処理後、受付結果と一覧を確認してください。失敗分は再選択できます。`;
+  render();
+ };
  prepare.onclick=()=>{const items=visible().filter(r=>checked.has(r.key)&&r.kind==='social'&&r.group!=='skipped');if(!items.length){message.textContent='縦型動画を選択してください';return;}select(items[0]);adapters.social.select(items.map(r=>r.video.id));checked=new Set(items.map(r=>r.key));render();message.textContent=`${items.length}本の縦型を選択しました。下の投稿先・日時を確認してください。`;};
  refresh.onclick=async()=>{for(const a of Object.values(adapters))try{await a.refresh();}catch(e){message.textContent=e.message;}render();};
  sync.onclick=()=>{if(confirm('縦型は公開結果の照合と従来のCloudinary削除条件の確認、横型はYouTubeの状態照合を行います。実行しますか？')){$('socialSync').click();$('youtubeSync').click();}};
