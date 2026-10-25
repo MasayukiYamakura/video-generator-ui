@@ -1,6 +1,6 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "c3f0c8bd6c2783f819e92c85687f98d6e8bf4ec9",
+  "source_commit": "b8397ed7658d45456eaa22ee5f9fd20b83ac23bc",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "fda75eee7cb03c52a3767d7e7ba5a8f8b003aeb5059100a782e42d63530e7399",
@@ -30,9 +30,9 @@
     "builder/tarot-visual.mjs": "21a078e1aff2b2b4af6c54808144c2167389118da8fbaaf023e050f1969e835b",
     "builder/ui.mjs": "6615ea6166176f39d24cc4bae5fdae4891c6b418cc92cf49b3b1b3919ef4b2f1",
     "history.mjs": "be821200de104df9c232db9f1bfbe497a60a271e5c34e4708dcef6e6c24581cd",
-    "index.html": "1fb8b63a6247a4ec016defb369ab6782c3741647034be918eabd0b9d38e56654",
-    "posting-manager.mjs": "c368e74dfe3dd89d6521dc4c507ea15a3dc80ef967b332d3849fa86dc6aa2d8f",
-    "social-entry.mjs": "375bbb0482302a9a9d75124cf2ddf3740cc3274a514a570c84e0eb2d95ee5bd8",
+    "index.html": "fcd881f21d73980cfd9ed49433ba7944c947ab4c05438a92ed043993b93063ef",
+    "posting-manager.mjs": "a8fc9654c3ec78fb2759c2b2376d3f9c4dd49ccd364d874b6237f4ca72fbe3a9",
+    "social-entry.mjs": "b079cc3c4191ec91e92041c04fe53081855f8a6c1a15daeec1104c2d6eb3b936",
     "social.mjs": "25eceaabca4b2477b861bd2eb00e6ff3b9f3f5f01df53b03d395fc65354ef807",
     "studio-features.mjs": "9f050d4f03ee74dcb71770ad39fc61e86dce431d38e3fcbe7e04e069271d6bf9",
     "style.css": "3bfbb7341dcd51426097a85754b26e8832daf7d60828d4ebc55dc505ca8e76d7",
