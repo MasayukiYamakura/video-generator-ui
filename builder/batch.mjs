@@ -2,7 +2,7 @@ import {subjects,subjectKind,subjectMeta,MBTI_NAMES} from './subjects.mjs?v=taro
 import {normalizeVisual} from './tarot-visual.mjs?v=visual-20261016';
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 import {TAROT_CARDS} from './tarot-cards.mjs';
-import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=mbti-sizes-20261022';
+import {TAROT_SIGNS, applyConfig, tarotTitle, availableCategories} from './compiler.mjs?v=motion-20261026';
 
 export const SIGNS=Object.entries(TAROT_SIGNS);
 export const POSITIONS=['overall','relationships','work','advice'];
@@ -199,5 +199,6 @@ function subjectPrompt(text,value) {
  .replaceAll('"version":1,','"version":1,"subject_kind":"mbti",')
  +'\n\nMBTI月間タロットです。対象は16タイプ。内部のzodiacキーにはタイプの小文字IDを入れ、表示はINTJ（建築家）のように英字4文字と日本語名を併記する。対応表: '+Object.values(MBTI_NAMES).join('、')+'。subject_kindはmbti。性格や未来を断定せず、カードから生活のヒントを提案する。';
 }
+
 
 

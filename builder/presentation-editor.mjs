@@ -1,9 +1,9 @@
 // One editor per format. Legacy common settings remain read-only fallbacks.
-import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=mbti-sizes-20261022';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=mbti-sizes-20261022';
-import {designDefaults} from './presentation.mjs?v=mbti-sizes-20261022';
-import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=mbti-sizes-20261022';
-export {designDefaults} from './presentation.mjs?v=mbti-sizes-20261022';
+import {PRESENTATION_VIDEO_KEYS,validatePresentation,clone} from './model.mjs?v=motion-20261026';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=motion-20261026';
+import {designDefaults} from './presentation.mjs?v=motion-20261026';
+import {tarotBrand,TAROT_BRAND_VIDEO,TAROT_BRAND_LAYOUT} from './tarot-brand.mjs?v=motion-20261026';
+export {designDefaults} from './presentation.mjs?v=motion-20261026';
 import {el,options} from './dom.mjs?v=maintenance-20261016';
 
 export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setFormat,onChange,onInvalid}) {
@@ -119,6 +119,7 @@ export function mountPresentationEditor({root,guideRoot,getConfig,getFormat,setF
   function reset(){errors.clear();themeModes.clear();for(const {input} of controls)input.setCustomValidity('');render();}
   return {render,assertValid,reset};
 }
+
 
 
 

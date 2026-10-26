@@ -1,4 +1,5 @@
-import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=mbti-sizes-20261022';
+import {validateMotionValues} from '../motion/settings.mjs';
+import {VIDEO_DEFAULTS, VIDEO_PRESETS, COMPAT_VIDEO_PRESETS, LAYOUT_DEFAULTS, LAYOUT_PRESETS, BACKGROUNDS, CATEGORIES} from './presets.mjs?v=motion-20261026';
 
 export const emptyRegistry = () => ({version:1, video_presets:[], layout_presets:[], backgrounds:[], favorites:[]});
 export const clone = value => JSON.parse(JSON.stringify(value));
@@ -14,6 +15,7 @@ export function validateValues(values, kind) {
     if(typeof value!==typeof defaults[key] || (typeof value==='number' && !Number.isFinite(value))) throw Error(`${key}の型が不正です`);
   }
   if(kind==='video') {
+    validateMotionValues(values);
     const enums={tarot_subject:['zodiac','mbti'],tarot_mode:['single','batch'],tiktok_style:['standard','legacy_vertical'],output_mode:['vertical_only','vertical_horizontal','horizontal_only'],format:['vertical','landscape'], template:['standard','portrait_brand','tarot_monthly'], tarot_renderer:['classic','remotion'],
       hook_orientation:['horizontal','vertical'], voice_mode:['original','anonymous','tts'], tts_voice:['hashimoto','male_a','male_b'], tts_style:['natural','calm','gentle','bright','serious','powerful'], tts_pace:['slow','normal','fast'],
       background_mode:['fixed','mixed','stock'], stock_provider:['pexels','pixabay'],
@@ -253,6 +255,7 @@ export function migrateRegistry(registry) {
   }
   return validateRegistry(next);
 }
+
 
 
 

@@ -1,6 +1,6 @@
 import {subjectKind} from './subjects.mjs?v=tarot-display-20261021';
-import {promptConfig,requestedFormats} from './presentation.mjs?v=mbti-sizes-20261022';
-import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=mbti-sizes-20261022';
+import {promptConfig,requestedFormats} from './presentation.mjs?v=motion-20261026';
+import {fixedSettings, availableCategories, tarotTitle} from './compiler.mjs?v=motion-20261026';
 
 const commonRules = correctTypos => [
   '以下の台本から動画生成用のJSONを作ってください。Gemini / ChatGPT共通の指示です。',
@@ -87,6 +87,7 @@ export function buildPrompt(config, transcript='', bgmCatalog=null, output='full
     '【ナレーション原稿（処理対象の文章）】',transcript||'（ここにナレーション原稿を貼る）');
   return rules.join('\n\n');
 }
+
 
 
 

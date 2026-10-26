@@ -1,19 +1,20 @@
+import {motionSettings} from '../motion/settings.mjs';
 import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=tarot-display-20261021';
-import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=mbti-sizes-20261022';
-import {tarotBrand} from './tarot-brand.mjs?v=mbti-sizes-20261022';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=mbti-sizes-20261022';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=mbti-sizes-20261022';
+import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=motion-20261026';
+import {tarotBrand} from './tarot-brand.mjs?v=motion-20261026';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=motion-20261026';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=motion-20261026';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=mbti-sizes-20261022';
-import {mountBatchEditor} from './batch-editor.mjs?v=mbti-sizes-20261022';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=mbti-sizes-20261022';
+import {mountSingleEditor} from './single-editor.mjs?v=motion-20261026';
+import {mountBatchEditor} from './batch-editor.mjs?v=motion-20261026';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=motion-20261026';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=mbti-sizes-20261022';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=mbti-sizes-20261022';
-import {buildPrompt} from './prompt.mjs?v=mbti-sizes-20261022';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=mbti-sizes-20261022';
-import {decodeContent} from './storage.mjs?v=mbti-sizes-20261022';
-import {drawPreview} from './preview.mjs?v=mbti-sizes-20261022';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=motion-20261026';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=motion-20261026';
+import {buildPrompt} from './prompt.mjs?v=motion-20261026';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=motion-20261026';
+import {decodeContent} from './storage.mjs?v=motion-20261026';
+import {drawPreview} from './preview.mjs?v=motion-20261026';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -81,6 +82,7 @@ export function mountBuilder(apiProvider) {
     if(!batch&&!$('pbApplyOnSend').checked)return;
     add('出力',requestedFormats(c).map(f=>f==='vertical'?'縦型':'横型').join(' ＋ '));
     add('音声',c.video.voice_mode==='tts'?'AI読み上げ':c.video.voice_mode==='anonymous'?'匿名加工':'録音音声');
+    add('描画方式',c.video.motion_enabled?'モーション試用版':'安定版');
     add('BGM',c.video.bgm_mode==='off'?'OFF':c.video.bgm_mode==='track'?c.video.bgm_track:c.video.bgm_mode==='category'?c.video.bgm_category:'AI自動');
     for(const f of requestedFormats(c)) {
       if(c.video.template==='tarot_monthly'){add(f==='vertical'?'縦型デザイン':'横型デザイン',f==='vertical'?'タロット固定配置':'タロット固定配置・テーマ等は横型タブの設定');continue;}
@@ -135,7 +137,7 @@ export function mountBuilder(apiProvider) {
     relabelSubject(v.tarot_subject);presentationEditor?.render();$('pbPreviewError').textContent='';paint();
   }
   function lists() {
-    options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name]),visiblePreset(session.video_preset));
+    options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name+(p.name.includes('〈')?'':resolvePreset(registry,'video',p.id).values.motion_enabled?'〈モーション試用版〉':'〈安定版〉')]),visiblePreset(session.video_preset));
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
   }
@@ -144,7 +146,7 @@ export function mountBuilder(apiProvider) {
     validateDesign:()=>presentationEditor?.assertValid(),
     setOutputMode:mode=>{session.overrides.video.output_mode=mode;}});
   for(const [key,label,items,type] of VIDEO_FIELDS) {
-    const input=field($(PRESENTATION_VIDEO_KEYS.includes(key)?'pbLegacyVideoFields':key==='output_mode'||key==='cta_enabled'?'pbBasicFields':key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
+    const input=field($(key.startsWith('motion_')?(['motion_unit','motion_duration_ms','motion_frequency','motion_scale','motion_offset_ms','motion_direction','motion_emphasis'].includes(key)?'pbMotionDetails':'pbMotionFields'):PRESENTATION_VIDEO_KEYS.includes(key)?'pbLegacyVideoFields':key==='output_mode'||key==='cta_enabled'?'pbBasicFields':key==='voice_mode'?'pbVoiceFields':key==='tts_custom_style'?'pbTtsCustom':key.startsWith('tts_')?'pbTtsFields':'pbVideoFields'),key,label,items,type);
     if(key.startsWith('bgm_')&&type==='number'&&key!=='bgm_volume_db'){input.min=0;input.max=key.includes('fade')?30:86400;input.step=0.1;}
     if(key==='intro_scenes'){input.min=1;input.max=10;input.step=1;}
     if(key==='bgm_volume_db'){
@@ -153,7 +155,8 @@ export function mountBuilder(apiProvider) {
       hint.textContent='0 dB：従来の標準。+6で小さい場合は+12→+18の順に調整（最大+24）。ダッキングOFFで確認し、声が聞き取れる音量にしてください。';
       input.setAttribute('aria-describedby',hint.id);input.parentElement.append(hint);
     }
-    input.addEventListener('change',()=>{session.overrides.video[key]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;invalidate();renderFields();});
+    if(key==='motion_scale'){input.step=.01;input.min=1;input.max=1.5;}
+    input.addEventListener('change',()=>{if(key==='motion_intensity'){const n={subtle:[4,1.08],standard:[8,1.15],dynamic:[12,1.22]}[input.value];Object.assign(session.overrides.video,{motion_frequency:n[0],motion_scale:n[1]});}session.overrides.video[key]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;invalidate();renderFields();});
   }
   for(const [key,label] of Object.entries(LAYOUT_LABELS)) {
     const input=field($(key.startsWith('safe_')?'pbGuideFields':'pbLayoutFields'),key,label,key==='hook_font_size_mode'?[['auto','自動調整（指定サイズが上限）'],['fixed','固定サイズ']]:null,key==='hook_band_color'?'color':'number');
@@ -165,6 +168,17 @@ export function mountBuilder(apiProvider) {
   presentationEditor=mountPresentationEditor({root:$('pdEditor'),guideRoot:$('pbGuideFields'),getConfig:config,onInvalid:invalidate,
     getFormat:()=>designFormat(),
     setFormat:format=>{session.designFormat=format;renderFields();refreshBackground();},onChange:value=>{const before=previewConfig().background;session.presentation=value;if(before!==previewConfig().background){image=null;imageFile=null;imageFormat=null;refreshBackground();}invalidate();renderFields();}});
+  $('pbStableCopy').onclick=()=>{
+    session.overrides.video.motion_enabled=false;
+    $('pbSaveId').value='stable_'+session.video_preset.replace(/[^a-zA-Z0-9_-]/g,'');
+    $('pbSaveName').value=resolvePreset(registry,'video',session.video_preset).name.replace('〈モーション試用版〉','')+'〈安定版〉';
+    invalidate();renderFields();status('安定版へ切り替えました。設定の保存エリアから「新規保存」で複製できます。');
+  };
+  $('pbMotionPreview').onclick=async()=>{
+    $('pbMotionStatus').textContent='動作サンプルを準備中…';
+    try {await import('../motion/player-bundle.js');window.mountMotionSample($('pbMotionPlayer'),motionSettings(config().video));$('pbMotionStatus').textContent='動作サンプルです。実音声との同期は生成動画で確認してください。';}
+    catch(e){$('pbMotionStatus').textContent='動作サンプルを読み込めませんでした。配置プレビューは引き続き使えます。';}
+  };
   const modeSessions=new Map();
   async function loadBackgroundPreview(announce=false) {
     const c=previewConfig();
@@ -251,6 +265,7 @@ export function mountBuilder(apiProvider) {
   lists();
   return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
+
 
 
 

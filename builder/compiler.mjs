@@ -1,8 +1,9 @@
+import {motionSettings} from '../motion/settings.mjs';
 import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
-import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=mbti-sizes-20261022';
-import {tarotBrand} from './tarot-brand.mjs?v=mbti-sizes-20261022';
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=mbti-sizes-20261022';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=mbti-sizes-20261022';
+import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=motion-20261026';
+import {tarotBrand} from './tarot-brand.mjs?v=motion-20261026';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=motion-20261026';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=motion-20261026';
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 
 export function fixedSettings(config) {
@@ -40,6 +41,7 @@ export function fixedSettings(config) {
       loop:v.bgm_loop,fade_in_seconds:v.bgm_fade_in_seconds,fade_out_seconds:v.bgm_fade_out_seconds,volume_db:v.bgm_volume_db,ducking:v.bgm_ducking,
       enabled:v.bgm_mode!=='off',selection_mode:v.bgm_mode==='track'?'track':'category'},
   };
+  if(v.motion_enabled) g.motion=motionSettings(v);
   if(branded) g.template='portrait_brand';
   if(v.template==='tarot_monthly') {
     g.template='tarot_monthly';
@@ -227,6 +229,7 @@ export function applyConfig(script, config, bgmCatalog, formatPass=false) {
   });
   return {...(v.voice_mode==='tts'?{}:{audio_file:typeof script.audio_file==='string'?script.audio_file:'新規録音.m4a'}),global_settings:g,scenes,...(social?{social}:{})};
 }
+
 
 
 

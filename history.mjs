@@ -1,7 +1,7 @@
 const BRANCH = 'ui-history';
 const cache = new Map();
 const FIELDS = ['repo','runId','id','audio','created','kind','subjectKind','signs','sha','bgm','batchProgress',
-  'outputMode','outputFormats','pairedOutput','audioMode','verticalArtifact','horizontalArtifact','outputStatus','resumeFrom','preparationStatus'];
+  'stableSourceRun','motionRequested','motionEffective','motionFallbackCount','outputMode','outputFormats','pairedOutput','audioMode','verticalArtifact','horizontalArtifact','outputStatus','resumeFrom','preparationStatus'];
 export function cleanRecord(value, repository) {
   if (!value || value.repo !== repository || !Number.isSafeInteger(value.runId) || value.runId <= 0) return null;
   const result = {};
@@ -67,4 +67,5 @@ export async function migrateHistory(api, repository, local) {
 
 // Compatibility for callers importing the previous migration helper.
 export const syncHistory=migrateHistory;
+
 

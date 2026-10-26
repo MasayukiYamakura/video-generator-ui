@@ -1,5 +1,5 @@
-import {tarotTitle} from './compiler.mjs?v=mbti-sizes-20261022';
-import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,mbtiVerticalIntroRows,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=mbti-sizes-20261022';
+import {tarotTitle} from './compiler.mjs?v=motion-20261026';
+import {tarotBrandElements,TAROT_LANDSCAPE_LAYOUT,tarotCardPosition,tarotTitleFontSize,mbtiVerticalIntroRows,layoutTarotBrandElements,tarotBrandFont} from './tarot-brand.mjs?v=motion-20261026';
 // Position guide only. Actual video is rendered by Python or Remotion.
 export function drawPreview(canvas, config, image=null, intro=false, safe=true, title='', presetId='', themeTitle='テーマタイトル') {
   const {width:w,height:h,layout:l}=config;
@@ -186,6 +186,7 @@ export function drawPreview(canvas, config, image=null, intro=false, safe=true, 
   c.setLineDash([12,10]);c.strokeStyle='#6de5ff';c.lineWidth=2/scale;
   c.beginPath();c.moveTo(w/2,0);c.lineTo(w/2,h);c.moveTo(0,h/2);c.lineTo(w,h/2);c.stroke();c.setLineDash([]);
 }
+
 
 
 

@@ -1,5 +1,5 @@
 import {MBTI_NAMES} from './builder/subjects.mjs?v=tarot-display-20261021';
-import {loadHistory,migrateHistory} from './history.mjs?v=resume-20261022';
+import {loadHistory,migrateHistory} from './history.mjs?v=motion-20261026-resume-20261022';
 const $ = id => document.getElementById(id);
 const KEY = 'video-studio-v1', WORKFLOW = 'generate_video_ui.yml';
 const BATCH_SIGNS={aries:'おひつじ座',taurus:'おうし座',gemini:'ふたご座',cancer:'かに座',leo:'しし座',virgo:'おとめ座',
@@ -123,6 +123,11 @@ function render() {
     if(h.status==='completed'&&(batchNeedsResume||videoNeedsResume)&&h.resumeAvailable===false)box.append(node('p','この実行には再開用入力がありません（保存期限切れ・保存失敗）。再開元の履歴で再開できるか確認し、利用できなければ新規生成してください。'));
     if((!h.kind||['video','batch'].includes(h.kind))&&h.status==='completed'&&(!h.pairedOutput||h.outputFormats?.includes('vertical'))){const prepare=node('button','縦型動画をSNS投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('social-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
     if(['video','batch'].includes(h.kind)&&h.status==='completed'&&h.outputFormats?.includes('landscape')){const prepare=node('button','横型動画をYouTube投稿管理へ取り込む');prepare.className='secondary';prepare.onclick=()=>window.dispatchEvent(new CustomEvent('youtube-prepare',{detail:{runId:h.runId,navigate:$('autoLink').checked}}));box.append(prepare);}
+    if(h.stableSourceRun){const origin=node('a','再生成元の実行');origin.href=`https://github.com/${h.repo}/actions/runs/${h.stableSourceRun}`;origin.target='_blank';origin.rel='noopener noreferrer';box.append(origin);}
+    if(h.motionRequested&&h.status==='completed'&&h.sha&&h.resumeAvailable){
+      const stable=node('button','同じ内容を安定版で再生成');stable.className='secondary';stable.disabled=busy||Boolean(pending);stable.onclick=()=>stableRetry(h);box.append(stable);
+    }
+    if(h.motionRequested)box.append(node('p',h.motionEffective===false?'安定版で生成（モーション停止・代替表示）':h.motionFallbackCount?'モーション試用版（一部通常表示）':'モーション試用版'));
     $('history').append(box);
   }
   controls();
@@ -161,7 +166,7 @@ async function refresh() {
       const active=artifact=>artifact&&!artifact.expired&&Date.parse(artifact.expires_at)>Date.now();
       h.resumeAvailable=h.kind==='batch'
         ?artifacts.some(artifact=>artifact.name===`batch-input-${receipt}`&&active(artifact))
-        :h.kind==='video'&&h.pairedOutput&&artifacts.some(artifact=>artifact.name===`video-input-${receipt}`&&active(artifact));
+        :h.kind==='video'&&(h.pairedOutput||h.motionRequested)&&artifacts.some(artifact=>artifact.name===`video-input-${receipt}`&&active(artifact));
       h.reusableAudioAvailable=artifacts.some(artifact=>artifact.name===`video-audio-${receipt}`&&active(artifact))
         ||h.audioMode!=='tts'&&artifacts.some(artifact=>artifact.name===`video-input-${receipt}`&&active(artifact));
       h.artifacts=h.kind==='batch'
@@ -220,7 +225,26 @@ async function submit(kind='video'){if(busy||pending)return;busy=true;controls()
 if(kind==='batch'){if(!window.videoConfigurator?.batch?.active())throw Error('タロットの複数星座モードを選択してください');script=window.videoConfigurator.batch.manifest();mode='tts';}
 else if(kind==='title-preview'){if(new TextEncoder().encode($('script').value).length>1024*1024)throw Error('JSONは1 MiBまでです');script=JSON.parse($('script').value);if(window.videoConfigurator)script=window.videoConfigurator.prepareScript(script);if(!script.scenes?.length)throw Error('タイトルを含むJSONが必要です');mode='title-preview';}else{({script,ext,mode}=validate(file,$('script').value));if(kind==='audio-preview'&&mode==='tts')throw Error('試聴は添付録音・匿名加工音声に対応しています');}
 script.auto_link=$('autoLink').checked;
-const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const connection=await api('');if(!connection.private)throw Error('音声の保存先は非公開リポジトリにしてください');if((await listRuns()).some(run=>run.status!=='completed'))throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();const settings=script.global_settings||script.videos?.[0]?.script?.global_settings||{};const formats=settings.output_mode==='vertical_horizontal'?['vertical','landscape']:settings.output_mode==='horizontal_only'?['landscape']:settings.format==='landscape'?['landscape']:['vertical'];pending={id,repo:repo(),kind,signs:kind==='batch'?script.videos.map(video=>video.zodiac):undefined,subjectKind:kind==='batch'?script.subject_kind:script.tarot?.subject_kind,outputMode:settings.output_mode,pairedOutput:settings.format==='vertical'&&Boolean(settings.output_mode),outputFormats:formats,audio:kind==='batch'?`${script.subject_kind==='mbti'?'16タイプ':'12星座'}一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let audioBlob=null;if(!['tts','title-preview'].includes(mode)){audioBlob=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const scriptBlob=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(audioBlob?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:audioBlob.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:scriptBlob.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(error){message(pending?`${error.message}。受付IDを保持しました。受付状況を確認してから再操作してください。`:error.message);}finally{busy=false;render();}}
+const bgm=kind==='batch'?'星座ごとのBGM設定':kind==='title-preview'?'タイトル確認':await previewBgm(script);const connection=await api('');if(!connection.private)throw Error('音声の保存先は非公開リポジトリにしてください');if((await listRuns()).some(run=>run.status!=='completed'))throw Error('すでに生成中の処理があります。完了後に実行してください');const id=crypto.randomUUID();const settings=script.global_settings||script.videos?.[0]?.script?.global_settings||{};const formats=settings.output_mode==='vertical_horizontal'?['vertical','landscape']:settings.output_mode==='horizontal_only'?['landscape']:settings.format==='landscape'?['landscape']:['vertical'];pending={id,repo:repo(),kind,motionRequested:Boolean(settings.motion?.enabled),signs:kind==='batch'?script.videos.map(video=>video.zodiac):undefined,subjectKind:kind==='batch'?script.subject_kind:script.tarot?.subject_kind,outputMode:settings.output_mode,pairedOutput:settings.format==='vertical'&&Boolean(settings.output_mode),outputFormats:formats,audio:kind==='batch'?`${script.subject_kind==='mbti'?'16タイプ':'12星座'}一括制作（${script.videos.length}本）`:kind==='title-preview'?'タイトル確認':kind==='audio-preview'?'試聴: '+file.name:mode==='tts'?'AI読み上げ':file.name,bgm,created:new Date().toISOString()};persist();message('アップロード中。画面を開いたままお待ちください。');let audioBlob=null;if(!['tts','title-preview'].includes(mode)){audioBlob=await api('git/blobs','POST',{content:await base64(file),encoding:'base64'});script.audio_file=`input.${ext}`;}const scriptBlob=await api('git/blobs','POST',{content:JSON.stringify(script),encoding:'utf-8'});const tree=await api('git/trees','POST',{tree:[...(audioBlob?[{path:`input/input.${ext}`,mode:'100644',type:'blob',sha:audioBlob.sha}]:[]),{path:'input/script.json',mode:'100644',type:'blob',sha:scriptBlob.sha}]});const commit=await api('git/commits','POST',{message:`Pages input ${id}`,tree:tree.sha,parents:[]});pending.sha=commit.sha;persist();await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();}catch(error){message(pending?`${error.message}。受付IDを保持しました。受付状況を確認してから再操作してください。`:error.message);}finally{busy=false;render();}}
+async function stableRetry(h){
+ if(busy||pending)return;busy=true;controls();
+ try{
+  if((await listRuns()).some(r=>r.status!=='completed'))throw Error('生成中の処理が完了してから操作してください');
+  const run=await api(`actions/runs/${h.runId}`);if(run.status!=='completed'||run.display_title!==`Pages ${h.id}`)throw Error('再生成元の受付を確認できません');
+  const tree=await api(`git/trees/${h.sha}?recursive=1`);
+  const input=tree.tree.find(e=>e.path==='input/script.json'&&e.type==='blob');if(!input)throw Error('元の入力がありません。原稿を再度読み込んでください');
+  const blob=await api(`git/blobs/${input.sha}`);const script=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(blob.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
+  script.auto_link=false;
+  for(const item of script.videos||[{script}])delete item.script.global_settings.motion;
+  script.stable_retry={receipt_id:h.id,run_id:h.runId,input_sha:h.sha};
+  const id=crypto.randomUUID();pending={id,repo:h.repo,kind:h.kind||'video',created:new Date().toISOString(),motionRequested:false,stableSourceRun:h.runId,audio:h.audio+'（安定版再生成）',audioMode:h.audioMode,outputFormats:h.outputFormats,outputMode:h.outputMode,pairedOutput:h.pairedOutput,signs:h.signs,subjectKind:h.subjectKind};persist();
+  const content=await base64(new Blob([JSON.stringify(script)],{type:'application/json'}));
+  const written=await api('git/blobs','POST',{content,encoding:'base64'});
+  const entries=tree.tree.filter(e=>e.type==='blob'&&e.path.startsWith('input/')).map(e=>({path:e.path,mode:'100644',type:'blob',sha:e.path==='input/script.json'?written.sha:e.sha}));
+  const nextTree=await api('git/trees','POST',{tree:entries});const commit=await api('git/commits','POST',{message:`Stable retry ${id}`,tree:nextTree.sha,parents:[]});pending.sha=commit.sha;persist();
+  await api('git/refs','POST',{ref:`refs/heads/ui-input/${id}`,sha:commit.sha});await dispatch();message('新しい受付で安定版を生成します。投稿管理への自動連携はOFFです。');
+ }catch(e){message(e.message+'。受付情報は保持しています。');}finally{busy=false;render();}
+}
 async function resumeGeneration(h){
  if(busy||pending)return;busy=true;controls();
  try{
@@ -284,3 +308,4 @@ function syncAudioUpload() {
 }
 $('script').addEventListener('input',syncAudioUpload);
 $('pbApplyOnSend').addEventListener('change',syncAudioUpload);
+
