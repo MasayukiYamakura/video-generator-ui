@@ -1,6 +1,8 @@
+import {MOTION_DEFAULTS} from '../motion/settings.mjs';
 // Semantic presets contain no pixel coordinates. Layouts and renderer internals
 // have their own sources; anonymous is a one-field semantic override.
 export const VIDEO_DEFAULTS = Object.freeze({
+  ...MOTION_DEFAULTS,
   tarot_subject:'zodiac', tarot_mode:'single', tiktok_style:'standard', output_mode:'vertical_only',
   format:'landscape', template:'standard', tarot_renderer:'classic', hook_enabled:false, cta_enabled:false,
   hook_orientation:'vertical', intro_scenes:2, intro_caption:true,
@@ -12,6 +14,9 @@ export const VIDEO_DEFAULTS = Object.freeze({
   voice_mode:'original', tts_voice:'hashimoto', tts_style:'natural', tts_pace:'normal', tts_custom_style:'', hook_band_enabled:false,
 });
 const ALL_VIDEO_PRESETS = [
+  {id:'thought_motion_v1',name:'思想語り〈モーション試用版〉',extends:'tiktok_standard',values:{motion_enabled:true}},
+  {id:'zodiac_motion_v1',name:'星座タロット〈モーション試用版〉',extends:'tarot_monthly_remotion',values:{motion_enabled:true,motion_intensity:'subtle',motion_frequency:4,motion_scale:1.08}},
+  {id:'mbti_motion_v1',name:'MBTIタロット〈モーション試用版〉',extends:'mbti_monthly_remotion',values:{motion_enabled:true,motion_intensity:'subtle',motion_frequency:4,motion_scale:1.08}},
   {id:'tiktok_standard', name:'思想語り', default_layout:'portrait_standard', values:{
     format:'vertical', template:'portrait_brand', hook_enabled:true,
     hook_orientation:'horizontal', intro_scenes:1, intro_caption:false,
@@ -82,6 +87,7 @@ export const SYSTEM = Object.freeze({
     max_bar_height_ratio:0.08, visualizer_opacity:0.95,
     visualizer_glow_strength:0.4, update_fps:20, background:'video'},
 });
+
 
 
 

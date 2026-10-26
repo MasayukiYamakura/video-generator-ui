@@ -1,4 +1,4 @@
-import {emptyRegistry, validateRegistry, migrateRegistry, clone} from './model.mjs?v=mbti-sizes-20261022';
+import {emptyRegistry, validateRegistry, migrateRegistry, clone} from './model.mjs?v=motion-20261026';
 export const PRESET_PATH='config/prompt-builder.json';
 export const decodeContent=response=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(response.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
 export function encodeContent(value) {
@@ -24,6 +24,7 @@ export async function writeRegistry(api, registry, expectedSha) {
   });
   return {registry:clone(registry),sha:result.content.sha};
 }
+
 
 
 

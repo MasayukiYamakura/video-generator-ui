@@ -1,5 +1,7 @@
+import {MOTION_FIELDS} from '../motion/settings.mjs';
 // Editable field metadata; no persistence or network operations.
 export const VIDEO_FIELDS=[
+  ...MOTION_FIELDS,
   ['output_mode','出力形式',[['vertical_only','縦型のみ'],['vertical_horizontal','縦型＋横型'],['horizontal_only','横型のみ']]],
   ['voice_mode','音声方式',[['original','録音音声'],['anonymous','匿名加工音声'],['tts','AI読み上げ']]],
   ['tts_voice','声',[['hashimoto','ハシモト本人（Voice IDの登録が必要）'],['male_a','男性A'],['male_b','男性B']]],
@@ -38,5 +40,6 @@ export const LAYOUT_LABELS={mbti_date_font_size:'MBTI縦型・冒頭の日付文
   caption_center_y:'字幕 Y（中心）',hook_font_size:'フック最大文字サイズ',caption_font_size:'字幕文字サイズ',
   max_width_ratio:'字幕最大幅比率',hook_max_width_ratio:'横書きフック最大幅比率',
   hook_band_color:'帯の色',hook_band_width_ratio:'帯の横幅比率',hook_band_padding_y:'帯の上下余白（px）',hook_font_size_mode:'文字サイズ方式',hook_band_opacity:'帯の不透明度',safe_top:'上ガイド比率',safe_right:'右ガイド比率',safe_bottom:'下ガイド比率'};
+
 
 

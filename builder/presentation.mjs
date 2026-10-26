@@ -1,5 +1,5 @@
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=mbti-sizes-20261022';
-import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=mbti-sizes-20261022';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=motion-20261026';
+import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=motion-20261026';
 
 export function designDefaults(config,format) {
   const w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;
@@ -40,4 +40,5 @@ export function promptConfig(config) {
   return {...config,video:{...config.video,background_mode,hook_enabled:views.some(c=>c.video.hook_enabled),
     intro_scenes:Math.max(...views.map(c=>c.video.intro_scenes))}};
 }
+
 
