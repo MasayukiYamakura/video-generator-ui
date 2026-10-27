@@ -20,7 +20,7 @@ export function mountPostingFoundation(){
  const status=el('p');status.id='foundationStatus';status.setAttribute('role','status');
  const form=el('div');form.id='foundationForm';form.hidden=true;
  section.append(status,form);host.append(section);
- const note=el('p','X・Threads用の原稿を保存する準備機能です。この画面からSNSへの送信・予約は行いません。希望日時も下書きです。');form.append(note);
+ const note=el('p','ここでは原稿を保存します。希望日時は下書きです。X予約は下の専用欄で別途確認してください。Threads送信は未対応です。');form.append(note);
  const fields={};
  function field(key,label,tag='input',options=null){const l=el('label',label),n=el(tag);n.id='foundation-'+key;
   if(options)for(const [value,text] of options){const o=el('option',text);o.value=value;n.append(o);}
@@ -38,9 +38,9 @@ export function mountPostingFoundation(){
  const month=field('month','保存月','select');const list=el('div');list.id='foundationDrafts';form.append(list);
  let current=null,index=null,drafts={},repo='',enabled=false,loading=false,activeReceipt=null;
  const api=(...args)=>window.videoStudioApi(...args);
- function reset(){current=null;fields.name.value='';fields.body.value='';fields.source.value='';fields.link.value='';fields.due.value='';fields.body.oninput();cancel.disabled=true;}
+ function reset(){current=null;fields.name.value='';fields.body.value='';fields.source.value='';fields.link.value='';fields.due.value='';fields.body.oninput();cancel.disabled=true;window.dispatchEvent(new window.CustomEvent('posting-draft-selected',{detail:null}));}
  function controls(){const state=adapter.snapshot();enabled=state.foundation?.enabled===true;form.hidden=!enabled;
-  status.textContent=enabled?'下書き保存のみON。SNS送信機能は未実装です。':'OFF：既存の動画投稿をご利用ください。有効化する場合は非公開リポジトリのVariable POSTING_FOUNDATION_ENABLEDをtrueにし、「投稿先を取得」等の処理後に一覧を更新してください。';
+  status.textContent=enabled?'下書き保存ON。X予約は別の確認操作が必要です。Threads送信は未対応です。':'OFF：既存の動画投稿をご利用ください。有効化する場合は非公開リポジトリのVariable POSTING_FOUNDATION_ENABLEDをtrueにし、「投稿先を取得」等の処理後に一覧を更新してください。';
   if(activeReceipt){const receipt=state.requests?.[activeReceipt];status.textContent+=` ／ 受付ID：${activeReceipt} ／ ${receipt?.message||'受付を確認中です。投稿管理の受付履歴から同じIDで再依頼できます。'}`;}
   if(state.foundation?.protection_error)status.textContent+=' ／ '+state.foundation.protection_error;
   save.disabled=cancel.disabled=adapter.busy()||loading||!enabled;cancel.disabled ||= !current;
@@ -51,7 +51,7 @@ export function mountPostingFoundation(){
  }
  function renderList(){list.replaceChildren();for(const d of Object.values(drafts).sort((a,b)=>b.updated_at.localeCompare(a.updated_at))){
   const item=el('article');item.className='item';item.append(el('strong',d.name),el('p',`${d.service==='x'?'X':'Threads'} ／ ${d.status==='cancelled'?'取消済み':'下書き'} ／ 改訂 ${d.revision}`),el('p',d.body));
-  const edit=el('button','この下書きを編集');edit.onclick=()=>{current=d;fields.name.value=d.name;fields.service.value=d.service;fields.kind.value=d.kind;fields.body.value=d.body;fields.source.value=d.source_video_id||'';fields.link.value=d.link_url||'';fields.due.value=d.due_at?new Date(Date.parse(d.due_at)+9*3600000).toISOString().slice(0,16):'';fields.body.oninput();controls();};item.append(edit);list.append(item);
+  const edit=el('button','この下書きを編集');edit.onclick=()=>{current=d;fields.name.value=d.name;fields.service.value=d.service;fields.kind.value=d.kind;fields.body.value=d.body;fields.source.value=d.source_video_id||'';fields.link.value=d.link_url||'';fields.due.value=d.due_at?new Date(Date.parse(d.due_at)+9*3600000).toISOString().slice(0,16):'';fields.body.oninput();controls();window.dispatchEvent(new window.CustomEvent('posting-draft-selected',{detail:d}));};item.append(edit);list.append(item);
  }if(!list.children.length)list.append(el('p','この月の保存済み下書きはありません。'));}
  async function load(){if(!enabled||loading||adapter.busy())return;loading=true;controls();const selectedRepo=document.getElementById('repo').value.trim();
   try{let ref;try{ref=await api('git/ref/heads/posting-state');}catch(e){if(e.status!==404)throw e;if(selectedRepo!==document.getElementById('repo').value.trim())return;index=null;drafts={};month.replaceChildren();renderList();return;}
