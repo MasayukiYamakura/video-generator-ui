@@ -80,7 +80,7 @@ export function mountSocial(){
   const selected=new Set(selectedVideos().map(v=>v.id));
   $('socialSetup').textContent=`Cloudinary：${state.setup?.cloudinary?'Secrets登録済み（実接続は転送時に確認）':'Secrets未設定'} ／ Buffer：${state.setup?.buffer?'Secrets登録済み':'Secrets未設定'}`;
   const previous=new Set(selectedChannels().map(c=>c?.id));$('socialChannels').replaceChildren();
-  for(const c of state.channels){const l=el('label'),input=el('input');input.type='checkbox';input.value=c.id;input.checked=previous.size?previous.has(c.id):false;input.disabled=c.isDisconnected||c.isLocked||c.isQueuePaused;l.className='check';l.append(input,el('span',`${MEDIA[c.service]}：${c.name}${input.disabled?'（接続・停止状態を確認）':''}`));$('socialChannels').append(l);}
+  for(const c of state.channels.filter(c=>c.service!=='x')){const l=el('label'),input=el('input');input.type='checkbox';input.value=c.id;input.checked=previous.size?previous.has(c.id):false;input.disabled=c.isDisconnected||c.isLocked||c.isQueuePaused;l.className='check';l.append(input,el('span',`${MEDIA[c.service]}：${c.name}${input.disabled?'（接続・停止状態を確認）':''}`));$('socialChannels').append(l);}
   if(!state.channels.length)$('socialChannels').append(el('p','Secrets登録後、「投稿先を取得」を押してください。'));
   $('socialLocationStatus').textContent=state.settings?.instagram_location?`Instagramの場所：${state.settings.instagram_location.text}（取得済み）`:'Instagramの場所：未設定（場所なしで予約できます）';
   $('socialVideos').replaceChildren();
@@ -191,7 +191,7 @@ export function mountSocial(){
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];queueReview=false;loadPending();render();renderRows();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  window.postingAdapters ||= {};
- window.postingAdapters.social={snapshot:()=>state,refresh,saveDraft:draft=>run({action:'foundation_save',draft}),cancelDraft:draft=>run({action:'foundation_cancel',draft}),withdraw:id=>run({action:'withdraw',video_id:id}),withdrawBulk:ids=>run({action:'withdraw_bulk',video_ids:ids}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
+ window.postingAdapters.social={snapshot:()=>state,refresh,xAction:request=>run(request),saveDraft:draft=>run({action:'foundation_save',draft}),cancelDraft:draft=>run({action:'foundation_cancel',draft}),withdraw:id=>run({action:'withdraw',video_id:id}),withdrawBulk:ids=>run({action:'withdraw_bulk',video_ids:ids}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
 
