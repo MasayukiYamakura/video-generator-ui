@@ -159,10 +159,10 @@ export function mountSocial(){
   say('実行を依頼しました。画面を閉じても処理が続きます。「一覧を更新」で結果を確認できます。');
  }
  async function run(request){
-  if(busy||pending)return;busy=true;control();
+  if(busy||pending)return;busy=true;control();let receiptId;
   try{
    const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください');
-   pending={id:crypto.randomUUID()};savePending();
+   pending={id:crypto.randomUUID()};receiptId=pending.id;savePending();
    const blob=await api('git/blobs','POST',{content:JSON.stringify(request),encoding:'utf-8'});
    const tree=await api('git/trees','POST',{tree:[{path:'request.json',mode:'100644',type:'blob',sha:blob.sha}]});
    const commit=await api('git/commits','POST',{message:`Social input ${pending.id}`,tree:tree.sha,parents:[]});
@@ -170,6 +170,7 @@ export function mountSocial(){
    await api('git/refs','POST',{ref:`refs/heads/social-input/${pending.id}`,sha:commit.sha});await dispatch();await refresh();
   }catch(e){say(e.message+'。受付情報を保持しました。確認後に同じ受付IDで再依頼できます。');}
   finally{busy=false;control();renderRows();if(pending&&!poll)poll=setInterval(()=>{if(!document.hidden)refresh().catch(e=>say(e.message));},15000);}
+  return receiptId;
  }
  auto.onchange=()=>run({action:'refill_settings',enabled:auto.checked});
  refillButton.onclick=()=>run({action:'refill'});
@@ -190,6 +191,7 @@ export function mountSocial(){
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];queueReview=false;loadPending();render();renderRows();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  window.postingAdapters ||= {};
- window.postingAdapters.social={snapshot:()=>state,refresh,withdraw:id=>run({action:'withdraw',video_id:id}),withdrawBulk:ids=>run({action:'withdraw_bulk',video_ids:ids}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
+ window.postingAdapters.social={snapshot:()=>state,refresh,saveDraft:draft=>run({action:'foundation_save',draft}),cancelDraft:draft=>run({action:'foundation_cancel',draft}),withdraw:id=>run({action:'withdraw',video_id:id}),withdrawBulk:ids=>run({action:'withdraw_bulk',video_ids:ids}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
