@@ -42,6 +42,7 @@ export function postingRows(adapters){
    else if(relevant.length&&!unresolved&&relevant.every(p=>['scheduled','sending','published'].includes(p.status)))group='progress';
    if(kind==='social'&&video.cloud?.status==='deleted'&&!unresolved)group='completed';
    const lines=[fileStatus(kind,video),...posts.map(p=>`${kind==='youtube'?'YouTube':MEDIA[p.service]||p.service}：${(status(p)==='private_ready'&&(decision==='skipped'||decision==='private_complete')?'非公開で保存済み':STATUS[status(p)]||status(p))}${skipped.includes(p.channel_id)?'（この投稿先は見送り）':''}`)];
+   if(kind==='social'&&state.foundation?.protected_video_ids?.includes(video.id))lines.push('配信用素材：新しい投稿下書きで利用予定（削除保護中）');
    if(!posts.length)lines.push(kind==='youtube'?'YouTube：未送信':'投稿先：未登録');
    result.push({key:`${kind}/${video.id}`,kind,video,posts,group,unresolved,lines,type:video.tarot?(video.tarot.subject_kind==='mbti'?'MBTI':'星座'):'思想'});
   }
@@ -156,3 +157,4 @@ export function mountPostingManager(){
  window.addEventListener('posting-state',()=>{if(ready)render();});$('repo').addEventListener('change',()=>{close();checked.clear();render();});
  ready=true;render();
 }
+
