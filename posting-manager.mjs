@@ -86,7 +86,7 @@ export function mountPostingManager(){
  const uploadForm=el('div');uploadForm.id='postingUploadForm';yt.insertBefore(uploadForm,$('youtubeSelected'));let uploadNode=$('youtubeSelected');while(uploadNode&&uploadNode!==$('youtubeReview')){const next=uploadNode.nextSibling;uploadForm.append(uploadNode);uploadNode=next;}
  const socialPosts=$('socialPosts'),youtubePosts=$('youtubeUploads');
  function rows(){return postingRows(adapters);}
- function visible(){return rows().filter(r=>(group==='all'||r.group===group)&&(format.value==='all'||r.kind===format.value)&&(type.value==='すべての種類'||r.type===type.value)&&(service.value==='all'||(service.value==='youtube'?r.kind==='youtube':r.kind==='social'&&(r.posts.some(p=>p.service===(service.value==='shorts'?'youtube':service.value))||!r.posts.length)))&&`${r.video.filename} ${r.video.id} ${r.video.run_id} ${generatedTime(r.video)} ${r.video.tarot?.zodiac||''}`.toLowerCase().includes(search.value.trim().toLowerCase()));}
+ function visible(){return rows().filter(r=>(group==='all'||r.group===group)&&(format.value==='all'||(format.value==='social'?(r.kind==='social'||r.video.format==='portrait'):(r.kind==='youtube'&&r.video.format!=='portrait')))&&(type.value==='すべての種類'||r.type===type.value)&&(service.value==='all'||(service.value==='youtube'?(r.kind==='youtube'&&r.video.format!=='portrait'):service.value==='shorts'&&r.kind==='youtube'?r.video.format==='portrait':r.kind==='social'&&(r.posts.some(p=>p.service===(service.value==='shorts'?'youtube':service.value))||!r.posts.length)))&&`${r.video.filename} ${r.video.id} ${r.video.run_id} ${generatedTime(r.video)} ${r.video.tarot?.zodiac||''}`.toLowerCase().includes(search.value.trim().toLowerCase()));}
  function render(){
   tabs.replaceChildren();for(const [key,label] of Object.entries(GROUP)){const count=key==='all'?rows().length:rows().filter(r=>r.group===key).length;const b=el('button',`${label} ${count}`);b.className='secondary';b.setAttribute('aria-pressed',String(group===key));b.onclick=()=>{group=key;checked.clear();render();};tabs.append(b);}
   const items=visible();list.replaceChildren();
@@ -98,7 +98,7 @@ export function mountPostingManager(){
    if(cloud){thumb.src=cloud.replace('/upload/','/upload/so_0,w_160,h_90,c_fill/').replace(/\.[a-z0-9]+(?:\?.*)?$/i,'.jpg');card.append(thumb);}
    else if(r.kind==='youtube'&&remote){thumb.src=`https://i.ytimg.com/vi/${remote.video_id}/default.jpg`;card.append(thumb);}
    thumb.onerror=()=>{thumb.hidden=true;};
-   card.append(choice,open,el('p',`${r.kind==='youtube'?'横型':'縦型'} · ${r.type} · ${generatedTime(r.video)} · ${r.video.id.slice(-12)}`),el('span',GROUP[r.group]+(r.unresolved?'・未解決あり':'')));
+   card.append(choice,open,el('p',`${r.kind==='youtube'&&r.video.format!=='portrait'?'横型':'縦型'} · ${r.type} · ${generatedTime(r.video)} · ${r.video.id.slice(-12)}`),el('span',GROUP[r.group]+(r.unresolved?'・未解決あり':'')));
    for(const line of r.lines)card.append(el('p',line));list.append(card);
   }
   if(!items.length)list.append(el('p','該当する動画はありません。'));
@@ -110,7 +110,13 @@ export function mountPostingManager(){
  function renderDetail(r){
   detail.replaceChildren(el('h3',r.video.filename),el('p',`${GROUP[r.group]} ／ ${fileStatus(r.kind,r.video)}${r.unresolved?'・未解決の結果があります。投稿先を照合してください。':''}`));
   const href=previewLink(r.video)||sourceLink(r.video,$('repo').value.trim());if(href){const a=el('a','動画を確認・ダウンロード');a.href=href;a.target='_blank';a.rel='noopener noreferrer';detail.append(a);}
-  const related=rows().filter(v=>v.key!==r.key&&v.video.receipt_id===r.video.receipt_id&&((v.video.target_id||v.video.id.split(':')[1])===(r.video.target_id||r.video.id.split(':')[1])));for(const other of related){const b=el('button',`関連する${other.kind==='youtube'?'横型':'縦型'}を開く`);b.className='secondary';b.onclick=()=>select(other);detail.append(b);}
+  const related=rows().filter(v=>v.key!==r.key&&v.video.receipt_id===r.video.receipt_id&&((v.video.target_id||v.video.id.split(':')[1])===(r.video.target_id||r.video.id.split(':')[1])));for(const other of related){const b=el('button',`関連する${other.kind==='youtube'&&r.video.format!=='portrait'?'横型':'縦型'}を開く`);b.className='secondary';b.onclick=()=>select(other);detail.append(b);}
+  if(r.kind==='social'){
+   const direct=adapters.youtube.snapshot().shorts_direct===true;
+   const old=r.posts.some(p=>p.service==='youtube');
+   if(direct&&!old&&!r.video.youtube_route){const take=el('button','この動画のYouTubeを直接API経路にする');take.disabled=adapters.youtube.busy()||adapters.social.busy();take.onclick=()=>{if(confirm('この動画のYouTube投稿を直接API経路に固定します。Bufferには送れなくなります。取込だけでは投稿しません。続行しますか？'))adapters.youtube.importVertical(r.video.id);};detail.append(take);}
+   if(r.video.youtube_route==='direct'){detail.append(el('p','YouTube：直接API経路（Bufferへは送信しません）'));const recover=el('button','直接投稿の取込を確認・再開');recover.disabled=adapters.youtube.busy();recover.onclick=()=>adapters.youtube.importVertical(r.video.id);detail.append(recover);}
+  }
   const actions=el('div');actions.className='actions';for(const [decision,label] of [['skipped',r.posts.length&&r.kind==='youtube'?'公開を見送る':'投稿を見送る'],['active','投稿作業に戻す'],...(r.kind==='youtube'?[['private_complete','非公開のまま完了する']]:[])]){const b=el('button',label);b.className='secondary';b.disabled=adapters[r.kind].busy();b.onclick=()=>manage([r],decision);actions.append(b);}detail.append(actions);
   if(r.kind==='social')for(const c of adapters.social.snapshot().channels||[]){const skipped=r.video.management?.skipped_channels?.includes(c.id);const intended=(r.video.management?.target_channels||r.posts.map(p=>p.channel_id)).includes(c.id);const b=el('button',`${MEDIA[c.service]}：${skipped?'投稿対象に戻す':intended?'この投稿先を見送る':'投稿対象に追加する'}`);b.className='secondary';b.disabled=adapters.social.busy();b.onclick=()=>manage([r],skipped||!intended?'active':'skipped',c.id);detail.append(b);}
   if(r.kind==='social'&&adapters.social.canWithdraw(r.video.id)){const files=el('details');files.append(el('summary','ファイルの管理'));const remove=el('button','投稿せずCloudinaryのファイルを削除する');remove.className='secondary';remove.disabled=adapters.social.busy();remove.onclick=()=>{if(confirm('Cloudinaryの配信用ファイルを削除します。元に戻せません。元の生成成果物や投稿先の動画は削除しません。実行しますか？'))adapters.social.withdraw(r.video.id);};files.append(remove);detail.append(files);}

@@ -5,7 +5,7 @@ const $=id=>document.getElementById(id);
 const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
 const LABEL={uploaded:'非公開アップロード済み（動画の処理完了はStudioで確認）',resumable:'一部送信済み・同じ送信から再開可能',unknown:'結果確認中・新規送信は保留'};
 export function privateUpload(video, channel, fields){
- if(!video||video.format!=='landscape'||!channel?.id)throw Error('横型動画と接続済みチャンネルを選択してください');
+ if(!video||!['landscape','portrait'].includes(video.format)||!channel?.id)throw Error('動画と接続済みチャンネルを選択してください');
  const title=fields.title.trim(),description=fields.description;
  if(!title||Array.from(title).length>100||/[<>\x00-\x1f]/.test(title)||new TextEncoder().encode(description).length>5000||/[<>\x00]/.test(description))throw Error('タイトルは1〜100文字、説明文は5000バイト以内、山括弧なしで指定してください');
  if(!fields.category_id||typeof fields.made_for_kids!=='boolean'||typeof fields.contains_synthetic_media!=='boolean')throw Error('カテゴリ・子ども向け・合成コンテンツを確認してください');
@@ -171,8 +171,9 @@ export function mountYouTube(){
  window.addEventListener('youtube-prepare',e=>{if(e.detail.navigate!==false){document.querySelector('[data-studio-tab="social"]')?.click();panel.open=true;}run({action:'import',run_id:e.detail.runId});});
  document.querySelector('[data-studio-tab="social"]')?.addEventListener('click',()=>refresh().catch(e=>say(e.message)));
  window.postingAdapters ||= {};
- window.postingAdapters.youtube={snapshot:()=>state,refresh,manage:request=>run({action:'manage',...request}),select:id=>{ $('youtubeVideo').value=id;selectVideo();},busy:()=>busy||Boolean(pending)};
+ window.postingAdapters.youtube={snapshot:()=>state,refresh,importVertical:id=>run({action:'import_vertical',source_id:id}),manage:request=>run({action:'manage',...request}),select:id=>{ $('youtubeVideo').value=id;selectVideo();},busy:()=>busy||Boolean(pending)};
  load();render();polling();
 }
+
 
 
