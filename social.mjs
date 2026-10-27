@@ -2,6 +2,7 @@ import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v
 import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
+const workflowFor=p=>p?.workflow||WORKFLOW;
 const WORKFLOW='social_publish.yml';
 const LABELS={ready:'未送信',waiting:'予約枠待ち',api_wait:'API利用上限による保留',channel_wait:'投稿先の対応待ち',unknown:'結果確認中（再送保留）',scheduled:'予約済み',sending:'公開処理中',published:'投稿完了',failed:'失敗',expired:'日時の再設定が必要',approval_required:'Bufferで承認が必要',manual_required:'手動投稿の設定です',withdrawn:'取り下げ済み'};
 const MEDIA={tiktok:'TikTok',instagram:'Instagramリール',youtube:'YouTubeショート'};
@@ -145,7 +146,7 @@ export function mountSocial(){
    if(['completed','failed'].includes(result.status)){pending=null;savePending();}
   }
   if(pending?.sha){
-   try{const data=await api(`actions/workflows/${WORKFLOW}/runs?event=workflow_dispatch&per_page=100`);const latest=data?.workflow_runs?.find(r=>r.display_title===`Social ${pending.id}`);
+   try{const data=await api(`actions/workflows/${workflowFor(pending)}/runs?event=workflow_dispatch&per_page=100`);const latest=data?.workflow_runs?.find(r=>r.display_title===`Social ${pending.id}`);
     const status=latest?.status==='completed'?(['cancelled','failure','timed_out','action_required','startup_failure'].includes(latest.conclusion)?'中断・失敗しました。同じ受付IDで確認・再依頼できます。':'実行終了。記録を更新して個別結果を確認してください。'):latest?.status==='in_progress'?'処理中です。':'受付済み・実行待ちです。';
     say(`受付ID：${pending.id} ／ ${status}`);
    }catch{say(`受付ID：${pending.id} ／ 実行状態を取得できません。同じ受付IDで確認・再依頼できます。`);}
@@ -155,14 +156,14 @@ export function mountSocial(){
  }
  async function dispatch(){
   if(!pending?.sha)throw Error('入力の保存が未完了です。「受付情報を取り消す」で準備をやり直してください');
-  await api(`actions/workflows/${WORKFLOW}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha}});
+  await api(`actions/workflows/${workflowFor(pending)}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha}});
   say('実行を依頼しました。画面を閉じても処理が続きます。「一覧を更新」で結果を確認できます。');
  }
  async function run(request){
   if(busy||pending)return;busy=true;control();let receiptId;
   try{
    const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください');
-   pending={id:crypto.randomUUID()};receiptId=pending.id;savePending();
+   pending={id:crypto.randomUUID(),workflow:(request.action.startsWith('threads_')||request.action==='dependency_release')?'threads_publish.yml':WORKFLOW};receiptId=pending.id;savePending();
    const blob=await api('git/blobs','POST',{content:JSON.stringify(request),encoding:'utf-8'});
    const tree=await api('git/trees','POST',{tree:[{path:'request.json',mode:'100644',type:'blob',sha:blob.sha}]});
    const commit=await api('git/commits','POST',{message:`Social input ${pending.id}`,tree:tree.sha,parents:[]});
