@@ -1,20 +1,20 @@
-import {motionSettings} from '../motion/settings.mjs';
+import {motionSettings} from '../motion/settings.mjs?v=readable-20261101';
 import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=tarot-display-20261021';
-import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=motion-20261026';
-import {tarotBrand} from './tarot-brand.mjs?v=motion-20261026';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=motion-20261026';
-import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=motion-20261026';
+import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=readable-20261101';
+import {tarotBrand} from './tarot-brand.mjs?v=readable-20261101';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=readable-20261101';
+import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=readable-20261101';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
-import {mountSingleEditor} from './single-editor.mjs?v=motion-20261026';
-import {mountBatchEditor} from './batch-editor.mjs?v=motion-20261026';
-import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=motion-20261026';
+import {mountSingleEditor} from './single-editor.mjs?v=readable-20261101';
+import {mountBatchEditor} from './batch-editor.mjs?v=readable-20261101';
+import {loadPresetData,savePresetSettings} from './preset-controller.mjs?v=readable-20261101';
 import {visiblePreset,isBatch,isTikTok} from './modes.mjs?v=mbti-20261019';
-import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=motion-20261026';
-import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=motion-20261026';
-import {buildPrompt} from './prompt.mjs?v=motion-20261026';
-import {applyConfig,tarotTitle} from './compiler.mjs?v=motion-20261026';
-import {decodeContent} from './storage.mjs?v=motion-20261026';
-import {drawPreview} from './preview.mjs?v=motion-20261026';
+import {VIDEO_DEFAULTS, LAYOUT_DEFAULTS} from './presets.mjs?v=readable-20261101';
+import {emptyRegistry,catalog,clone,resolvePreset,resolveConfig,defaultLayout,PRESENTATION_VIDEO_KEYS} from './model.mjs?v=readable-20261101';
+import {buildPrompt} from './prompt.mjs?v=readable-20261101';
+import {applyConfig,tarotTitle} from './compiler.mjs?v=readable-20261101';
+import {decodeContent} from './storage.mjs?v=readable-20261101';
+import {drawPreview} from './preview.mjs?v=readable-20261101';
 
 const $=id=>document.getElementById(id);
 export function mountBuilder(apiProvider) {
@@ -176,7 +176,7 @@ export function mountBuilder(apiProvider) {
   };
   $('pbMotionPreview').onclick=async()=>{
     $('pbMotionStatus').textContent='動作サンプルを準備中…';
-    try {await import('../motion/player-bundle.js');window.mountMotionSample($('pbMotionPlayer'),motionSettings(config().video));$('pbMotionStatus').textContent='動作サンプルです。実音声との同期は生成動画で確認してください。';}
+    try {await import('../motion/player-bundle.js?v=readable-20261101');window.mountMotionSample($('pbMotionPlayer'),motionSettings(config().video));$('pbMotionStatus').textContent='動作サンプルです。実音声との同期は生成動画で確認してください。';}
     catch(e){$('pbMotionStatus').textContent='動作サンプルを読み込めませんでした。配置プレビューは引き続き使えます。';}
   };
   const modeSessions=new Map();

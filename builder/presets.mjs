@@ -1,4 +1,4 @@
-import {MOTION_DEFAULTS} from '../motion/settings.mjs';
+import {MOTION_DEFAULTS} from '../motion/settings.mjs?v=readable-20261101';
 // Semantic presets contain no pixel coordinates. Layouts and renderer internals
 // have their own sources; anonymous is a one-field semantic override.
 export const VIDEO_DEFAULTS = Object.freeze({

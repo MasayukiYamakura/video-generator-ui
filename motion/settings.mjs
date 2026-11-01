@@ -1,12 +1,12 @@
-import {ANIMATIONS,SPRINGS} from './core.mjs';
+import {ANIMATIONS,SPRINGS} from './core.mjs?v=readable-20261101';
 export const MOTION_DEFAULTS={motion_enabled:false,motion_mode:'ai_hybrid',motion_intensity:'standard',motion_unit:'phrase',motion_animation:'fade',motion_emphasis:'pop',motion_duration_ms:300,motion_frequency:8,motion_scale:1.15,motion_direction:'up',motion_sync:true,motion_offset_ms:0,motion_physics:true,motion_spring:'smooth'};
 export const MOTION_FIELDS=[
  ['motion_enabled','モーション演出（OFFで安定版）'],
  ['motion_mode','演出モード',[['manual','手動固定'],['ai_hybrid','AI＋手動'],['ai_auto','AI自動']]],
  ['motion_intensity','演出の強さ',[['subtle','控えめ'],['standard','標準'],['dynamic','ダイナミック']]],
- ['motion_animation','字幕の基本動作',ANIMATIONS.map((a,i)=>[a,['フェード','スライド','ポップ','バウンス','タイプライター','発声中ハイライト','パンチ','スタッガー'][i]])],
+ ['motion_animation','字幕の基本演出（文字は常時表示）',ANIMATIONS.map((a,i)=>[a,['フェード','スライド','ポップ','バウンス','タイプライター','発声中ハイライト','パンチ','スタッガー'][i]])],
  ['motion_emphasis','強調字幕の動作',ANIMATIONS.map(a=>[a,a])],
- ['motion_sync','音声同期（失敗箇所は従来字幕）'],
+ ['motion_sync','音声同期（失敗箇所は同じ見た目の静止字幕）'],
  ['motion_physics','物理演算'],['motion_spring','動きのプリセット',Object.keys(SPRINGS).map((a,i)=>[a,['ソフト','スムーズ','バウンス','エネルギッシュ','クイック'][i]])],
  ['motion_unit','表示単位',[['sentence','文章'],['phrase','文節'],['character','文字']]],
  ['motion_duration_ms','動作時間（100〜1500ms）',null,'number'],['motion_frequency','強調上限（0〜30回／分）',null,'number'],['motion_scale','強調最大倍率（1〜1.5）',null,'number'],['motion_offset_ms','同期補正（-500〜500ms）',null,'number'],

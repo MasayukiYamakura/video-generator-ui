@@ -1,9 +1,9 @@
-import {motionSettings} from '../motion/settings.mjs';
+import {motionSettings} from '../motion/settings.mjs?v=readable-20261101';
 import {MBTI_NAMES,subjectKind} from './subjects.mjs?v=tarot-display-20261021';
-import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=motion-20261026';
-import {tarotBrand} from './tarot-brand.mjs?v=motion-20261026';
-import {SYSTEM, CATEGORIES} from './presets.mjs?v=motion-20261026';
-import {clone, assertObject,validatePresentation} from './model.mjs?v=motion-20261026';
+import {designDefaults,formatConfig,requestedFormats,promptConfig} from './presentation.mjs?v=readable-20261101';
+import {tarotBrand} from './tarot-brand.mjs?v=readable-20261101';
+import {SYSTEM, CATEGORIES} from './presets.mjs?v=readable-20261101';
+import {clone, assertObject,validatePresentation} from './model.mjs?v=readable-20261101';
 import {normalizeSocial} from './social-data.mjs?v=tarot-display-20261021';
 
 export function fixedSettings(config) {

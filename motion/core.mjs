@@ -2,15 +2,38 @@
 export const ANIMATIONS=['fade','slide','pop','bounce','typewriter','highlight','punch','stagger'];
 export const SPRINGS={soft:{damping:24,stiffness:80,mass:1,overshootClamping:true},smooth:{damping:24,stiffness:160,mass:1,overshootClamping:true},bounce:{damping:12,stiffness:170,mass:1},energetic:{damping:9,stiffness:210,mass:.8},quick:{damping:25,stiffness:280,mass:.7,overshootClamping:true}};
 export const graphemes=text=>Array.from(new Intl.Segmenter('ja',{granularity:'grapheme'}).segment(text),x=>x.segment);
-export function splitUnits(text,unit='phrase') {
-  const clean=String(text).replace(/\[\[|\]\]/g,'');
-  let parts=unit==='sentence'?[clean]:unit==='character'?graphemes(clean):Array.from(new Intl.Segmenter('ja',{granularity:'word'}).segment(clean),x=>x.segment);
-  if(unit==='phrase') {
-    const merged=[];
-    for(const part of parts){const last=merged.at(-1);if(last&&(/^[\p{Script=Hiragana}ー]+$/u.test(part)||/^[、。，！？!?）」』】\s]+$/u.test(part)))merged[merged.length-1]+=part;else merged.push(part);}
-    parts=merged;
+// Display boundaries also drive timing units, so compounds never split at a page edge.
+export const CAPTION_TERMS=['正位置','逆位置','ソード','ワンド','ペンタクル','カップ',
+  'ましょう','でしょう','ください','ません','ようです','付き合えない','付き合えていない','付き合いたい','付き合う','付き合','付合','イメージ'];
+export function japaneseUnits(text,protectedTerms=[]) {
+ const segmenter=new Intl.Segmenter('ja',{granularity:'word'}),units=[];
+ for(const paragraph of String(text).split('\n')) {
+  const ranges=[];
+  for(const term of [...CAPTION_TERMS,...protectedTerms].filter(Boolean))
+   for(let at=paragraph.indexOf(term);at>=0;at=paragraph.indexOf(term,at+term.length))ranges.push([at,at+term.length]);
+  let first=true;
+  for(const part of segmenter.segment(paragraph)) {
+   const previous=units.at(-1),word=part.segment;
+   const protectedBoundary=ranges.some(([a,b])=>part.index>a&&part.index<b);
+   const suffix=/^(?:は|が|を|に|で|と|も|へ|の|や|か|ね|よ|から|まで|より|ので|です|ます|ない|たい|た|て|な|う|れ|いる|れる|られる|する|した|いう|いく|ください|ましょう|でしょう|ようです)$/u.test(word)&&!/[。！？、，.!?,]$/.test(previous?.text||'');
+   const closing=/^[、。，．！？!?.,)）」』】〉》〕］｝…・\s]+$/u.test(word);
+   const opening=/[(（「『【〈《〔［｛・]$/.test(previous?.text||'');
+   if(!first&&previous&&(protectedBoundary||suffix||closing||opening))previous.text+=word;
+   else units.push({text:word,breakBefore:first&&units.length>0});
+   first=false;
   }
-  let start=0;return parts.filter(Boolean).map((text,i)=>{const out={id:`u${String(i).padStart(4,'0')}`,text,start,end:start+Array.from(text).length};start=out.end;return out;});
+ }
+ return units;
+}
+export function splitUnits(text,unit='phrase') {
+ const clean=String(text).replace(/\[\[|\]\]/g,'');
+ const parts=unit==='sentence'?[clean]:unit==='character'?graphemes(clean):japaneseUnits(clean).map(u=>u.text);
+ // Preserve whitespace/newline offsets exactly, including explicit paragraph breaks.
+ let cursor=0;return parts.filter(Boolean).map((text,i)=>{
+  const chars=Array.from(clean),needle=Array.from(text);
+  while(cursor<chars.length&&chars.slice(cursor,cursor+needle.length).join('')!==text)cursor++;
+  const out={id:`u${String(i).padStart(4,'0')}`,text,start:cursor,end:cursor+needle.length};cursor=out.end;return out;
+ });
 }
 export const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 export function effectStyle(animation,progress,{scale=1.15,direction='up',springValue,visible=true}={}) {

@@ -1,5 +1,5 @@
-import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=motion-20261026';
-import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=motion-20261026';
+import {PRESENTATION_VIDEO_KEYS,mergePresentation,clone} from './model.mjs?v=readable-20261101';
+import {LAYOUT_DEFAULTS,LAYOUT_PRESETS} from './presets.mjs?v=readable-20261101';
 
 export function designDefaults(config,format) {
   const w=format==='vertical'?1080:1920,h=format==='vertical'?1920:1080;
