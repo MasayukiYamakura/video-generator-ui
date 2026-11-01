@@ -1,4 +1,4 @@
-import {ReferencePanel,mergeReferences} from "./upload.mjs?v=20261023-materials-1";
+import {ReferencePanel,mergeReferences} from "./upload.mjs?v=20261101-actions-1";
 import {
   DEFAULT_REPO,
   WORKFLOW,
@@ -9,7 +9,7 @@ import {
   describe,
   artifactLink,
   isAvailable,
-} from "./core.mjs?v=20261023-materials-1";
+} from "./core.mjs?v=20261101-actions-1";
 const $ = (id) => document.getElementById(id),
   storageKey = "dance-studio-v1",
   pendingKey = (repo) => "dance-pending:" + repo;
@@ -105,7 +105,7 @@ function refOptions() {
   updateButtons();
 }
 async function connect() {
-  if (busy || refreshing) return;
+  if (busy || refreshing || references.busy) return;
   busy = true;
   updateButtons();
   try {
@@ -387,7 +387,7 @@ async function dispatch(request, retry = false) {
 }
 $("connect").onclick = connect;
 $("forget").onclick = () => {
-  if (busy || refreshing) return;
+  if (busy || refreshing || references.busy) return;
   localStorage.removeItem(storageKey);
   client = null;
   connected = false;

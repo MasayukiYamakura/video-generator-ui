@@ -9,12 +9,12 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src 'self' https://api.github.com https://api.cloudinary.com https://*.workers.dev; media-src 'self' blob:; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'"
+      content="default-src 'self'; connect-src 'self' https://api.github.com https://api.cloudinary.com; media-src 'self' blob:; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'"
     />
     <meta name="theme-color" content="#101b25" />
     <title>D-Generator</title>
     <link rel="stylesheet" href="style.css" />
-    <script type="module" src="app.mjs?v=20261023-materials-1"></script>
+    <script type="module" src="app.mjs?v=20261101-actions-1"></script>
   </head>
   <body>
     <main>
@@ -87,12 +87,7 @@
           <p class="muted">MP4・MOV、80 MB・120秒まで。H.264／HEVCに対応。HDRは非対応です。</p>
           <p id="file-info" class="muted"></p><video id="upload-preview" controls playsinline preload="metadata" hidden></video>
           <progress id="upload-progress" max="100" value="0" hidden></progress><p id="upload-percent" class="muted"></p>
-          <details><summary>アップロードの初期設定</summary>
-            <p class="muted">本人専用のCloudflare Workerを初回だけ設定してください。設定手順は「使い方・初回設定」にあります。Cloudinaryの秘密鍵は画面に入力しません。</p>
-            <label>本人専用アップロードAPIのURL<input id="upload-api" type="url" autocapitalize="none" spellcheck="false" placeholder="https://d-generator-upload.本人のサブドメイン.workers.dev" /></label>
-            <button id="save-upload-api" class="secondary" disabled>接続先を保存</button>
-            <label class="check"><input id="upload-consent" type="checkbox" />本人が作成したWorkerであることを確認しました。このWorkerへGitHubトークンを送って本人確認することに同意します。</label>
-          </details>
+          <p class="muted">Cloudinaryの接続情報はGitHub Secretsに登録します。アップロード前にActionsで許可を準備するため、起動待ちが入ります。動画転送中はActionsを待機させません。Cloudflareの設定は不要です。</p>
         </div>
         <div id="source-kaggle" hidden>
           <label>Kaggle DatasetのURL<input id="dataset" autocapitalize="none" spellcheck="false" placeholder="https://www.kaggle.com/datasets/所有者/名前" /></label>
