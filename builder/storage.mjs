@@ -1,4 +1,4 @@
-import {emptyRegistry, validateRegistry, migrateRegistry, clone} from './model.mjs?v=motion-20261026';
+import {emptyRegistry, validateRegistry, migrateRegistry, clone} from './model.mjs?v=readable-20261101';
 export const PRESET_PATH='config/prompt-builder.json';
 export const decodeContent=response=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(response.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));
 export function encodeContent(value) {

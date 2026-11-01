@@ -1,4 +1,4 @@
-import {MOTION_FIELDS} from '../motion/settings.mjs';
+import {MOTION_FIELDS} from '../motion/settings.mjs?v=readable-20261101';
 // Editable field metadata; no persistence or network operations.
 export const VIDEO_FIELDS=[
   ...MOTION_FIELDS,

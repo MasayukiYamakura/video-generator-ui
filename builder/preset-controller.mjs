@@ -1,6 +1,6 @@
-import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=motion-20261026';
-import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=motion-20261026';
-import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=motion-20261026';
+import {VIDEO_DEFAULTS,LAYOUT_DEFAULTS} from './presets.mjs?v=readable-20261101';
+import {clone,resolvePreset,savePreset,mergePresentation} from './model.mjs?v=readable-20261101';
+import {readRegistry,writeRegistry,decodeContent} from './storage.mjs?v=readable-20261101';
 export async function loadPresetData(api) {
   const preset=await readRegistry(api),bgm=decodeContent(await api('contents/media/bgm/catalog.json?ref=main'));
   if(bgm.version!==1||!Array.isArray(bgm.tracks))throw Error('BGM登録一覧が不正です');
