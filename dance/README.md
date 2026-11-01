@@ -40,14 +40,21 @@
 更新後にページを再読み込みしてから「接続を確認」を押してください。「GitHub APIへ通信できません」はブラウザとAPI間の通信失敗、「GitHub HTTP 401/403/404」は接続先や認証・権限の確認が必要な応答です。トークン自体をチャットやログへ貼り付けないでください。送信後の通信失敗では、先に「状態を確認」を使ってください。
 
 
-## 画面からのアップロード：初期設定が必要
+## 画面からのアップロード：GitHub Secretsを設定
 
-80 MB・120秒以内のMP4/MOVに対応。動画選択→転送→CPU検査→Kaggleへの登録の順に進み、登録完了後にダンス生成で選択できます。転送と受付確認までは画面を閉じないでください。
+Cloudflareのアカウント・Worker・D1・URL設定は不要です。
+非公開のchibi-dance-generatorリポジトリのActions Secretsへ、以下を登録します。
 
-本人専用Cloudflare WorkerとD1、Cloudinaryの設定を先に行います。Gitコマンドは不要で、GitHub Actionsの「Deploy D-Generator upload API」から公開できます。
+- DANCE_CLOUDINARY_CLOUD_NAME
+- DANCE_CLOUDINARY_API_KEY
+- DANCE_CLOUDINARY_API_SECRET
 
-詳細な設定手順：[非公開リポジトリの素材登録手順](https://github.com/MasayukiYamakura/chibi-dance-generator/blob/main/docs/reference-ingestion.md)。
+既存のKAGGLE_API_TOKENはそのまま使います。V-GeneratorのSecretsは自動でコピーされません。秘密情報を画面やチャットへ貼り付けないでください。
 
-本人のWorker URLを画面で保存し、GitHubトークンをそのWorkerへ送って本人確認することに同意してください。Cloudinaryの秘密鍵は画面に入力しません。
+GitHubへ接続し、動画を選択して「素材を登録（GPUなし）」を押すと、Actionsが暗号化したアップロード許可を返します。Actionsの起動待ち中は画面を閉じても、同じブラウザから「登録を再開」で続けられます。動画転送中は画面を開いてください。転送中ずっとActionsを待機させる構成ではありません。
 
-「登録を再開」は同じ受付でCPU登録を続けます。素材登録だけではGPUを起動しません。YouTube取得は利用条件と実取得を確認するまで無効で、URL保存だけでは生成できません。
+復号鍵はこのブラウザ内に保存します。転送前にブラウザのサイトデータを削除した場合は、新規登録が必要になることがあります。転送の応答が不明な場合は、再開時にCloudinaryの受領状況を先に確認します。
+
+詳細：[素材登録・初期設定手順](https://github.com/MasayukiYamakura/chibi-dance-generator/blob/main/docs/reference-ingestion.md)。
+
+YouTubeは参考リンク保存で、自動取得は引き続き無効です。GPU生成は素材登録完了後の別操作です。
