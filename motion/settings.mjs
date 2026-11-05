@@ -6,7 +6,7 @@ export const MOTION_FIELDS=[
  ['motion_intensity','演出の強さ',[['subtle','控えめ'],['standard','標準'],['dynamic','ダイナミック']]],
  ['motion_animation','字幕の基本演出（文字は常時表示）',ANIMATIONS.map((a,i)=>[a,['フェード','スライド','ポップ','バウンス','タイプライター','発声中ハイライト','パンチ','スタッガー'][i]])],
  ['motion_emphasis','強調字幕の動作',ANIMATIONS.map(a=>[a,a])],
- ['motion_sync','音声同期（失敗箇所は同じ見た目の静止字幕）'],
+ ['motion_sync','音声同期（失敗箇所も基本演出を表示）'],
  ['motion_physics','物理演算'],['motion_spring','動きのプリセット',Object.keys(SPRINGS).map((a,i)=>[a,['ソフト','スムーズ','バウンス','エネルギッシュ','クイック'][i]])],
  ['motion_unit','表示単位',[['sentence','文章'],['phrase','文節'],['character','文字']]],
  ['motion_duration_ms','動作時間（100〜1500ms）',null,'number'],['motion_frequency','強調上限（0〜30回／分）',null,'number'],['motion_scale','強調最大倍率（1〜1.5）',null,'number'],['motion_offset_ms','同期補正（-500〜500ms）',null,'number'],
