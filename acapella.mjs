@@ -7,7 +7,8 @@ let file=null,url=null,rows=[],source=null,busy=false;
 const pendingKey=()=>`acapella-pending:${repo()}`;
 function savedPending(){try{return JSON.parse(localStorage.getItem(pendingKey())||'null');}catch{return null;}}
 const repo=()=>$('repo').value.trim();
-const lip=()=>$('acMode').value==='lip';
+const lip=()=>$('acMode').value!=='original';
+const fullMode=()=>$('acMode').value==='full';
 const chorusPlayer=$('acChorusPlayer');
 const offset=()=>Math.round(Number($('acOffset').value)*1000)/1000;
 let chorus=null, decoded=null, fullUrl=null, chorusUrl=null, previewEnd=null;
@@ -57,14 +58,15 @@ function compiledLyrics(partial=false){
 function script(id,meta){
  const title=$('acTitle').value.trim(),artist=$('acArtist').value.trim(),end=Math.round(Number($('acHook').value)*1000);
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
- const output=lip()?'vertical_only':$('acOutput').value,framing=$('acFraming').value;
+ const output=lip()?(fullMode()?'horizontal_only':'vertical_only'):$('acOutput').value,framing=$('acFraming').value;
  const result={schema_version:1,production_type:'acapella',title,artist,hook_end_ms:end,lyrics,
   source:{public_id:`v-generator/acapella/${id}`,format:meta.format,bytes:meta.bytes,sha256:meta.sha256},
   framing:{vertical:framing,landscape:framing},global_settings:{format:'vertical',output_mode:output},auto_link:false};
  if(lip()){
   if(!chorus||!Number.isFinite(file?.duration)||!Number.isFinite(offset())||offset()<0)throw Error('映像とサビ音源を確認してください。');
   const length=chorusPlayer.duration;
-  if(!(length>0&&length<=120)||end<0||end>length*1000)throw Error('サビまたは冒頭表示の長さを確認してください。');
+  if(file.duration>(fullMode()?360:120))throw Error('撮影動画の時間上限を超えています。');
+  if(!(length>0&&length<=(fullMode()?360:120))||end<0||end>length*1000)throw Error('サビまたは冒頭表示の長さを確認してください。');
   const shortage=offset()+length-file.duration;
   if(shortage>.001)throw Error(`映像が ${shortage.toFixed(3)} 秒不足しています。`);
   if(end>0&&(!title||!artist))throw Error('冒頭表示には曲名とアーティスト名が必要です。');
@@ -78,7 +80,7 @@ function script(id,meta){
  return result;
 }
 async function fileMeta(f,audio=false){
- if(!f||!(audio?['wav']:['mp4','mov']).includes(f.name.split('.').at(-1).toLowerCase())||!f.size||f.size>(audio?24_000_000:80_000_000))throw Error(audio?'24 MB以下のサビWAVを選択してください。':'80 MB以下のMP4またはMOVを選択してください。');
+ if(!f||!(audio?['wav']:['mp4','mov']).includes(f.name.split('.').at(-1).toLowerCase())||!f.size||f.size>(fullMode()?(audio?64_000_000:100_000_000):(audio?24_000_000:80_000_000)))throw Error('素材の形式と容量上限を確認してください。');
  const digest=await crypto.subtle.digest('SHA-256',await f.arrayBuffer());
  return {bytes:f.size,sha256:Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join(''),format:f.name.split('.').at(-1).toLowerCase()};
 }
@@ -132,10 +134,12 @@ async function submit(){
   if(!file)throw Error('先に動画を選択してください。');
   const videoFile=file.blob, audioFile=chorus;
   const meta=await fileMeta(videoFile);
-  const retryKey=`acapella-transfer:${repo()}`;
+  const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
   const saved=lip()?JSON.parse(localStorage.getItem(retryKey)||'null'):null;
   const retry=saved?.videoSha===meta.sha256?saved:null;
-  const id=retry?.videoId??crypto.randomUUID().replaceAll('-','');
+  const savedVideo=lip()?project?.layouts?.[layoutKey()]?.video:null;
+  const existingVideo=savedVideo?.sha256===meta.sha256?savedVideo:null;
+  const id=existingVideo?.public_id.split('/').at(-1)??retry?.videoId??crypto.randomUUID().replaceAll('-','');
   const payload=script(id,meta);
   const audioMeta=lip()?await fileMeta(audioFile,true):null;
   const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
@@ -146,7 +150,7 @@ async function submit(){
    const audioId=retry?.audioSha===audioMeta.sha256?retry.audioId:crypto.randomUUID().replaceAll('-','');
    const transfer={videoSha:meta.sha256,videoId:id,audioSha:audioMeta.sha256,audioId};
    localStorage.setItem(retryKey,JSON.stringify(transfer));
-   await transferSource(videoFile,id,meta,pair);
+   if(!existingVideo)await transferSource(videoFile,id,meta,pair);
    await transferSource(audioFile,audioId,audioMeta,pair);
    payload.audio_source={...audioMeta,public_id:`v-generator/acapella/${audioId}`};
   }else await transferSource(videoFile,id,meta,pair);
@@ -158,14 +162,23 @@ async function submit(){
   localStorage.setItem(pendingKey(),JSON.stringify({receipt,sha:commit.sha}));
   if(payload.schema_version===2)localStorage.removeItem(retryKey);
   await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:commit.sha,job_kind:'video'}});
+  if(lip()&&project){
+   project.layouts[layoutKey()]??={};
+   project.layouts[layoutKey()].video={...payload.source,name:videoFile.name};
+   project.runs??={};
+   const key=layoutKey();
+   project.runs[key]=[...runList(project.runs[key]),receipt];
+   try{await saveProject();}catch(e){status(`生成受付済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);return;}
+  }
   status(`生成を受け付けました。受付ID：${receipt}。生成履歴の「更新」で結果を確認してください。`);
  }catch(e){status(e.message);}finally{busy=false;$('acSubmit').disabled=false;}
 }
-$('acFile').onchange=()=>{
- const blob=$('acFile').files[0];if(url)URL.revokeObjectURL(url);
+$('acFile').onchange=()=>selectVideo($('acFile').files[0]);
+function selectVideo(blob){
+ if(url)URL.revokeObjectURL(url);
  if(!blob){file=null;return;}url=URL.createObjectURL(blob);file={blob,duration:NaN};$('acPreview').src=url;$('acBackground').src=url;
  $('acPreview').onloadedmetadata=()=>{file.duration=$('acPreview').duration;status(`${file.duration.toFixed(1)}秒の動画を読み込みました。`);};
-};
+}
 $('acPreview').ontimeupdate=repaint;
 function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');}
 $('acPreviewFormat').onchange=previewLayout;$('acFraming').onchange=previewLayout;
@@ -188,7 +201,7 @@ if(savedPending())status(`前回の受付 ${savedPending().receipt} の確認が
 let syncPlaying=false;
 const full=$('acFullPlayer');
 const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears'];
-const draftKey=()=>`acapella-lip-draft:${repo()}`;
+const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return [file.name,file.size,file.lastModified].join(':');}
 function saveDraft(){
@@ -224,29 +237,44 @@ function setChorus(file){
 }
 function cut(){
  if(!decoded)throw Error('先にフル音源を読み込んでください。');
+ if(fullMode())return chorusWav(decoded,0,decoded.duration,360);
  return chorusWav(decoded,Number($('acCutStart').value),Number($('acCutEnd').value));
 }
 $('acMode').onchange=()=>{
+ if(project&&previousMode!=='original'){
+  const key=previousMode==='full'?'full':'short';
+  project.layouts[key]={...project.layouts[key],...projectSnapshot()};
+ }
+ previousMode=$('acMode').value;
+ $('acCutFields').hidden=fullMode();
  $('acLip').hidden=!lip();$('acPreview').muted=lip();
  $('acHook').min=lip()?'0':'0.1';$('acHook').value=lip()?'0':'3';
  $('acOutput').disabled=lip();$('acPreviewFormat').disabled=lip();
- if(lip()){$('acPreviewFormat').value='vertical';restoreDraft();previewLayout();}
+ if(lip()){$('acPreviewFormat').value=fullMode()?'landscape':'vertical';if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
  else chorusPlayer.pause();
- $('acSubmit').textContent=lip()?'口パク動画を生成':'アカペラ動画を生成';
+ $('acSubmit').textContent=lip()?(fullMode()?'横型フルMVを生成':'縦型サビショートを生成'):'アカペラ動画を生成';
  repaint();
 };
-$('acFull').onchange=async()=>{
+$('acFull').onchange=()=>readFull($('acFull').files[0]).catch(e=>status(e.message));
+async function readFull(f){
  decoded=null;
- const f=$('acFull').files[0];
  if(!f)return;
- try{
+  if(!/\.(mp3|wav|m4a)$/i.test(f.name))throw Error('MP3、WAV、M4Aを選択してください。');
   if(f.size>100_000_000)throw Error('フル音源は100 MB以下にしてください。');
   if(fullUrl)URL.revokeObjectURL(fullUrl);
   fullUrl=URL.createObjectURL(f);full.src=fullUrl;
   const context=new OfflineAudioContext(2,1,44100);
   const buffer=await context.decodeAudioData(await f.arrayBuffer());
   if(buffer.duration>600)throw Error('フル音源は10分以下にしてください。');
-  decoded=buffer;$('acCutEnd').value=Math.min(60,buffer.duration);
+  if(project?.audio){
+   const digest=await crypto.subtle.digest('SHA-256',await f.arrayBuffer());
+   const sha=Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+   if(sha!==project.audio.sha256)throw Error('保存済みのフル音源と一致しません。');
+  }
+  projectAudio=f;decoded=buffer;
+  if(fullMode())setChorus(chorusWav(buffer,0,buffer.duration,360));
+  else if(project?.range)setChorus(chorusWav(buffer,...project.range));
+  if(!project?.range)$('acCutEnd').value=Math.min(60,buffer.duration);
   const canvas=$('acWave'), ctx=canvas.getContext('2d'), data=buffer.getChannelData(0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
   for(let x=0;x<canvas.width;x++){
@@ -256,8 +284,7 @@ $('acFull').onchange=async()=>{
    ctx.fillRect(x,32-peak*30,1,Math.max(1,peak*60));
   }
   status('音源を読み込みました。開始と終了を指定してください。');
- }catch(e){status(e.message);}
-};
+}
 $('acWave').onclick=e=>{if(decoded)full.currentTime=e.offsetX/$('acWave').clientWidth*decoded.duration;};
 $('acCutMarkStart').onclick=()=>$('acCutStart').value=full.currentTime.toFixed(3);
 $('acCutMarkEnd').onclick=()=>$('acCutEnd').value=full.currentTime.toFixed(3);
@@ -291,10 +318,10 @@ $('acClearLyric').onclick=()=>{
  const field=$('acClears');field.value=[field.value,val().toFixed(3)].filter(Boolean).join(',');
  repaint();
 };
-function chorusWav(buffer, start, end) {
+function chorusWav(buffer, start, end, limit=120) {
  const rate=buffer.sampleRate, first=Math.round(start*rate), last=Math.round(end*rate);
- if(!Number.isFinite(first)||!Number.isFinite(last)||first<0||last<=first||last>buffer.length||last-first>120*rate)
-  throw Error('120秒以内の切り出し範囲を指定してください。');
+ if(!Number.isFinite(first)||!Number.isFinite(last)||first<0||last<=first||last>buffer.length||last-first>limit*rate)
+  throw Error(`${limit}秒以内の音源範囲を指定してください。`);
  const channels=Array.from({length:Math.min(buffer.numberOfChannels,2)},(_,i)=>buffer.getChannelData(i));
  const size=(last-first)*channels.length*2, bytes=new ArrayBuffer(44+size), view=new DataView(bytes);
  const tag=(offset,value)=>[...value].forEach((char,i)=>view.setUint8(offset+i,char.charCodeAt(0)));
@@ -325,3 +352,165 @@ function lyricIntervals(lines, clears, duration) {
 
 $('acapellaArea').addEventListener('input',()=>{saveDraft();repaint();});
 $('acapellaArea').addEventListener('click',saveDraft);
+
+let project=null, projectSha=null, projectAudio=null, previousMode='original';
+const projectDir='contents/config/music-projects';
+async function assetHash(file){
+ const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+ return Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join('');
+}
+async function downloadProjectAsset(asset){
+ const id=asset.public_id.split('/').at(-1);
+ const pair=await keyPair();
+ const signed=await decrypt(await permission(id,{bytes:asset.bytes,sha256:asset.sha256,format:asset.format,download:true},pair),pair.privateKey);
+ const response=await fetch(signed.download_url);
+ if(!response.ok)throw Error('保存済みの音源を取得できません。元のファイルを選択してください。');
+ const restored=new File([await response.blob()],asset.name);
+ if(await assetHash(restored)!==asset.sha256)throw Error('保存済み素材の照合に失敗しました。');
+ return restored;
+}
+
+const projectFile=id=>`${projectDir}/${id}.json`;
+const projectFields=[...draftFields,'acCutStart','acCutEnd','acCandidate'];
+const layoutKey=()=>fullMode()?'full':'short';
+function projectSnapshot(){
+ return {fields:Object.fromEntries(projectFields.map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value])),
+  rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])};
+}
+function applySnapshot(snapshot){
+ for(const id of projectFields){
+  const field=$(id),value=snapshot?.fields?.[id];
+  if(field.type==='checkbox')field.checked=!!value;
+  else field.value=value??({acHook:'0',acOffset:'0',acCutStart:'0',acFraming:'contain_blur'}[id]??'');
+ }
+ buildRows();
+ for(const [i,values] of (snapshot?.rows??[]).entries()){
+  if(rows[i])[rows[i].text.value,rows[i].start.value,rows[i].end.value]=values;
+ }
+ repaint();
+}
+function restoreProjectLayout(){
+ const saved=project?.layouts?.[layoutKey()];
+ applySnapshot(saved);
+ if(!project)return;
+ $('acTitle').value=project.title;
+ $('acArtist').value=project.artist;
+ $('acCandidate').checked=project.candidate;
+ if(project.range){$('acCutStart').value=project.range[0];$('acCutEnd').value=project.range[1];}
+ if(fullMode()&&!saved&&project.lyrics?.length){
+  $('acLyrics').value=project.lyrics.map(line=>line.text).join('\n');
+  buildRows();
+  project.lyrics.forEach((line,i)=>{rows[i].start.value=line.start_ms/1000;rows[i].end.value=line.end_ms/1000;});
+ }
+ renderProjectHistory();
+}
+const runList=value=>Array.isArray(value)?value:value?[value]:[];
+async function postingState(path){
+ try{
+  const result=await api(path);
+  return JSON.parse(new TextDecoder().decode(bytes(result.content.replace(/\s/g,''))));
+ }catch{return {};}
+}
+async function renderProjectHistory(){
+ const history=$('acProjectHistory'), current=project;
+ history.replaceChildren();
+ if(!current||!Object.keys(current.runs??{}).length)return;
+ const [shorts,youtube]=await Promise.all([
+  postingState('contents/state.json?ref=social-state'),
+  postingState('contents/view.json?ref=youtube-state')
+ ]);
+ if(project!==current)return;
+ const labels={published:'公開済み',scheduled:'予約済み',private_ready:'非公開',ready:'未送信',failed:'失敗',waiting:'予約枠待ち'};
+ const services={tiktok:'TikTok',instagram:'Instagramリール',youtube:'YouTubeショート'};
+ for(const [layout,receipts] of Object.entries(project?.runs??{}))for(const receipt of runList(receipts)){
+  const link=document.createElement('a');
+  link.href=`https://github.com/${repo()}/actions?query=${encodeURIComponent(receipt)}`;
+  link.textContent=layout==='full'?'横型の生成受付':'縦型の生成受付';
+  history.append(link,document.createTextNode(' '));
+  const state=layout==='full'?youtube:shorts;
+  const videos=Object.values(state.videos??{}).filter(v=>v.receipt_id===receipt);
+  const ids=new Set(videos.map(v=>v.id));
+  const posts=Object.values(layout==='full'?(state.uploads??{}):(state.posts??{}))
+   .filter(post=>ids.has(layout==='full'?post.source_id:post.video_id));
+  for(const post of posts){
+   const name=layout==='full'?'YouTube通常動画':(services[post.service]??post.service);
+   const label=`${name} ${labels[post.status]??post.status}`;
+   const url=layout==='full'&&post.status==='published'&&/^[\w-]{11}$/.test(post.video_id)
+    ?`https://www.youtube.com/watch?v=${post.video_id}`:post.published_url;
+   if(/^https:\/\//.test(url??'')){
+    const published=document.createElement('a');published.href=url;published.textContent=label;history.append(published);
+   }else history.append(document.createTextNode(label));
+   history.append(document.createTextNode(' '));
+  }
+  if(!posts.length)history.append(document.createTextNode(videos.length?'投稿管理に登録済み ':'生成履歴で確認 '));
+  history.append(document.createElement('br'));
+ }
+}
+async function saveProject(){
+ const repository=await api('');
+ if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
+ const title=$('acTitle').value.trim();
+ if(!title)throw Error('曲名を入力してください。');
+ const next=structuredClone(project??{version:1,id:crypto.randomUUID(),layouts:{},lyrics:[],runs:{}});
+ next.title=title;next.artist=$('acArtist').value.trim();next.candidate=$('acCandidate').checked;
+ next.layouts[layoutKey()]={...next.layouts[layoutKey()],...projectSnapshot()};
+ if(file?.blob){
+  const videoMeta=await fileMeta(file.blob);
+  if(next.layouts[layoutKey()].video?.sha256!==videoMeta.sha256){
+   const id=crypto.randomUUID().replaceAll('-','');
+   await transferSource(file.blob,id,videoMeta,await keyPair());
+   next.layouts[layoutKey()].video={...videoMeta,name:file.blob.name,public_id:`v-generator/acapella/${id}`};
+  }
+ }
+ const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
+ if(end>start&&start>=0&&end-start<=120)next.range=[start,end];
+ if(chorus&&rows.length&&rows.every(row=>row.start.value!=='')){
+  const shift=fullMode()?0:Math.round(start*1000);
+  const timed=compiledLyrics().map(line=>({...line,start_ms:line.start_ms+shift,end_ms:line.end_ms+shift}));
+  next.lyrics=fullMode()?timed:[...next.lyrics.filter(line=>line.end_ms<=shift||line.start_ms>=Math.round(end*1000)),...timed].sort((a,b)=>a.start_ms-b.start_ms);
+ }
+ if(projectAudio&&!next.audio?.public_id){
+  const format=projectAudio.name.split('.').at(-1).toLowerCase();
+  const meta={format,bytes:projectAudio.size,sha256:await assetHash(projectAudio)};
+  const id=crypto.randomUUID().replaceAll('-','');
+  await transferSource(projectAudio,id,meta,await keyPair());
+  next.audio={...meta,name:projectAudio.name,public_id:`v-generator/acapella/${id}`};
+ }
+ const data=new TextEncoder().encode(JSON.stringify(next));
+ let binary='';
+ for(let i=0;i<data.length;i+=8192)binary+=String.fromCharCode(...data.subarray(i,i+8192));
+ const response=await api(projectFile(next.id),'PUT',{message:'Save music project',content:btoa(binary),...(projectSha?{sha:projectSha}:{})});
+ project=next;projectSha=response.content.sha;
+ const select=$('acProjects');
+ let option=Array.from(select.options).find(item=>item.value===next.id);
+ if(!option){option=new Option('',next.id);select.add(option);}
+ option.textContent=next.title+(next.candidate?'（フルMV候補）':'');select.value=next.id;
+ renderProjectHistory();
+}
+$('acProjectSave').onclick=async()=>{try{await saveProject();status('曲プロジェクトを保存しました。');}catch(e){status(e.message);}};
+$('acProjectList').onclick=async()=>{try{
+ let files=[];
+ try{files=await api(projectDir);}catch(e){if(e.status!==404)throw e;}
+ const entries=await Promise.all(files.filter(f=>/^[a-f0-9-]{36}\.json$/.test(f.name)).map(async f=>{
+  const result=await api(projectFile(f.name.slice(0,-5)));
+  return JSON.parse(new TextDecoder().decode(bytes(result.content.replace(/\s/g,''))));
+ }));
+ $('acProjects').replaceChildren(new Option('新規',''),...entries.map(p=>new Option(p.title+(p.candidate?'（フルMV候補）':''),p.id)));
+ $('acProjects').value=project?.id??'';
+ status(`${entries.length}曲を読み込みました。`);
+}catch(e){status(e.message);}};
+$('acProjects').onchange=async()=>{try{
+ const id=$('acProjects').value;
+ const entry=id?await api(projectFile(id)):null;
+ project=entry?JSON.parse(new TextDecoder().decode(bytes(entry.content.replace(/\s/g,'')))):null;
+ projectSha=entry?.sha??null;projectAudio=null;decoded=null;chorus=null;file=null;audioIdentity=null;
+ for(const field of ['acFile','acFull','acChorus'])$(field).value='';
+ for(const media of [$('acPreview'),$('acBackground'),full,chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
+ restoreProjectLayout();
+ if(project?.audio?.public_id){
+  status('保存済みのフル音源を取得しています。');
+  await readFull(await downloadProjectAsset(project.audio));
+  const video=project.layouts?.[layoutKey()]?.video;
+  if(video)selectVideo(await downloadProjectAsset(video));
+ }else status(project?.audio?`フル音源「${project.audio.name}」を再選択してください。`:'曲の情報と素材を選択してください。');
+}catch(e){status(e.message);}};
