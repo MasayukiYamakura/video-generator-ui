@@ -31,6 +31,7 @@ function repaint(){
  overlay.textContent=hook?`${$('acTitle').value} / ${$('acArtist').value}`:lip()?lyricText:lyric?.text.value||'';
  overlay.className=hook&&!lip()?'ac-overlay hook':'ac-overlay lyric';
  if(lip()&&hook)overlay.textContent=lyricText;
+ if(lip())paintMask();
  $('acLipTitle').textContent=lip()&&hook?`${$('acTitle').value} / ${$('acArtist').value}`:'';
 }
 function buildRows(){
@@ -67,11 +68,13 @@ function script(id,meta){
   const length=chorusPlayer.duration;
   if(file.duration>(fullMode()?360:120))throw Error('撮影動画の時間上限を超えています。');
   if(!(length>0&&length<=(fullMode()?360:120))||end<0||end>length*1000)throw Error('サビまたは冒頭表示の長さを確認してください。');
-  const shortage=offset()+length-file.duration;
+  const trim=numberMs('acTrimEnd');
+  if(trim!==null&&(trim<=offset()*1000||trim>file.duration*1000+1))throw Error('映像の終了位置を確認してください。');
+  const shortage=offset()+length-(trim===null?file.duration:trim/1000);
   if(shortage>.001)throw Error(`映像が ${shortage.toFixed(3)} 秒不足しています。`);
   if(end>0&&(!title||!artist))throw Error('冒頭表示には曲名とアーティスト名が必要です。');
   if(!rows.length||rows.length>100)throw Error('歌詞を1〜100行で入力してください。');
-  return {...result,title:title||'口パク動画',artist:artist||'未設定',schema_version:2,video_start_ms:Math.round(offset()*1000)};
+  return {...result,title:title||'口パク動画',artist:artist||'未設定',schema_version:2,video_start_ms:Math.round(offset()*1000),video_end_ms:trim,face_mask:readMask(length)};
  }
  if(title.length<1||artist.length<1||!rows.length||!file)throw Error('動画・曲名・アーティスト名・歌詞を入力してください。');
  if(!Number.isFinite(file.duration)||file.duration>120||end>file.duration*1000)throw Error('動画またはフックの長さを確認してください。');
@@ -200,7 +203,7 @@ if(savedPending())status(`前回の受付 ${savedPending().receipt} の確認が
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
-const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears'];
+const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return [file.name,file.size,file.lastModified].join(':');}
@@ -381,7 +384,7 @@ function applySnapshot(snapshot){
  for(const id of projectFields){
   const field=$(id),value=snapshot?.fields?.[id];
   if(field.type==='checkbox')field.checked=!!value;
-  else field.value=value??({acHook:'0',acOffset:'0',acCutStart:'0',acFraming:'contain_blur'}[id]??'');
+  else field.value=value??({acHook:'0',acOffset:'0',acCutStart:'0',acMaskStrength:'8',acMaskStart:'0',acFraming:'contain_blur'}[id]??'');
  }
  buildRows();
  for(const [i,values] of (snapshot?.rows??[]).entries()){
@@ -514,3 +517,78 @@ $('acProjects').onchange=async()=>{try{
   if(video)selectVideo(await downloadProjectAsset(video));
  }else status(project?.audio?`フル音源「${project.audio.name}」を再選択してください。`:'曲の情報と素材を選択してください。');
 }catch(e){status(e.message);}};
+
+const maskCanvas=$('acMaskPreview');
+maskCanvas.style.touchAction='none';
+const numberMs=id=>$(id).value===''?null:Math.round(Number($(id).value)*1000);
+let dragStart=null;
+function readMask(duration){
+ const kind=$('acMaskKind').value;
+ if(!kind)return null;
+ const start_ms=numberMs('acMaskStart')??0,end_ms=numberMs('acMaskEnd')??Math.round(duration*1000);
+ const strength=Number($('acMaskStrength').value);
+ const keys=$('acMaskKeys').value.split('\n').filter(line=>line.trim()).map(line=>line.split(',').map((v,i)=>v.trim()?Math.round(Number(v)*(i?100:1000)):NaN));
+ if(!Number.isInteger(strength)||strength<1||strength>10||!(start_ms>=0&&end_ms>start_ms&&end_ms<=duration*1000+1)||!keys.length||keys.length>60||
+ keys.some(([t,x,y,w,h,...rest],i)=>rest.length||![t,x,y,w,h].every(Number.isInteger)||t<start_ms||t>end_ms||(i&&t<=keys[i-1][0])||x<0||y<0||w<=0||h<=0||x+w>10000||y+h>10000))
+  throw Error('顔モザイクの枠・適用時刻・強度を確認してください。');
+ return {kind,strength,start_ms,end_ms,keys};
+}
+function paintMask(){
+ if(!maskCanvas?.offsetWidth)return;
+ const video=$('acPreview');
+ if(!video.videoWidth||video.readyState<2)return;
+ maskCanvas.height=Math.round(maskCanvas.width*video.videoHeight/video.videoWidth);
+ const ctx=maskCanvas.getContext('2d'), W=maskCanvas.width,H=maskCanvas.height;
+ ctx.drawImage(video,0,0,W,H);
+ try{
+  const mask=readMask(chorusPlayer.duration);
+  const time=(video.currentTime-offset())*1000;
+  if(!mask||time<mask.start_ms||time>=mask.end_ms)return;
+  const i=mask.keys.findIndex(k=>k[0]>time);
+  const a=mask.keys[i<0?mask.keys.length-1:Math.max(0,i-1)],b=mask.keys[i<0?mask.keys.length-1:i];
+  const fraction=a===b?0:(time-a[0])/(b[0]-a[0]);
+  const [x,y,w,h]=a.slice(1).map((v,n)=>(v+(b[n+1]-v)*fraction)*(n%2?H:W)/10000);
+  if(mask.kind==='black'){ctx.fillStyle='black';ctx.fillRect(x,y,w,h);return;}
+  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+  if(mask.kind==='blur'){ctx.filter=`blur(${mask.strength*2}px)`;ctx.drawImage(video,0,0,W,H);}
+  else{
+   const small=document.createElement('canvas');small.width=Math.max(1,Math.round(W/(mask.strength*2+2)));small.height=Math.max(1,Math.round(H/(mask.strength*2+2)));
+   small.getContext('2d').drawImage(video,0,0,small.width,small.height);
+   ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,W,H);
+  }
+  ctx.restore();
+ }catch{}
+}
+function maskPoint(event){
+ const box=maskCanvas.getBoundingClientRect();
+ return [Math.min(100,Math.max(0,(event.clientX-box.left)/box.width*100)),Math.min(100,Math.max(0,(event.clientY-box.top)/box.height*100))];
+}
+maskCanvas.onpointerdown=event=>{
+ if(!$('acPreview').videoWidth)return;
+ event.preventDefault();maskCanvas.setPointerCapture(event.pointerId);dragStart=maskPoint(event);
+};
+maskCanvas.onpointerup=event=>{
+ if(!dragStart)return;
+ const [ax,ay]=dragStart,[bx,by]=maskPoint(event);dragStart=null;
+ const time=Math.max(0,$('acPreview').currentTime-offset()).toFixed(3);
+ const values=[Math.min(ax,bx),Math.min(ay,by),Math.abs(ax-bx),Math.abs(ay-by)].map(v=>v.toFixed(2));
+ if(Number(values[2])<.1||Number(values[3])<.1)return;
+ const field=$('acMaskKeys');
+ field.value=[...field.value.split('\n').filter(line=>line.trim()&&Number(line.split(',')[0])!==Number(time)),[time,...values].join(',')].sort((a,b)=>Number(a.split(',')[0])-Number(b.split(',')[0])).join('\n');
+ if(!$('acMaskKind').value)$('acMaskKind').value='pixel';
+ saveDraft();repaint();
+};
+maskCanvas.onpointercancel=()=>{dragStart=null;};
+$('acMarkTrimEnd').onclick=()=>{$('acTrimEnd').value=$('acPreview').currentTime.toFixed(2);};
+$('acPlayTrim').onclick=async()=>{
+ try{
+  if(!file||!Number.isFinite(chorusPlayer.duration))throw Error('撮影映像と曲を選択してください。');
+  const end=numberMs('acTrimEnd')??file.duration*1000;
+  if(end>file.duration*1000+1||offset()+chorusPlayer.duration>end/1000+.001)
+   throw Error('選択した映像範囲が曲の長さに合いません。');
+  chorusPlayer.currentTime=0;await chorusPlayer.play();
+ }catch(e){status(e.message);}
+};
+$('acPreview').addEventListener('seeked',paintMask);
+$('acPreview').addEventListener('loadeddata',paintMask);
+maskCanvas.closest('details').addEventListener('toggle',paintMask);
