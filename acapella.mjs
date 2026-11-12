@@ -236,7 +236,12 @@ function setChorus(file){
  chorus=file;
  saveDraft();
  if(chorusUrl)URL.revokeObjectURL(chorusUrl);
- chorusUrl=URL.createObjectURL(file);chorusPlayer.src=chorusUrl;
+ chorusUrl=URL.createObjectURL(file.slice(0,file.size,'audio/wav'));
+ chorusPlayer.src=chorusUrl;
+ chorusPlayer.load();
+ const link=$('acWavDownload');
+ link.href=chorusUrl;link.download=file.name;link.hidden=false;
+ $('acWavShare').hidden=!navigator.canShare?.({files:[file]});
 }
 function cut(){
  if(!decoded)throw Error('先にフル音源を読み込んでください。');
@@ -297,11 +302,20 @@ $('acCutPreview').onclick=async()=>{try{
  if(!decoded||!(start>=0&&end>start&&end<=decoded.duration&&end-start<=120))throw Error('切り出し範囲を確認してください。');
  full.currentTime=start;previewEnd=end;await full.play();
 }catch(e){status(e.message);}};
-$('acCutSave').onclick=()=>{try{
- setChorus(cut());
- const link=document.createElement('a');link.href=chorusUrl;link.download=chorus.name;link.click();
- status('サビを確定しました。映像との同期と歌詞の時刻を確認してください。');
-}catch(e){status(e.message);}};
+const cutStatus=message=>{$('acCutStatus').textContent=message;};
+$('acCutSave').onclick=()=>{
+ try{
+  setChorus(cut());
+  cutStatus('サビを確定しました。このまま動画制作に進めます。端末に保存する場合は下のボタンを使ってください。');
+ }catch(e){cutStatus(e.message);}
+};
+$('acWavShare').onclick=async()=>{
+ try{if(chorus)await navigator.share({files:[chorus]});}
+ catch(e){if(e.name!=='AbortError')cutStatus('共有できませんでした。「WAVをダウンロード」を使ってください。');}
+};
+chorusPlayer.addEventListener('error',()=>{
+ if(chorus)cutStatus('サビWAVを再生できません。WAVをダウンロードして端末で再生できるか確認してください。');
+});
 $('acChorus').onchange=()=>{const selected=$('acChorus').files[0];if(selected)setChorus(selected);};
 $('acMarkOffset').onclick=()=>{$('acOffset').value=$('acPreview').currentTime.toFixed(2);};
 chorusPlayer.onplay=()=>{
@@ -507,6 +521,7 @@ $('acProjects').onchange=async()=>{try{
  const entry=id?await api(projectFile(id)):null;
  project=entry?JSON.parse(new TextDecoder().decode(bytes(entry.content.replace(/\s/g,'')))):null;
  projectSha=entry?.sha??null;projectAudio=null;decoded=null;chorus=null;file=null;audioIdentity=null;
+ $('acWavDownload').hidden=true;$('acWavShare').hidden=true;cutStatus('');
  for(const field of ['acFile','acFull','acChorus'])$(field).value='';
  for(const media of [$('acPreview'),$('acBackground'),full,chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
  restoreProjectLayout();
