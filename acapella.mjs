@@ -12,6 +12,48 @@ const fullMode=()=>$('acMode').value==='full';
 const chorusPlayer=$('acChorusPlayer');
 const offset=()=>Math.round(Number($('acOffset').value)*1000)/1000;
 let chorus=null, decoded=null, fullUrl=null, chorusUrl=null, previewEnd=null;
+const textDefaults=()=>({vertical:{hook:{font_size:70,center_x:540,center_y:384,max_width_ratio:.82,lines:'single'},caption:{font_size:52,center_x:540,center_y:1190,max_width_ratio:.82}},landscape:{hook:{font_size:86,center_x:960,center_y:216,max_width_ratio:.82,lines:'single'},caption:{font_size:60,center_x:960,center_y:670,max_width_ratio:.82}}});
+let textLayouts=textDefaults();
+const textDimensions=fmt=>fmt==='vertical'?[1080,1920]:[1920,1080];
+const textFields={hook:{font_size:'acHookSize',center_x:'acHookX',center_y:'acHookY',max_width_ratio:'acHookWidth',lines:'acHookLines'},caption:{font_size:'acCaptionSize',center_x:'acCaptionX',center_y:'acCaptionY',max_width_ratio:'acCaptionWidth'}};
+function loadTextFields(){
+ const fmt=$('acTextFormat').value,[width,height]=textDimensions(fmt),slot=textLayouts[fmt];
+ for(const [kind,fields] of Object.entries(textFields))for(const [key,id] of Object.entries(fields)){
+  const value=slot[kind][key];$(id).value=key==='center_x'?(value/width*100).toFixed(1):key==='center_y'?(value/height*100).toFixed(1):key==='max_width_ratio'?Math.round(value*100):value;
+ }
+ paintTextStyle();
+}
+function saveTextFields(){
+ const fmt=$('acTextFormat').value,[width,height]=textDimensions(fmt),slot=textLayouts[fmt];
+ for(const [kind,fields] of Object.entries(textFields))for(const [key,id] of Object.entries(fields)){
+  if(key==='lines'){slot[kind][key]=$(id).value;continue;}
+  const n=Number($(id).value);if($(id).value===''||!Number.isFinite(n))continue;
+  slot[kind][key]=key==='center_x'?Math.round(n/100*width):key==='center_y'?Math.round(n/100*height):key==='max_width_ratio'?n/100:Math.round(n);
+ }
+ saveDraft();paintTextStyle();
+}
+function paintTextStyle(){
+ const fmt=$('acPreviewFormat').value,[width,height]=textDimensions(fmt),box=$('acPreviewBox');
+ if(!box?.clientWidth)return;
+ const slot=textLayouts[fmt],scale=box.clientWidth/width;
+ const actual=[];
+ for(const [id,kind] of [['acLipTitle','hook'],['acOverlay',lip()?'caption':Number($('acPreview')?.currentTime||0)<Number($('acHook').value)*1?'hook':'caption']]){
+  const node=$(id),style=slot[kind];if(!node)continue;
+  const parts=kind==='hook'&&style.lines==='double'?[$('acTitle').value,$('acArtist').value]:[kind==='hook'?`${$('acTitle').value}  /  ${$('acArtist').value}`:node.textContent];
+  let effective=style.font_size;
+  const context=document.createElement('canvas').getContext?.('2d');
+  const measure=(part,size)=>{if(context){context.font=`700 ${size}px sans-serif`;return context.measureText(part).width+6;}return part.length*size;};
+  while(parts.some(part=>measure(part,effective)>width*style.max_width_ratio)&&effective>16)effective-=2;
+  actual.push(`${kind==='hook'?'フック':'歌詞'} ${effective}px${effective<style.font_size?'（幅に合わせ縮小）':''}`);
+  node.style.left=`${style.center_x/width*100}%`;node.style.top=`${style.center_y/height*100}%`;
+  node.style.maxWidth=`${style.max_width_ratio*100}%`;node.style.width=`${style.max_width_ratio*100}%`;
+  node.style.fontSize=`${Math.max(12,effective*scale)}px`;
+  node.style.whiteSpace=kind==='hook'&&style.lines==='double'?'pre-line':'nowrap';
+  if(kind==='hook'&&style.lines==='double')node.textContent=node.textContent.replace(' / ','\n');
+ }
+ const hook=slot.hook,caption=slot.caption;
+ $('acTextStatus').textContent=`${fmt==='vertical'?'縦型':'横型'}：設定 フック ${hook.font_size}px・歌詞 ${caption.font_size}px。表示目安 ${actual.join('／')}。端末と生成環境のフォント差は完成動画で確認してください。`;
+}
 function val(){if(lip())return chorusPlayer.currentTime;return Number($('acPreview').currentTime||0);}
 function repaint(){
  if(lip()&&chorus){
@@ -33,6 +75,7 @@ function repaint(){
  if(lip()&&hook)overlay.textContent=lyricText;
  if(lip())paintMask();
  $('acLipTitle').textContent=lip()&&hook?`${$('acTitle').value} / ${$('acArtist').value}`:'';
+ paintTextStyle();
 }
 function buildRows(){
  const root=$('acLines');root.replaceChildren();rows=[];
@@ -57,12 +100,13 @@ function compiledLyrics(partial=false){
   end_ms:r.end.value===''?null:Math.round(Number(r.end.value)*1000)})),clears,duration);
 }
 function script(id,meta){
+ validateLocalText();
  const title=$('acTitle').value.trim(),artist=$('acArtist').value.trim(),end=Math.round(Number($('acHook').value)*1000);
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
  const output=lip()?(fullMode()?'horizontal_only':'vertical_only'):$('acOutput').value,framing=$('acFraming').value;
  const result={schema_version:1,production_type:'acapella',title,artist,hook_end_ms:end,lyrics,
   source:{public_id:`v-generator/acapella/${id}`,format:meta.format,bytes:meta.bytes,sha256:meta.sha256},
-  framing:{vertical:framing,landscape:framing},global_settings:{format:'vertical',output_mode:output},auto_link:false};
+   framing:{vertical:framing,landscape:framing},text_layout:structuredClone(textLayouts),global_settings:{format:'vertical',output_mode:output},auto_link:false};
  if(lip()){
   if(!chorus||!Number.isFinite(file?.duration)||!Number.isFinite(offset())||offset()<0)throw Error('映像とサビ音源を確認してください。');
   const length=chorusPlayer.duration;
@@ -81,6 +125,15 @@ function script(id,meta){
  let previous=0;
  for(const line of lyrics){if(!line.text||line.start_ms<previous||line.end_ms<=line.start_ms||line.end_ms>file.duration*1000+50)throw Error('歌詞の時刻が重複または動画の範囲外です。');previous=line.end_ms;}
  return result;
+}
+function validateLocalText(){
+ for(const fmt of ['vertical','landscape']){
+  const [width,height]=textDimensions(fmt);
+  for(const name of ['hook','caption']){
+   const slot=textLayouts[fmt][name];
+   if(!Number.isInteger(slot.font_size)||slot.font_size<16||slot.font_size>300||!Number.isInteger(slot.center_x)||slot.center_x<0||slot.center_x>width||!Number.isInteger(slot.center_y)||slot.center_y<0||slot.center_y>height||!Number.isFinite(slot.max_width_ratio)||slot.max_width_ratio<.1||slot.max_width_ratio>1)throw Error('冒頭フック・歌詞の文字サイズ、位置、表示幅を確認してください。');
+  }
+ }
 }
 async function fileMeta(f,audio=false){
  if(!f||!(audio?['wav']:['mp4','mov']).includes(f.name.split('.').at(-1).toLowerCase())||!f.size||f.size>(fullMode()?(audio?64_000_000:100_000_000):(audio?24_000_000:80_000_000)))throw Error('素材の形式と容量上限を確認してください。');
@@ -183,10 +236,24 @@ function selectVideo(blob){
  $('acPreview').onloadedmetadata=()=>{file.duration=$('acPreview').duration;status(`${file.duration.toFixed(1)}秒の動画を読み込みました。`);};
 }
 $('acPreview').ontimeupdate=repaint;
-function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');}
+function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');paintTextStyle();}
 $('acPreviewFormat').onchange=previewLayout;$('acFraming').onchange=previewLayout;
 previewLayout();
 for(const id of ['acTitle','acArtist','acHook'])$(id).oninput=repaint;
+$('acTextFormat').onchange=()=>{if(!lip()){$('acPreviewFormat').value=$('acTextFormat').value;previewLayout();}loadTextFields();};
+for(const fields of Object.values(textFields))for(const id of Object.values(fields))$(id).addEventListener('input',()=>{saveTextFields();repaint();});
+$('acTextReset').onclick=()=>{const fmt=$('acTextFormat').value;textLayouts[fmt]=textDefaults()[fmt];loadTextFields();saveDraft();repaint();};
+$('acTextDrag').onchange=()=>{$('acPreviewBox').classList.toggle('text-edit',$('acTextDrag').checked);};
+for(const id of ['acOverlay','acLipTitle']){
+ const node=$(id);let dragging=false;
+ node.onpointerdown=e=>{if(!$('acTextDrag').checked||!node.textContent)return;dragging=true;node.setPointerCapture(e.pointerId);e.preventDefault();};
+ node.onpointermove=e=>{if(!dragging)return;const rect=$('acPreviewBox').getBoundingClientRect(),fmt=$('acPreviewFormat').value,[width,height]=textDimensions(fmt);
+  const kind=id==='acLipTitle'||id==='acOverlay'&&!lip()&&val()<Number($('acHook').value)?'hook':'caption';
+  textLayouts[fmt][kind].center_x=Math.round(Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))*width);
+  textLayouts[fmt][kind].center_y=Math.round(Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))*height);
+  $('acTextFormat').value=fmt;loadTextFields();saveDraft();repaint();};
+ node.onpointerup=node.onpointercancel=()=>{dragging=false;};
+}
 $('acBuildLines').onclick=buildRows;$('acSubmit').onclick=submit;
 async function recover(){
  const item=savedPending();if(!item){status('確認待ちの生成受付はありません。');return;}
@@ -208,15 +275,15 @@ const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return [file.name,file.size,file.lastModified].join(':');}
 function saveDraft(){
- if(!lip())return;
  const fields=Object.fromEntries(draftFields.map(id=>[id,$(id).value]));
- try{localStorage.setItem(draftKey(),JSON.stringify({fields,audioIdentity,rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])}));}catch{}
+ try{localStorage.setItem(draftKey(),JSON.stringify({fields,textLayouts,audioIdentity,rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])}));}catch{}
 }
 function restoreDraft(){
  try{
   const draft=JSON.parse(localStorage.getItem(draftKey()));
   if(!draft)return;
   for(const id of draftFields)if(draft.fields[id]!==undefined)$(id).value=draft.fields[id];
+   textLayouts=mergeTextLayouts(draft.textLayouts);loadTextFields();
   audioIdentity=draft.audioIdentity;
   buildRows();
   for(const [i,values] of draft.rows.entries()){
@@ -224,6 +291,14 @@ function restoreDraft(){
    [rows[i].text.value,rows[i].start.value,rows[i].end.value]=values;
   }
  }catch{}
+}
+function mergeTextLayouts(saved){
+ const defaults=textDefaults();
+ if(!saved||typeof saved!=='object')return defaults;
+ for(const fmt of ['vertical','landscape'])for(const kind of ['hook','caption']){
+  if(saved[fmt]?.[kind]&&typeof saved[fmt][kind]==='object')Object.assign(defaults[fmt][kind],saved[fmt][kind]);
+ }
+ return defaults;
 }
 function setChorus(file){
  const next=identity(file);
@@ -258,12 +333,16 @@ $('acMode').onchange=()=>{
  $('acLip').hidden=!lip();$('acPreview').muted=lip();
  $('acHook').min=lip()?'0':'0.1';$('acHook').value=lip()?'0':'3';
  $('acOutput').disabled=lip();$('acPreviewFormat').disabled=lip();
- if(lip()){$('acPreviewFormat').value=fullMode()?'landscape':'vertical';if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
- else chorusPlayer.pause();
+ const videoLabel=$('acFile').parentElement;
+ if(lip()){ $('acLip').insertBefore(videoLabel,$('acOffset').parentElement);$('acPreviewFormat').value=fullMode()?'landscape':'vertical';$('acTextFormat').value=$('acPreviewFormat').value;$('acTextFormat').disabled=true;if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
+ else { $('acPreviewFormat').parentElement.before(videoLabel);$('acTextFormat').disabled=false;chorusPlayer.pause();restoreDraft();}
+ loadTextFields();
  $('acSubmit').textContent=lip()?(fullMode()?'横型フルMVを生成':'縦型サビショートを生成'):'アカペラ動画を生成';
  repaint();
 };
 $('acFull').onchange=()=>readFull($('acFull').files[0]).catch(e=>status(e.message));
+function seekAudio(player,delta){const duration=player.duration;if(!Number.isFinite(duration))return;player.currentTime=Math.min(duration,Math.max(0,player.currentTime+delta));repaint();}
+for(const [id,player,delta] of [['acFullBack',full,-5],['acFullForward',full,5],['acChorusBack',chorusPlayer,-5],['acChorusForward',chorusPlayer,5]])$(id).onclick=()=>seekAudio(player,delta);
 async function readFull(f){
  decoded=null;
  if(!f)return;
@@ -392,9 +471,10 @@ const projectFields=[...draftFields,'acCutStart','acCutEnd','acCandidate'];
 const layoutKey=()=>fullMode()?'full':'short';
 function projectSnapshot(){
  return {fields:Object.fromEntries(projectFields.map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value])),
-  rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])};
+   textLayouts:structuredClone(textLayouts),rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])};
 }
 function applySnapshot(snapshot){
+ textLayouts=mergeTextLayouts(snapshot?.textLayouts);loadTextFields();
  for(const id of projectFields){
   const field=$(id),value=snapshot?.fields?.[id];
   if(field.type==='checkbox')field.checked=!!value;
@@ -536,7 +616,7 @@ $('acProjects').onchange=async()=>{try{
 const maskCanvas=$('acMaskPreview');
 maskCanvas.style.touchAction='none';
 const numberMs=id=>$(id).value===''?null:Math.round(Number($(id).value)*1000);
-let dragStart=null;
+let dragStart=null,dragMask=null,compareMask=false;
 function readMask(duration){
  const kind=$('acMaskKind').value;
  if(!kind)return null;
@@ -555,24 +635,34 @@ function paintMask(){
  maskCanvas.height=Math.round(maskCanvas.width*video.videoHeight/video.videoWidth);
  const ctx=maskCanvas.getContext('2d'), W=maskCanvas.width,H=maskCanvas.height;
  ctx.drawImage(video,0,0,W,H);
+ let currentRect=null;
  try{
   const mask=readMask(chorusPlayer.duration);
   const time=(video.currentTime-offset())*1000;
-  if(!mask||time<mask.start_ms||time>=mask.end_ms)return;
-  const i=mask.keys.findIndex(k=>k[0]>time);
-  const a=mask.keys[i<0?mask.keys.length-1:Math.max(0,i-1)],b=mask.keys[i<0?mask.keys.length-1:i];
-  const fraction=a===b?0:(time-a[0])/(b[0]-a[0]);
-  const [x,y,w,h]=a.slice(1).map((v,n)=>(v+(b[n+1]-v)*fraction)*(n%2?H:W)/10000);
-  if(mask.kind==='black'){ctx.fillStyle='black';ctx.fillRect(x,y,w,h);return;}
-  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-  if(mask.kind==='blur'){ctx.filter=`blur(${mask.strength*2}px)`;ctx.drawImage(video,0,0,W,H);}
-  else{
-   const small=document.createElement('canvas');small.width=Math.max(1,Math.round(W/(mask.strength*2+2)));small.height=Math.max(1,Math.round(H/(mask.strength*2+2)));
-   small.getContext('2d').drawImage(video,0,0,small.width,small.height);
-   ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,W,H);
+  if(mask&&time>=mask.start_ms&&time<mask.end_ms){
+   const i=mask.keys.findIndex(k=>k[0]>time);
+   const a=mask.keys[i<0?mask.keys.length-1:Math.max(0,i-1)],b=mask.keys[i<0?mask.keys.length-1:i];
+   const fraction=a===b?0:(time-a[0])/(b[0]-a[0]);
+   const [x,y,w,h]=a.slice(1).map((v,n)=>(v+(b[n+1]-v)*fraction)*(n%2?H:W)/10000);
+   currentRect={x,y,w,h};
+   if(!compareMask){
+    if(mask.kind==='black'){ctx.fillStyle='black';ctx.fillRect(x,y,w,h);}
+    else{
+     ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+     if(mask.kind==='blur'){ctx.filter=`blur(${mask.strength*2}px)`;ctx.drawImage(video,0,0,W,H);}
+     else{
+      const small=document.createElement('canvas');small.width=Math.max(1,Math.round(W/(mask.strength*2+2)));small.height=Math.max(1,Math.round(H/(mask.strength*2+2)));
+      small.getContext('2d').drawImage(video,0,0,small.width,small.height);
+      ctx.imageSmoothingEnabled=false;ctx.drawImage(small,0,0,W,H);
+     }
+     ctx.restore();
+    }
+   }
   }
-  ctx.restore();
- }catch{}
+  $('acMaskNow').textContent=`映像 ${video.currentTime.toFixed(2)}秒／完成動画 ${Math.max(0,time/1000).toFixed(2)}秒：${mask?(currentRect?'枠を表示中':'適用時間外'):'枠未設定'}。記録済み ${mask?.keys.length||0}件`;
+ }catch{$('acMaskNow').textContent='モザイクの枠・適用時刻を確認してください。';}
+ const outline=dragMask||currentRect;
+ if(outline){ctx.save();ctx.strokeStyle='#00f5bd';ctx.lineWidth=Math.max(3,W/120);ctx.strokeRect(outline.x,outline.y,outline.w,outline.h);ctx.fillStyle='#00f5bd';ctx.fillRect(outline.x+outline.w-7,outline.y+outline.h-7,14,14);ctx.restore();}
 }
 function maskPoint(event){
  const box=maskCanvas.getBoundingClientRect();
@@ -580,20 +670,50 @@ function maskPoint(event){
 }
 maskCanvas.onpointerdown=event=>{
  if(!$('acPreview').videoWidth)return;
- event.preventDefault();maskCanvas.setPointerCapture(event.pointerId);dragStart=maskPoint(event);
+ event.preventDefault();maskCanvas.setPointerCapture(event.pointerId);
+ const [px,py]=maskPoint(event),x=px/100*maskCanvas.width,y=py/100*maskCanvas.height;
+ let rect=null;try{const mask=readMask(chorusPlayer.duration),time=($('acPreview').currentTime-offset())*1000;
+  if(mask&&time>=mask.start_ms&&time<mask.end_ms){const i=mask.keys.findIndex(k=>k[0]>time),a=mask.keys[i<0?mask.keys.length-1:Math.max(0,i-1)],b=mask.keys[i<0?mask.keys.length-1:i],fraction=a===b?0:(time-a[0])/(b[0]-a[0]);
+   const [rx,ry,rw,rh]=a.slice(1).map((v,n)=>(v+(b[n+1]-v)*fraction)*(n%2?maskCanvas.height:maskCanvas.width)/10000);rect={x:rx,y:ry,w:rw,h:rh};}}
+ catch{}
+ const corner=rect&&Math.abs(x-(rect.x+rect.w))<25&&Math.abs(y-(rect.y+rect.h))<25;
+ const inside=rect&&x>=rect.x&&x<=rect.x+rect.w&&y>=rect.y&&y<=rect.y+rect.h;
+ dragStart={x,y,rect,mode:corner?'resize':inside?'move':'new'};
+};
+maskCanvas.onpointermove=event=>{
+ if(!dragStart)return;
+ const [px,py]=maskPoint(event),x=px/100*maskCanvas.width,y=py/100*maskCanvas.height;
+ const start=dragStart,base=start.rect;
+ if(start.mode==='move')dragMask={x:Math.max(0,Math.min(maskCanvas.width-base.w,base.x+x-start.x)),y:Math.max(0,Math.min(maskCanvas.height-base.h,base.y+y-start.y)),w:base.w,h:base.h};
+ else if(start.mode==='resize')dragMask={x:base.x,y:base.y,w:Math.max(1,Math.min(maskCanvas.width-base.x,x-base.x)),h:Math.max(1,Math.min(maskCanvas.height-base.y,y-base.y))};
+ else dragMask={x:Math.min(start.x,x),y:Math.min(start.y,y),w:Math.abs(x-start.x),h:Math.abs(y-start.y)};
+ paintMask();
 };
 maskCanvas.onpointerup=event=>{
  if(!dragStart)return;
- const [ax,ay]=dragStart,[bx,by]=maskPoint(event);dragStart=null;
+ maskCanvas.onpointermove(event);
+ const frame=dragMask;dragStart=null;dragMask=null;
+ if(!frame)return;
  const time=Math.max(0,$('acPreview').currentTime-offset()).toFixed(3);
- const values=[Math.min(ax,bx),Math.min(ay,by),Math.abs(ax-bx),Math.abs(ay-by)].map(v=>v.toFixed(2));
+ const values=[frame.x/maskCanvas.width*100,frame.y/maskCanvas.height*100,frame.w/maskCanvas.width*100,frame.h/maskCanvas.height*100].map(v=>v.toFixed(2));
  if(Number(values[2])<.1||Number(values[3])<.1)return;
  const field=$('acMaskKeys');
  field.value=[...field.value.split('\n').filter(line=>line.trim()&&Number(line.split(',')[0])!==Number(time)),[time,...values].join(',')].sort((a,b)=>Number(a.split(',')[0])-Number(b.split(',')[0])).join('\n');
  if(!$('acMaskKind').value)$('acMaskKind').value='pixel';
  saveDraft();repaint();
 };
-maskCanvas.onpointercancel=()=>{dragStart=null;};
+maskCanvas.onpointercancel=()=>{dragStart=null;dragMask=null;paintMask();};
+$('acMaskDelete').onclick=()=>{
+ const time=Math.max(0,$('acPreview').currentTime-offset());
+ const lines=$('acMaskKeys').value.split('\n').filter(Boolean),index=lines.findIndex(line=>Math.abs(Number(line.split(',')[0])-time)<.51);
+ if(index<0){$('acMaskNow').textContent='現在位置の前後0.5秒に記録された枠がありません。';return;}
+ lines.splice(index,1);$('acMaskKeys').value=lines.join('\n');saveDraft();paintMask();
+};
+$('acMaskBefore').onclick=()=>{compareMask=!compareMask;$('acMaskBefore').textContent=compareMask?'モザイク表示に戻す':'元映像と比較';paintMask();};
+function maskControls(){const hidden=!$('acMaskKind').value||$('acMaskKind').value==='black';$('acMaskStrength').parentElement.hidden=hidden;paintMask();}
+$('acMaskKind').addEventListener('change',maskControls);
+$('acMaskStrength').addEventListener('input',paintMask);
+maskControls();
 $('acMarkTrimEnd').onclick=()=>{$('acTrimEnd').value=$('acPreview').currentTime.toFixed(2);};
 $('acPlayTrim').onclick=async()=>{
  try{
@@ -607,3 +727,15 @@ $('acPlayTrim').onclick=async()=>{
 $('acPreview').addEventListener('seeked',paintMask);
 $('acPreview').addEventListener('loadeddata',paintMask);
 maskCanvas.closest('details').addEventListener('toggle',paintMask);
+
+const standardAreas=['pbSaveSection','autoLinkArea','pbSingleNarration','audioUpload','promptBuilder','pbSingleScript','standardGenerate'];
+let shownMode='standard';
+function showProductionMode(){
+ const mode=$('productionMode').value,ac=mode!=='standard';
+ $('acapellaArea').hidden=!ac;
+ for(const id of standardAreas)$(id).hidden=ac;
+ if(ac){$('acapellaArea').querySelector('details').open=true;if(shownMode!==mode){$('acMode').value=mode;$('acMode').dispatchEvent(new Event('change'));}}
+ shownMode=mode;
+}
+$('productionMode').onchange=showProductionMode;
+showProductionMode();
