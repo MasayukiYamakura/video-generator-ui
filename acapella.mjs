@@ -9,6 +9,8 @@ function savedPending(){try{return JSON.parse(localStorage.getItem(pendingKey())
 const repo=()=>$('repo').value.trim();
 const lip=()=>$('acMode').value!=='original';
 const fullMode=()=>$('acMode').value==='full';
+const stock=()=>lip()&&$('acVisualMode').value==='stock_mix';
+let imageFile=null,imageUrl=null;
 const chorusPlayer=$('acChorusPlayer');
 const offset=()=>Math.round(Number($('acOffset').value)*1000)/1000;
 let chorus=null, decoded=null, fullUrl=null, chorusUrl=null, previewEnd=null;
@@ -56,7 +58,7 @@ function paintTextStyle(){
 }
 function val(){if(lip())return chorusPlayer.currentTime;return Number($('acPreview').currentTime||0);}
 function repaint(){
- if(lip()&&chorus){
+ if(lip()&&chorus&&!stock()){
   const video=$('acPreview'), target=offset()+val();
   if(!chorusPlayer.paused&&video.paused)video.play().catch(()=>{});
   if(chorusPlayer.paused&&!video.paused&&syncPlaying)video.pause();
@@ -105,8 +107,14 @@ function script(id,meta){
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
  const output=lip()?(fullMode()?'horizontal_only':'vertical_only'):$('acOutput').value,framing=$('acFraming').value;
  const result={schema_version:1,production_type:'acapella',title,artist,hook_end_ms:end,lyrics,
-  source:{public_id:`v-generator/acapella/${id}`,format:meta.format,bytes:meta.bytes,sha256:meta.sha256},
    framing:{vertical:framing,landscape:framing},text_layout:structuredClone(textLayouts),global_settings:{format:'vertical',output_mode:output},auto_link:false};
+ if(stock()){
+  const pct=Number($('acStockPercent').value),keywords=$('acStockKeywords').value.split('\n').map(v=>v.trim()).filter(Boolean);
+  if($('acStockPercent').value===''||!Number.isInteger(pct)||pct<0||pct>100||!['pexels','pixabay'].includes($('acStockProvider').value)||keywords.length<1||keywords.length>12||keywords.some(k=>!/^[A-Za-z0-9 _,-]{2,100}$/.test(k)))throw Error('外部映像の割合、提供元、英語の検索語を確認してください。');
+  if(!chorus||!imageFile||!rows.length||!Number.isFinite(chorusPlayer.duration)||end<1000||end>10000||end>=chorusPlayer.duration*1000)throw Error('冒頭画像・楽曲・歌詞・冒頭表示の長さを確認してください。');
+  return {...result,schema_version:3,image_source:{public_id:`v-generator/acapella/${id}`,...meta},music_visuals:{stock_percent:pct,provider:$('acStockProvider').value,keywords}};
+ }
+ result.source={public_id:`v-generator/acapella/${id}`,...meta};
  if(lip()){
   if(!chorus||!Number.isFinite(file?.duration)||!Number.isFinite(offset())||offset()<0)throw Error('映像とサビ音源を確認してください。');
   const length=chorusPlayer.duration;
@@ -135,10 +143,11 @@ function validateLocalText(){
   }
  }
 }
-async function fileMeta(f,audio=false){
- if(!f||!(audio?['wav']:['mp4','mov']).includes(f.name.split('.').at(-1).toLowerCase())||!f.size||f.size>(fullMode()?(audio?64_000_000:100_000_000):(audio?24_000_000:80_000_000)))throw Error('素材の形式と容量上限を確認してください。');
+async function fileMeta(f,audio=false,image=false){
+ if(!f||!(image?['png','jpg','jpeg','webp']:audio?['wav']:['mp4','mov']).includes(f.name.split('.').at(-1).toLowerCase())||!f.size||f.size>(image?20_000_000:fullMode()?(audio?64_000_000:100_000_000):(audio?24_000_000:80_000_000)))throw Error('素材の形式と容量上限を確認してください。');
  const digest=await crypto.subtle.digest('SHA-256',await f.arrayBuffer());
- return {bytes:f.size,sha256:Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join(''),format:f.name.split('.').at(-1).toLowerCase()};
+ const ext=f.name.split('.').at(-1).toLowerCase();
+ return {bytes:f.size,sha256:Array.from(new Uint8Array(digest),v=>v.toString(16).padStart(2,'0')).join(''),format:image&&ext==='jpeg'?'jpg':ext};
 }
 async function keyPair(){
  const keys=await crypto.subtle.generateKey({name:'RSA-OAEP',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},false,['encrypt','decrypt']);
@@ -171,7 +180,8 @@ function upload(f,p){
  return new Promise((resolve,reject)=>{
   if(p.expires_at<Date.now()/1000||p.params?.type!=='authenticated'||p.params?.public_id!==`v-generator/acapella/${source.id}`)return reject(Error('アップロード許可が無効です。'));
   const form=new FormData();form.append('file',f);for(const [k,v] of Object.entries(p.params))form.append(k,String(v));form.append('api_key',p.api_key);form.append('signature',p.signature);
-  const xhr=new XMLHttpRequest();xhr.open('POST',`https://api.cloudinary.com/v1_1/${p.cloud_name}/video/upload`);xhr.timeout=300000;
+  const resource=['png','jpg','jpeg','webp'].includes(p.metadata.format)?'image':'video';
+  const xhr=new XMLHttpRequest();xhr.open('POST',`https://api.cloudinary.com/v1_1/${p.cloud_name}/${resource}/upload`);xhr.timeout=300000;
   xhr.upload.onprogress=e=>{if(e.lengthComputable)status(`素材を送信中：${Math.round(e.loaded/e.total*100)}%`);};
   xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){try{const v=JSON.parse(xhr.responseText);if(v.public_id!==p.params.public_id||v.bytes!==p.metadata.bytes||v.format!==p.metadata.format)throw Error('登録結果が一致しません。');resolve(v);}catch(e){reject(e);}}else reject(Error('転送の結果を確認できません。新規受付で再送せずCloudinaryの素材を確認してください。'));};
   xhr.onerror=xhr.ontimeout=()=>reject(Error('転送結果が不明です。Cloudinaryの素材を確認してください。'));
@@ -187,13 +197,14 @@ async function submit(){
  if(busy)return;busy=true;$('acSubmit').disabled=true;
  try{
   if(savedPending())throw Error('前回の生成受付を確認してください。新しい動画を再送しません。');
-  if(!file)throw Error('先に動画を選択してください。');
-  const videoFile=file.blob, audioFile=chorus;
-  const meta=await fileMeta(videoFile);
+  if(!stock()&&!file)throw Error('先に動画を選択してください。');
+  if(stock()&&!imageFile)throw Error('冒頭画像を選択してください。');
+  const videoFile=stock()?imageFile:file.blob, audioFile=chorus;
+  const meta=await fileMeta(videoFile,false,stock());
   const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
   const saved=lip()?JSON.parse(localStorage.getItem(retryKey)||'null'):null;
   const retry=saved?.videoSha===meta.sha256?saved:null;
-  const savedVideo=lip()?project?.layouts?.[layoutKey()]?.video:null;
+  const savedVideo=lip()?project?.layouts?.[layoutKey()]?.[stock()?'image':'video']:null;
   const existingVideo=savedVideo?.sha256===meta.sha256?savedVideo:null;
   const id=existingVideo?.public_id.split('/').at(-1)??retry?.videoId??crypto.randomUUID().replaceAll('-','');
   const payload=script(id,meta);
@@ -202,7 +213,7 @@ async function submit(){
   const runs=await api('actions/workflows/generate_video_ui.yml/runs?per_page=30');
   if(runs.workflow_runs.some(r=>r.status!=='completed'))throw Error('生成中の処理が完了してから実行してください。');
   const pair=await keyPair();
-  if(payload.schema_version===2){
+  if(payload.schema_version>=2){
    const audioId=retry?.audioSha===audioMeta.sha256?retry.audioId:crypto.randomUUID().replaceAll('-','');
    const transfer={videoSha:meta.sha256,videoId:id,audioSha:audioMeta.sha256,audioId};
    localStorage.setItem(retryKey,JSON.stringify(transfer));
@@ -216,11 +227,11 @@ async function submit(){
   const commit=await api('git/commits','POST',{message:`Pages input ${receipt}`,tree:tree.sha,parents:[]});
   await api('git/refs','POST',{ref:`refs/heads/ui-input/${receipt}`,sha:commit.sha});
   localStorage.setItem(pendingKey(),JSON.stringify({receipt,sha:commit.sha}));
-  if(payload.schema_version===2)localStorage.removeItem(retryKey);
+  if(payload.schema_version>=2)localStorage.removeItem(retryKey);
   await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:commit.sha,job_kind:'video'}});
   if(lip()&&project){
    project.layouts[layoutKey()]??={};
-   project.layouts[layoutKey()].video={...payload.source,name:videoFile.name};
+   project.layouts[layoutKey()][stock()?'image':'video']={...(stock()?payload.image_source:payload.source),name:videoFile.name};
    project.runs??={};
    const key=layoutKey();
    project.runs[key]=[...runList(project.runs[key]),receipt];
@@ -230,6 +241,22 @@ async function submit(){
  }catch(e){status(e.message);}finally{busy=false;$('acSubmit').disabled=false;}
 }
 $('acFile').onchange=()=>selectVideo($('acFile').files[0]);
+function selectImage(blob){
+ if(imageUrl)URL.revokeObjectURL(imageUrl);
+ imageFile=blob||null;imageUrl=blob?URL.createObjectURL(blob):null;
+ const view=$('acStockPreview');if(imageUrl)view.src=imageUrl;else view.removeAttribute('src');
+ updateVisualMode();
+}
+$('acImage').onchange=()=>selectImage($('acImage').files[0]);
+function updateVisualMode(){
+ const enabled=stock();
+ $('acStockControls').hidden=!enabled;$('acFilmedControls').hidden=enabled;
+ $('acPreview').hidden=enabled;$('acBackground').hidden=enabled;$('acStockPreview').hidden=!enabled;
+ $('acFraming').parentElement.hidden=enabled;
+ if(enabled&&Number($('acHook').value)<1)$('acHook').value='3';
+ repaint();
+}
+$('acVisualMode').onchange=()=>{updateVisualMode();saveDraft();};
 function selectVideo(blob){
  if(url)URL.revokeObjectURL(url);
  if(!blob){file=null;return;}url=URL.createObjectURL(blob);file={blob,duration:NaN};$('acPreview').src=url;$('acBackground').src=url;
@@ -270,7 +297,7 @@ if(savedPending())status(`前回の受付 ${savedPending().receipt} の確認が
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
-const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys'];
+const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return [file.name,file.size,file.lastModified].join(':');}
@@ -329,14 +356,17 @@ $('acMode').onchange=()=>{
   project.layouts[key]={...project.layouts[key],...projectSnapshot()};
  }
  previousMode=$('acMode').value;
+ $('acVisualMode').value='filmed';
+ selectImage(null);$('acImage').value='';
  $('acCutFields').hidden=fullMode();
  $('acLip').hidden=!lip();$('acPreview').muted=lip();
  $('acHook').min=lip()?'0':'0.1';$('acHook').value=lip()?'0':'3';
  $('acOutput').disabled=lip();$('acPreviewFormat').disabled=lip();
  const videoLabel=$('acFile').parentElement;
- if(lip()){ $('acLip').insertBefore(videoLabel,$('acOffset').parentElement);$('acPreviewFormat').value=fullMode()?'landscape':'vertical';$('acTextFormat').value=$('acPreviewFormat').value;$('acTextFormat').disabled=true;if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
+ if(lip()){ $('acFilmedControls').insertBefore(videoLabel,$('acOffset').parentElement);$('acPreviewFormat').value=fullMode()?'landscape':'vertical';$('acTextFormat').value=$('acPreviewFormat').value;$('acTextFormat').disabled=true;if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
  else { $('acPreviewFormat').parentElement.before(videoLabel);$('acTextFormat').disabled=false;chorusPlayer.pause();restoreDraft();}
  loadTextFields();
+ updateVisualMode();
  $('acSubmit').textContent=lip()?(fullMode()?'横型フルMVを生成':'縦型サビショートを生成'):'アカペラ動画を生成';
  repaint();
 };
@@ -478,13 +508,13 @@ function applySnapshot(snapshot){
  for(const id of projectFields){
   const field=$(id),value=snapshot?.fields?.[id];
   if(field.type==='checkbox')field.checked=!!value;
-  else field.value=value??({acHook:'0',acOffset:'0',acCutStart:'0',acMaskStrength:'8',acMaskStart:'0',acFraming:'contain_blur'}[id]??'');
+ else field.value=value??({acHook:'0',acOffset:'0',acCutStart:'0',acMaskStrength:'8',acMaskStart:'0',acFraming:'contain_blur',acVisualMode:'filmed',acStockPercent:'50',acStockProvider:'pexels'}[id]??'');
  }
  buildRows();
  for(const [i,values] of (snapshot?.rows??[]).entries()){
   if(rows[i])[rows[i].text.value,rows[i].start.value,rows[i].end.value]=values;
  }
- repaint();
+ updateVisualMode();
 }
 function restoreProjectLayout(){
  const saved=project?.layouts?.[layoutKey()];
@@ -551,12 +581,20 @@ async function saveProject(){
  const next=structuredClone(project??{version:1,id:crypto.randomUUID(),layouts:{},lyrics:[],runs:{}});
  next.title=title;next.artist=$('acArtist').value.trim();next.candidate=$('acCandidate').checked;
  next.layouts[layoutKey()]={...next.layouts[layoutKey()],...projectSnapshot()};
- if(file?.blob){
+ if(!stock()&&file?.blob){
   const videoMeta=await fileMeta(file.blob);
   if(next.layouts[layoutKey()].video?.sha256!==videoMeta.sha256){
    const id=crypto.randomUUID().replaceAll('-','');
    await transferSource(file.blob,id,videoMeta,await keyPair());
    next.layouts[layoutKey()].video={...videoMeta,name:file.blob.name,public_id:`v-generator/acapella/${id}`};
+  }
+ }
+ if(stock()&&imageFile){
+  const imageMeta=await fileMeta(imageFile,false,true);
+  if(next.layouts[layoutKey()].image?.sha256!==imageMeta.sha256){
+   const id=crypto.randomUUID().replaceAll('-','');
+   await transferSource(imageFile,id,imageMeta,await keyPair());
+   next.layouts[layoutKey()].image={...imageMeta,name:imageFile.name,public_id:`v-generator/acapella/${id}`};
   }
  }
  const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
@@ -600,16 +638,17 @@ $('acProjects').onchange=async()=>{try{
  const id=$('acProjects').value;
  const entry=id?await api(projectFile(id)):null;
  project=entry?JSON.parse(new TextDecoder().decode(bytes(entry.content.replace(/\s/g,'')))):null;
- projectSha=entry?.sha??null;projectAudio=null;decoded=null;chorus=null;file=null;audioIdentity=null;
+ projectSha=entry?.sha??null;projectAudio=null;decoded=null;chorus=null;file=null;imageFile=null;audioIdentity=null;
  $('acWavDownload').hidden=true;$('acWavShare').hidden=true;cutStatus('');
- for(const field of ['acFile','acFull','acChorus'])$(field).value='';
+ for(const field of ['acFile','acImage','acFull','acChorus'])$(field).value='';
  for(const media of [$('acPreview'),$('acBackground'),full,chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
  restoreProjectLayout();
  if(project?.audio?.public_id){
   status('保存済みのフル音源を取得しています。');
   await readFull(await downloadProjectAsset(project.audio));
-  const video=project.layouts?.[layoutKey()]?.video;
-  if(video)selectVideo(await downloadProjectAsset(video));
+  const layout=project.layouts?.[layoutKey()]??{};
+  if(stock()&&layout.image)selectImage(await downloadProjectAsset(layout.image));
+  else if(!stock()&&layout.video)selectVideo(await downloadProjectAsset(layout.video));
  }else status(project?.audio?`フル音源「${project.audio.name}」を再選択してください。`:'曲の情報と素材を選択してください。');
 }catch(e){status(e.message);}};
 
