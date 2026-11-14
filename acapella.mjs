@@ -4,12 +4,36 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const status=s=>{$('acStatus').textContent=s;};
 const api=(...args)=>window.videoStudioApi(...args);
 let file=null,url=null,rows=[],source=null,busy=false;
-const pendingKey=()=>`acapella-pending:${repo()}`;
-function savedPending(){try{return JSON.parse(localStorage.getItem(pendingKey())||'null');}catch{return null;}}
+const pendingKey=()=>`acapella-pending-v2:${repo()}`;
+function pendingItems(){
+ try{
+  const current=JSON.parse(localStorage.getItem(pendingKey())||'[]');
+  const legacy=JSON.parse(localStorage.getItem(`acapella-pending:${repo()}`)||'null');
+  return [...(Array.isArray(current)?current:[]),...(legacy?.receipt&&legacy?.sha?[{...legacy,legacy:true}]:[])];
+ }catch{return [];}
+}
+function savePending(items){localStorage.setItem(pendingKey(),JSON.stringify(items.filter(item=>!item.legacy)));}
+function forgetPending(item){
+ if(item.legacy)localStorage.removeItem(`acapella-pending:${repo()}`);
+ else savePending(pendingItems().filter(entry=>entry.receipt!==item.receipt));
+}
 const repo=()=>$('repo').value.trim();
 const lip=()=>$('acMode').value!=='original';
 const fullMode=()=>$('acMode').value==='full';
 const stock=()=>lip()&&$('acVisualMode').value==='stock_mix';
+const preparedKey=()=>`acapella-prepared:${repo()}:${$('acMode').value}`;
+let prepared=null;
+function ready(){
+ const matches=prepared?.mode===$('acMode').value&&prepared?.stock===stock()&&
+  (stock()?prepared.imageName===$('acImage').value.trim():prepared.videoIdentity===identity(file?.blob))&&
+  (!lip()||prepared.audioIdentity===identity(chorus));
+ $('acSubmit').disabled=busy||!matches;
+ return matches;
+}
+function restorePrepared(){
+ try{prepared=JSON.parse(localStorage.getItem(preparedKey())||'null');}catch{prepared=null;}
+ ready();
+}
 let imageFile=null,imageUrl=null;
 function imageName(){
  const name=$('acImage').value.trim();
@@ -217,52 +241,89 @@ async function transferSource(blob,id,meta,pair){
  status('アップロード許可を準備しています。');
  await upload(blob,await decrypt(await permission(id,meta,pair),pair.privateKey));
 }
-async function submit(){
- if(busy)return;busy=true;$('acSubmit').disabled=true;
+async function prepare(){
+ if(busy)return;busy=true;ready();$('acPrepare').disabled=true;
  try{
-  if(savedPending())throw Error('前回の生成受付を確認してください。新しい動画を再送しません。');
+  const mode=$('acMode').value,visual=stock();
   if(!stock()&&!file)throw Error('先に動画を選択してください。');
-  const videoFile=stock()?null:file.blob, audioFile=chorus;
+  const videoFile=stock()?null:file.blob,audioFile=chorus;
   const meta=stock()?await repositoryImage():await fileMeta(videoFile);
-  const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
-  const saved=lip()?JSON.parse(localStorage.getItem(retryKey)||'null'):null;
-  const retry=saved?.videoSha===meta.sha256?saved:null;
-  const savedVideo=lip()&&!stock()?project?.layouts?.[layoutKey()]?.video:null;
-  const existingVideo=savedVideo?.sha256===meta.sha256?savedVideo:null;
-  const id=existingVideo?.public_id.split('/').at(-1)??retry?.videoId??crypto.randomUUID().replaceAll('-','');
-  const payload=script(id,meta);
   const audioMeta=lip()?await fileMeta(audioFile,true):null;
+  const saved=JSON.parse(localStorage.getItem(`acapella-transfer:${repo()}:${$('acMode').value}`)||'null');
+  const existing=lip()&&!stock()?project?.layouts?.[layoutKey()]?.video:null;
+  const savedVideo=existing?.sha256===meta.sha256?existing:null;
+  const id=savedVideo?.public_id.split('/').at(-1)??(saved?.videoSha===meta.sha256?saved.videoId:null)??crypto.randomUUID().replaceAll('-','');
+  const payload=script(id,meta);
+  const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
+  const audioId=lip()?(saved?.audioSha===audioMeta.sha256?saved.audioId:crypto.randomUUID().replaceAll('-','')):null;
+  const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
+  localStorage.setItem(retryKey,JSON.stringify({videoSha:meta.sha256,videoId:id,audioSha:audioMeta?.sha256,audioId}));
+  const pair=await keyPair();
+  if(!stock()&&!savedVideo)await transferSource(videoFile,id,meta,pair);
+  if(lip())await transferSource(audioFile,audioId,audioMeta,pair);
+  if(mode!==$('acMode').value||visual!==stock()||identity(videoFile)!==identity(file?.blob)||
+     (lip()&&identity(audioFile)!==identity(chorus)))
+   throw Error('準備中に素材または制作モードが変わりました。もう一度準備してください。');
+  prepared={mode:$('acMode').value,stock:stock(),imageName:stock()?imageName():null,
+   videoIdentity:identity(videoFile),audioIdentity:identity(audioFile),meta,id,
+   audioMeta,audioId,preparedAt:Date.now()};
+  if(lip())payload.audio_source={...audioMeta,public_id:`v-generator/acapella/${audioId}`};
+  localStorage.setItem(preparedKey(),JSON.stringify(prepared));
+  localStorage.removeItem(retryKey);
+  status('素材の準備が完了しました。生成ボタンを押し、「受付済み」の表示を確認してから別アプリへ切り替えられます。');
+ }catch(e){prepared=null;localStorage.removeItem(preparedKey());status(`素材の準備が完了していません。 ${e.message}`);}
+ finally{busy=false;$('acPrepare').disabled=false;ready();}
+}
+async function ensureInputRef(item){
+ const ref=`git/ref/heads/ui-input/${item.receipt}`;
+ try{
+  const current=await api(ref);
+  if(current.object?.sha!==item.sha)throw Error('受付IDの入力コミットが一致しません。生成を中止しました。');
+  return;
+ }catch(e){if(e.status!==404)throw e;}
+ try{await api('git/refs','POST',{ref:`refs/heads/ui-input/${item.receipt}`,sha:item.sha});}
+ catch(e){
+  if(e.status!==422)throw e;
+  const current=await api(ref);
+  if(current.object?.sha!==item.sha)throw Error('受付IDの入力コミットが一致しません。生成を中止しました。');
+ }
+}
+async function submit(){
+ if(busy||!ready())return;busy=true;ready();
+ try{
+  const current=prepared;
+  const meta=stock()?await repositoryImage():await fileMeta(file.blob);
+  if(JSON.stringify(meta)!==JSON.stringify(current.meta)||
+     (lip()&&(await fileMeta(chorus,true)).sha256!==current.audioMeta?.sha256))
+   throw Error('素材が準備時から変わりました。もう一度「素材を準備」を押してください。');
+  const payload=script(current.id,meta);
+  if(lip())payload.audio_source={...current.audioMeta,public_id:`v-generator/acapella/${current.audioId}`};
+  const signature=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(payload)))),v=>v.toString(16).padStart(2,'0')).join('');
+  if(pendingItems().some(item=>item.signature===signature))
+   throw Error('同じ内容の生成受付を確認中です。「前回の受付を確認・再開」から確認してください。');
   const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
   const runs=await api('actions/workflows/generate_video_ui.yml/runs?per_page=30');
   if(runs.workflow_runs.some(r=>r.status!=='completed'))throw Error('生成中の処理が完了してから実行してください。');
-  const pair=await keyPair();
-  if(payload.schema_version>=2){
-   const audioId=retry?.audioSha===audioMeta.sha256?retry.audioId:crypto.randomUUID().replaceAll('-','');
-   const transfer={videoSha:meta.sha256,videoId:id,audioSha:audioMeta.sha256,audioId};
-   localStorage.setItem(retryKey,JSON.stringify(transfer));
-   if(!stock()&&!existingVideo)await transferSource(videoFile,id,meta,pair);
-   await transferSource(audioFile,audioId,audioMeta,pair);
-   payload.audio_source={...audioMeta,public_id:`v-generator/acapella/${audioId}`};
-  }else await transferSource(videoFile,id,meta,pair);
-  status('動画登録完了。生成を受け付けています。');
   const receipt=crypto.randomUUID(),input=await api('git/blobs','POST',{content:JSON.stringify(payload),encoding:'utf-8'});
   const tree=await api('git/trees','POST',{tree:[{path:'input/script.json',mode:'100644',type:'blob',sha:input.sha}]});
   const commit=await api('git/commits','POST',{message:`Pages input ${receipt}`,tree:tree.sha,parents:[]});
-  await api('git/refs','POST',{ref:`refs/heads/ui-input/${receipt}`,sha:commit.sha});
-  localStorage.setItem(pendingKey(),JSON.stringify({receipt,sha:commit.sha}));
-  if(payload.schema_version>=2)localStorage.removeItem(retryKey);
+  const item={receipt,sha:commit.sha,signature,mode:$('acMode').value,title:payload.title,createdAt:Date.now()};
+  savePending([...pendingItems().filter(entry=>!entry.legacy),item]);
+  await ensureInputRef(item);
+  status(`受付ID ${receipt} を保存しました。GitHubへの受付を確認しています。`);
   await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:commit.sha,job_kind:'video'}});
+  status(`受付依頼を送信しました（${receipt}）。「受付済み」になるまで画面を開いてください。`);
+  await reconcilePending(false);
   if(lip()&&project){
    project.layouts[layoutKey()]??={};
-   project.layouts[layoutKey()][stock()?'image':'video']=stock()?{...meta,name:imageName()}:{...payload.source,name:videoFile.name};
-   project.runs??={};
-   const key=layoutKey();
+   project.layouts[layoutKey()][stock()?'image':'video']=stock()?{...meta,name:imageName()}:{...payload.source,name:file.blob.name};
+   project.runs??={};const key=layoutKey();
    project.runs[key]=[...runList(project.runs[key]),receipt];
-   try{await saveProject();}catch(e){status(`生成受付済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);return;}
+   try{await saveProject();}catch(e){status(`受付依頼済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);}
   }
-  status(`生成を受け付けました。受付ID：${receipt}。生成履歴の「更新」で結果を確認してください。`);
- }catch(e){status(e.message);}finally{busy=false;$('acSubmit').disabled=false;}
+ }catch(e){status(e.message);}finally{busy=false;ready();}
 }
+$('acPrepare').onclick=prepare;
 $('acFile').onchange=()=>selectVideo($('acFile').files[0]);
 function selectImage(blob){
  if(imageUrl)URL.revokeObjectURL(imageUrl);
@@ -278,12 +339,13 @@ function updateVisualMode(){
  $('acPreview').hidden=enabled;$('acBackground').hidden=enabled;$('acStockPreview').hidden=!enabled;
  $('acFraming').parentElement.hidden=enabled;
  if(enabled&&Number($('acHook').value)<1)$('acHook').value='3';
+ ready();
  repaint();
 }
 $('acVisualMode').onchange=()=>{updateVisualMode();saveDraft();};
 function selectVideo(blob){
  if(url)URL.revokeObjectURL(url);
- if(!blob){file=null;return;}url=URL.createObjectURL(blob);file={blob,duration:NaN};$('acPreview').src=url;$('acBackground').src=url;
+ if(!blob){file=null;ready();return;}url=URL.createObjectURL(blob);file={blob,duration:NaN};$('acPreview').src=url;$('acBackground').src=url;ready();
  $('acPreview').onloadedmetadata=()=>{file.duration=$('acPreview').duration;status(`${file.duration.toFixed(1)}秒の動画を読み込みました。`);};
 }
 $('acPreview').ontimeupdate=repaint;
@@ -307,24 +369,49 @@ for(const id of ['acOverlay','acLipTitle']){
 }
 $('acBuildLines').onclick=buildRows;$('acSubmit').onclick=submit;
 async function recover(){
- const item=savedPending();if(!item){status('確認待ちの生成受付はありません。');return;}
- try{
-  const runs=await api('actions/workflows/generate_video_ui.yml/runs?per_page=100');
-  const run=runs.workflow_runs.find(r=>r.display_title===`Pages ${item.receipt}`);
-  if(run){localStorage.removeItem(pendingKey());status(`受付済み：${item.receipt}。生成履歴を更新してください。`);return;}
-  await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:item.receipt,input_sha:item.sha,job_kind:'video'}});
-  status(`同じ受付IDで照会を依頼しました：${item.receipt}。少し後で再確認してください。`);
- }catch(e){status(e.message+'。受付IDは保持しています。');}
+ await reconcilePending(true);
 }
 $('acRecover').onclick=recover;
-if(savedPending())status(`前回の受付 ${savedPending().receipt} の確認が必要です。`);
+let reconciling=false;
+async function reconcilePending(resend){
+ if(reconciling)return;
+ const items=pendingItems();
+ if(!items.length){if(resend)status('確認待ちの生成受付はありません。');return;}
+ reconciling=true;
+ try{
+  const runs=await api('actions/workflows/generate_video_ui.yml/runs?per_page=100');
+  let found=0,remaining=0;
+  for(const item of items){
+   const run=runs.workflow_runs.find(r=>r.display_title===`Pages ${item.receipt}`);
+   if(run){forgetPending(item);found++;continue;}
+   try{
+    await api(`git/ref/tags/ui-accepted-${item.receipt}`);
+    forgetPending(item);found++;continue;
+   }catch(e){if(e.status!==404)throw e;}
+   remaining++;
+   if(resend){
+    await ensureInputRef(item);
+    await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:item.receipt,input_sha:item.sha,job_kind:'video'}});
+   }
+  }
+  status(found?`受付済み ${found} 件。生成履歴の「更新」で進捗・結果を確認してください。`:
+   resend?`同じ受付IDで ${remaining} 件の受付を再依頼しました。少し後に確認してください。`:
+   `受付確認中 ${remaining} 件。「前回の受付を確認・再開」で同じIDを確認できます。`);
+ }catch(e){status(`受付の照合に失敗しました。受付IDを保持しています。 ${e.message}`);}
+ finally{reconciling=false;}
+}
+if(pendingItems().length)status(`確認待ちの受付が ${pendingItems().length} 件あります。`);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcilePending(false);});
+window.addEventListener('pageshow',()=>reconcilePending(false));
+const pendingTimer=setInterval(()=>{if(pendingItems().length&&!document.hidden)reconcilePending(false);},5000);
+pendingTimer.unref?.();
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
 const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
-function identity(file){return [file.name,file.size,file.lastModified].join(':');}
+function identity(file){return file?[file.name,file.size,file.lastModified].join(':'):null;}
 function saveDraft(){
  const fields=Object.fromEntries(draftFields.map(id=>[id,$(id).value]));
  try{localStorage.setItem(draftKey(),JSON.stringify({fields,textLayouts,audioIdentity,rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])}));}catch{}
@@ -360,6 +447,7 @@ function setChorus(file){
  }
  audioIdentity=next;
  chorus=file;
+ ready();
  saveDraft();
  if(chorusUrl)URL.revokeObjectURL(chorusUrl);
  chorusUrl=URL.createObjectURL(file.slice(0,file.size,'audio/wav'));
@@ -392,6 +480,7 @@ $('acMode').onchange=()=>{
  loadTextFields();
  updateVisualMode();
  $('acSubmit').textContent=lip()?(fullMode()?'横型フルMVを生成':'縦型サビショートを生成'):'アカペラ動画を生成';
+ restorePrepared();
  repaint();
 };
 $('acFull').onchange=()=>readFull($('acFull').files[0]).catch(e=>status(e.message));
@@ -500,7 +589,7 @@ function lyricIntervals(lines, clears, duration) {
  });
 }
 
-$('acapellaArea').addEventListener('input',()=>{saveDraft();repaint();});
+$('acapellaArea').addEventListener('input',()=>{saveDraft();ready();repaint();});
 $('acapellaArea').addEventListener('click',saveDraft);
 
 let project=null, projectSha=null, projectAudio=null, previousMode='original';
@@ -662,6 +751,7 @@ $('acProjects').onchange=async()=>{try{
  $('acAutoLink').checked=false;selectImage(null);
  for(const media of [$('acPreview'),$('acBackground'),full,chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
  restoreProjectLayout();
+ ready();
  if(project?.audio?.public_id){
   status('保存済みのフル音源を取得しています。');
   await readFull(await downloadProjectAsset(project.audio));
@@ -800,4 +890,5 @@ function showProductionMode(){
 }
 $('productionMode').onchange=showProductionMode;
 showProductionMode();
+restorePrepared();
 
