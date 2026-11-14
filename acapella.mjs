@@ -11,6 +11,30 @@ const lip=()=>$('acMode').value!=='original';
 const fullMode=()=>$('acMode').value==='full';
 const stock=()=>lip()&&$('acVisualMode').value==='stock_mix';
 let imageFile=null,imageUrl=null;
+function imageName(){
+ const name=$('acImage').value.trim();
+ if(!name||name==='.'||name==='..'||name.startsWith('.')||/[\\/\x00-\x1f]/.test(name)||name.length>180||!/\.(png|jpe?g|webp)$/i.test(name))
+  throw Error('media/ 内の画像ファイル名（PNG/JPG/WebP）を入力してください。');
+ return name;
+}
+async function repositoryImage(){
+ const name=imageName();
+ const head=await api('git/ref/heads/main');
+ const commit_sha=head.object.sha;
+ const item=await api(`contents/media/${encodeURIComponent(name)}?ref=${commit_sha}`);
+ if(item.type!=='file'||item.name!==name||item.path!==`media/${name}`||!Number.isInteger(item.size)||item.size<1||item.size>20_000_000||!/^[a-f0-9]{40}$/.test(item.sha))
+  throw Error(`media/${name} の画像情報を確認できません。形式・容量（20 MB以下）を確認してください。`);
+ return {path:item.path,commit_sha,blob_sha:item.sha,format:name.split('.').at(-1).toLowerCase().replace('jpeg','jpg'),bytes:item.size};
+}
+async function previewRepositoryImage(asset){
+ const blob=await api(`git/blobs/${asset.blob_sha}`);
+ if(blob.encoding!=='base64')throw Error('画像のプレビューを取得できません。');
+ const data=bytes(blob.content.replace(/\s/g,''));
+ if(data.length!==asset.bytes)throw Error('画像の容量が一致しません。');
+ if(imageUrl)URL.revokeObjectURL(imageUrl);
+ imageUrl=URL.createObjectURL(new Blob([data],{type:`image/${asset.format==='jpg'?'jpeg':asset.format}`}));
+ $('acStockPreview').src=imageUrl;
+}
 const chorusPlayer=$('acChorusPlayer');
 const offset=()=>Math.round(Number($('acOffset').value)*1000)/1000;
 let chorus=null, decoded=null, fullUrl=null, chorusUrl=null, previewEnd=null;
@@ -107,12 +131,12 @@ function script(id,meta){
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
  const output=lip()?(fullMode()?'horizontal_only':'vertical_only'):$('acOutput').value,framing=$('acFraming').value;
  const result={schema_version:1,production_type:'acapella',title,artist,hook_end_ms:end,lyrics,
-   framing:{vertical:framing,landscape:framing},text_layout:structuredClone(textLayouts),global_settings:{format:'vertical',output_mode:output},auto_link:false};
+   framing:{vertical:framing,landscape:framing},text_layout:structuredClone(textLayouts),global_settings:{format:'vertical',output_mode:output},auto_link:$('acAutoLink').checked};
  if(stock()){
   const pct=Number($('acStockPercent').value),keywords=$('acStockKeywords').value.split('\n').map(v=>v.trim()).filter(Boolean);
   if($('acStockPercent').value===''||!Number.isInteger(pct)||pct<0||pct>100||!['pexels','pixabay'].includes($('acStockProvider').value)||keywords.length<1||keywords.length>12||keywords.some(k=>!/^[A-Za-z0-9 _,-]{2,100}$/.test(k)))throw Error('外部映像の割合、提供元、英語の検索語を確認してください。');
-  if(!chorus||!imageFile||!rows.length||!Number.isFinite(chorusPlayer.duration)||end<1000||end>10000||end>=chorusPlayer.duration*1000)throw Error('冒頭画像・楽曲・歌詞・冒頭表示の長さを確認してください。');
-  return {...result,schema_version:3,image_source:{public_id:`v-generator/acapella/${id}`,...meta},music_visuals:{stock_percent:pct,provider:$('acStockProvider').value,keywords}};
+  if(!chorus||!meta?.path||!rows.length||!Number.isFinite(chorusPlayer.duration)||end<1000||end>10000||end>=chorusPlayer.duration*1000)throw Error('冒頭画像・楽曲・歌詞・冒頭表示の長さを確認してください。');
+  return {...result,schema_version:4,image_source:meta,music_visuals:{stock_percent:pct,provider:$('acStockProvider').value,keywords}};
  }
  result.source={public_id:`v-generator/acapella/${id}`,...meta};
  if(lip()){
@@ -198,13 +222,12 @@ async function submit(){
  try{
   if(savedPending())throw Error('前回の生成受付を確認してください。新しい動画を再送しません。');
   if(!stock()&&!file)throw Error('先に動画を選択してください。');
-  if(stock()&&!imageFile)throw Error('冒頭画像を選択してください。');
-  const videoFile=stock()?imageFile:file.blob, audioFile=chorus;
-  const meta=await fileMeta(videoFile,false,stock());
+  const videoFile=stock()?null:file.blob, audioFile=chorus;
+  const meta=stock()?await repositoryImage():await fileMeta(videoFile);
   const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
   const saved=lip()?JSON.parse(localStorage.getItem(retryKey)||'null'):null;
   const retry=saved?.videoSha===meta.sha256?saved:null;
-  const savedVideo=lip()?project?.layouts?.[layoutKey()]?.[stock()?'image':'video']:null;
+  const savedVideo=lip()&&!stock()?project?.layouts?.[layoutKey()]?.video:null;
   const existingVideo=savedVideo?.sha256===meta.sha256?savedVideo:null;
   const id=existingVideo?.public_id.split('/').at(-1)??retry?.videoId??crypto.randomUUID().replaceAll('-','');
   const payload=script(id,meta);
@@ -217,7 +240,7 @@ async function submit(){
    const audioId=retry?.audioSha===audioMeta.sha256?retry.audioId:crypto.randomUUID().replaceAll('-','');
    const transfer={videoSha:meta.sha256,videoId:id,audioSha:audioMeta.sha256,audioId};
    localStorage.setItem(retryKey,JSON.stringify(transfer));
-   if(!existingVideo)await transferSource(videoFile,id,meta,pair);
+   if(!stock()&&!existingVideo)await transferSource(videoFile,id,meta,pair);
    await transferSource(audioFile,audioId,audioMeta,pair);
    payload.audio_source={...audioMeta,public_id:`v-generator/acapella/${audioId}`};
   }else await transferSource(videoFile,id,meta,pair);
@@ -231,7 +254,7 @@ async function submit(){
   await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:commit.sha,job_kind:'video'}});
   if(lip()&&project){
    project.layouts[layoutKey()]??={};
-   project.layouts[layoutKey()][stock()?'image':'video']={...(stock()?payload.image_source:payload.source),name:videoFile.name};
+   project.layouts[layoutKey()][stock()?'image':'video']=stock()?{...meta,name:imageName()}:{...payload.source,name:videoFile.name};
    project.runs??={};
    const key=layoutKey();
    project.runs[key]=[...runList(project.runs[key]),receipt];
@@ -247,7 +270,8 @@ function selectImage(blob){
  const view=$('acStockPreview');if(imageUrl)view.src=imageUrl;else view.removeAttribute('src');
  updateVisualMode();
 }
-$('acImage').onchange=()=>selectImage($('acImage').files[0]);
+$('acImagePreview').onclick=async()=>{try{await previewRepositoryImage(await repositoryImage());status('冒頭画像を確認しました。');}catch(e){status(e.status===404?'指定した画像が media/ に見つかりません。':e.message);}};
+$('acImage').onchange=()=>{selectImage(null);$('acImagePreview').click();};
 function updateVisualMode(){
  const enabled=stock();
  $('acStockControls').hidden=!enabled;$('acFilmedControls').hidden=enabled;
@@ -297,7 +321,7 @@ if(savedPending())status(`前回の受付 ${savedPending().receipt} の確認が
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
-const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acStockPercent','acStockProvider','acStockKeywords'];
+const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return [file.name,file.size,file.lastModified].join(':');}
@@ -357,7 +381,7 @@ $('acMode').onchange=()=>{
  }
  previousMode=$('acMode').value;
  $('acVisualMode').value='filmed';
- selectImage(null);$('acImage').value='';
+ selectImage(null);$('acImage').value='';$('acAutoLink').checked=false;
  $('acCutFields').hidden=fullMode();
  $('acLip').hidden=!lip();$('acPreview').muted=lip();
  $('acHook').min=lip()?'0':'0.1';$('acHook').value=lip()?'0':'3';
@@ -519,6 +543,7 @@ function applySnapshot(snapshot){
 function restoreProjectLayout(){
  const saved=project?.layouts?.[layoutKey()];
  applySnapshot(saved);
+ if(stock()&&saved?.image?.path)previewRepositoryImage(saved.image).catch(e=>status(e.message));
  if(!project)return;
  $('acTitle').value=project.title;
  $('acArtist').value=project.artist;
@@ -589,14 +614,7 @@ async function saveProject(){
    next.layouts[layoutKey()].video={...videoMeta,name:file.blob.name,public_id:`v-generator/acapella/${id}`};
   }
  }
- if(stock()&&imageFile){
-  const imageMeta=await fileMeta(imageFile,false,true);
-  if(next.layouts[layoutKey()].image?.sha256!==imageMeta.sha256){
-   const id=crypto.randomUUID().replaceAll('-','');
-   await transferSource(imageFile,id,imageMeta,await keyPair());
-   next.layouts[layoutKey()].image={...imageMeta,name:imageFile.name,public_id:`v-generator/acapella/${id}`};
-  }
- }
+ if(stock())next.layouts[layoutKey()].image={...await repositoryImage(),name:imageName()};
  const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
  if(end>start&&start>=0&&end-start<=120)next.range=[start,end];
  if(chorus&&rows.length&&rows.every(row=>row.start.value!=='')){
@@ -641,13 +659,17 @@ $('acProjects').onchange=async()=>{try{
  projectSha=entry?.sha??null;projectAudio=null;decoded=null;chorus=null;file=null;imageFile=null;audioIdentity=null;
  $('acWavDownload').hidden=true;$('acWavShare').hidden=true;cutStatus('');
  for(const field of ['acFile','acImage','acFull','acChorus'])$(field).value='';
+ $('acAutoLink').checked=false;selectImage(null);
  for(const media of [$('acPreview'),$('acBackground'),full,chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
  restoreProjectLayout();
  if(project?.audio?.public_id){
   status('保存済みのフル音源を取得しています。');
   await readFull(await downloadProjectAsset(project.audio));
   const layout=project.layouts?.[layoutKey()]??{};
-  if(stock()&&layout.image)selectImage(await downloadProjectAsset(layout.image));
+  if(stock()&&layout.image?.public_id){
+   selectImage(await downloadProjectAsset(layout.image));
+   status('旧方式の画像を表示しています。新規生成には同じ画像を media/ に登録してファイル名を入力してください。');
+  }
   else if(!stock()&&layout.video)selectVideo(await downloadProjectAsset(layout.video));
  }else status(project?.audio?`フル音源「${project.audio.name}」を再選択してください。`:'曲の情報と素材を選択してください。');
 }catch(e){status(e.message);}};
@@ -778,3 +800,4 @@ function showProductionMode(){
 }
 $('productionMode').onchange=showProductionMode;
 showProductionMode();
+
