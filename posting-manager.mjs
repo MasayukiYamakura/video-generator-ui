@@ -71,13 +71,18 @@ export function mountPostingManager(){
  const message=el('p');message.id='postingMessage';message.setAttribute('role','status');
  tools.append(search,format,type,service,refresh,sync);manager.append(title,tabs,tools,message);
  const refillPanel=$('socialRefillPanel');if(refillPanel)manager.append(refillPanel);
- const bulk=el('div');bulk.className='actions';const all=el('button','表示中の動画を全選択'),skip=el('button','選択した動画を見送る'),expiredSkip=el('button','期限切れの横型をまとめて見送る'),restore=el('button','選択した動画を作業に戻す'),prepare=el('button','選択した縦型の投稿を準備'),removeSelected=el('button','選択した見送り動画のCloudinaryファイルを削除');
- for(const b of [all,skip,expiredSkip,restore,prepare,removeSelected]){b.className='secondary';bulk.append(b);}manager.append(bulk);
+  const quick=el('div');quick.className='actions posting-quick';
+  const bulk=el('div');bulk.className='actions posting-selection';bulk.hidden=true;
+  const selectionCount=el('strong'),selectionHint=el('p');
+  const all=el('button','表示中の動画を全選択'),skip=el('button','選択した動画を見送る'),expiredSkip=el('button','期限切れの横型をまとめて見送る'),restore=el('button','選択した動画を作業に戻す'),prepare=el('button','選択した縦型の投稿を準備'),removeSelected=el('button','選択した見送り動画のCloudinaryファイルを削除');
+  for(const b of [all,expiredSkip]){b.className='secondary';quick.append(b);}manager.append(quick);
+  for(const b of [skip,restore,prepare,removeSelected]){b.className='secondary';bulk.append(b);}
+  bulk.prepend(selectionCount);bulk.append(selectionHint);
  const layout=el('div');layout.className='posting-layout';const list=el('div');list.id='postingList';const inspector=el('section');inspector.id='postingInspector';inspector.hidden=true;const back=el('button','一覧に戻る');back.className='secondary';const detail=el('div');inspector.append(back,detail);layout.append(list,inspector);manager.append(layout);
  // Keep the existing, tested editors and request recovery controls as the detail workspace.
  const workspace=el('div');workspace.id='postingWorkspace';workspace.hidden=true;
  while(panel.firstChild)workspace.append(panel.firstChild);
- panel.append(manager);inspector.append(workspace);
+  panel.append(manager);inspector.append(workspace);manager.append(bulk);
  const yt=$('youtubePanel');yt.querySelector('summary').textContent='YouTubeの投稿操作';yt.querySelector('p').hidden=true;
  const children=[...workspace.children];const yi=children.indexOf(yt);const socialEditor=el('div');socialEditor.id='postingSocialEditor';for(const n of children.slice(yi+1))socialEditor.append(n);workspace.append(socialEditor);
  const settings=el('details');settings.id='postingSettings';settings.append(el('summary','接続・定型文・詳細設定'));panel.append(settings);
@@ -97,8 +102,8 @@ export function mountPostingManager(){
  function render(){
   tabs.replaceChildren();for(const [key,label] of Object.entries(GROUP)){const count=key==='all'?rows().length:rows().filter(r=>r.group===key).length;const b=el('button',`${label} ${count}`);b.className='secondary';b.setAttribute('aria-pressed',String(group===key));b.onclick=()=>{group=key;checked.clear();render();};tabs.append(b);}
   const items=visible();list.replaceChildren();
-  for(const r of items){const card=el('article');card.className='posting-card';card.dataset.group=r.group;
-   const choice=el('input');choice.type='checkbox';choice.checked=checked.has(r.key);choice.setAttribute('aria-label',`${r.video.filename}を選択`);choice.onchange=()=>{choice.checked?checked.add(r.key):checked.delete(r.key);};
+   for(const r of items){const card=el('article');card.className='posting-card';card.dataset.group=r.group;
+    const choice=el('input');choice.type='checkbox';choice.checked=checked.has(r.key);choice.setAttribute('aria-label',`${r.video.filename}を選択`);choice.onchange=()=>{choice.checked?checked.add(r.key):checked.delete(r.key);render();};
    const open=el('button',r.video.filename?.replace(/\.mp4$/i,'')||r.video.id);open.className='posting-title';open.onclick=()=>select(r);
    const thumb=el('img');thumb.className='posting-thumb';thumb.loading='lazy';thumb.alt='動画のサムネイル';
    const cloud=previewLink(r.video);const remote=r.posts.find(p=>/^[\w-]{11}$/.test(p.video_id||''));
@@ -110,8 +115,25 @@ export function mountPostingManager(){
   }
   if(!items.length)list.append(el('p','該当する動画はありません。'));
   const r=rows().find(r=>r.key===selected);if(r)renderDetail(r);else if(selected)close();
-  const busy=Object.values(adapters).some(a=>a.busy());for(const b of [skip,expiredSkip,restore,prepare,removeSelected,sync])b.disabled=busy;
-  expiredSkip.hidden=group!=='attention';removeSelected.hidden=group!=='skipped';
+   const chosen=items.filter(r=>checked.has(r.key));
+   const skippable=chosen.filter(r=>r.group!=='skipped');
+   const restorable=chosen.filter(r=>r.group==='skipped');
+   const deletable=restorable.filter(r=>skippedCloudToDelete(r,id=>adapters.social.canWithdraw(id)));
+   const selectedBusy=chosen.some(r=>adapters[r.kind].busy());
+   bulk.hidden=!chosen.length;manager.classList.toggle('has-selection',Boolean(chosen.length));
+   selectionCount.textContent=`${chosen.length}本を選択中`;
+   skip.hidden=!skippable.length;restore.hidden=!restorable.length;
+   prepare.hidden=!skippable.some(r=>r.kind==='social');
+   removeSelected.hidden=!restorable.length||!restorable.some(r=>r.kind==='social');
+   removeSelected.disabled=adapters.social.busy()||!deletable.length;
+   selectionHint.textContent=selectedBusy?
+    'この投稿先で受付確認中の処理があります。画面上部の受付を確認してから操作してください。':
+    chosen.some(r=>r.kind==='youtube')?
+    '横型のGitHub成果物は保存期限後に取得できません。見送りは一覧の整理です。YouTube上の動画は削除しません。':
+    restorable.length&&!deletable.length?'配信用ファイルを削除できる見送り済み動画はありません。':'見送りは投稿記録を残し、後で戻せます。';
+   skip.disabled=selectedBusy;restore.disabled=selectedBusy;prepare.disabled=adapters.social.busy();
+   expiredSkip.disabled=adapters.youtube.busy();sync.disabled=Object.values(adapters).some(a=>a.busy());
+   expiredSkip.hidden=group!=='attention';
   // Recovery stays visible even when no video has been selected.
   for(const id of ['socialStatus','youtubeStatus','socialResume','youtubeRecover']){const n=$(id);if(n&&n.parentElement!==manager)manager.append(n);}
  }
@@ -143,13 +165,14 @@ export function mountPostingManager(){
  function close(){selected=null;inspector.hidden=true;workspace.hidden=true;}
  async function manage(items,decision,channel){
   if(!items.length){message.textContent='動画を選択してください';return;}
+   if(items.length>100){message.textContent='一度に整理できるのは100本までです。検索で対象を分けてください。';return;}
   const text=decision==='active'?'投稿作業に戻します。':'一覧を整理します。予約は取り消されません。YouTubeの動画は現在の公開設定のまま残り、ファイルは削除しません。';
   if(!confirm(`${items.length}件：${items.map(r=>r.video.filename).join('、')}\n${text}`))return;
   for(const kind of ['social','youtube']){const subset=items.filter(r=>r.kind===kind);if(subset.length){if(adapters[kind].busy()){message.textContent='受付中の処理結果を確認してから操作してください';continue;}await adapters[kind].manage({video_ids:subset.map(r=>r.video.id),decision,...(channel?{channel_id:channel}:{})});}}
   message.textContent='整理操作を受け付けました。結果は受付状況と一覧で確認できます。';render();
  }
  all.onclick=()=>{checked=new Set(visible().map(r=>r.key));render();};
- skip.onclick=()=>manage(visible().filter(r=>checked.has(r.key)),'skipped');restore.onclick=()=>manage(visible().filter(r=>checked.has(r.key)),'active');
+  skip.onclick=()=>manage(visible().filter(r=>checked.has(r.key)&&r.group!=='skipped'),'skipped');restore.onclick=()=>manage(visible().filter(r=>checked.has(r.key)&&r.group==='skipped'),'active');
  expiredSkip.onclick=()=>{const items=visible().filter(expiredSourceToSkip);if(!items.length){message.textContent='見送れる期限切れの横型動画はありません。予約中の動画は先にStudioで確認してください。';return;}if(items.length>100){message.textContent='一度に整理できるのは100本までです。検索で対象を分けてください。';return;}manage(items,'skipped');};
  removeSelected.onclick=async()=>{
   const chosen=visible().filter(r=>checked.has(r.key));
