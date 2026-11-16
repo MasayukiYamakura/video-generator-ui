@@ -27,7 +27,7 @@ function ready(){
  const matches=prepared?.mode===$('acMode').value&&prepared?.stock===stock()&&
   (stock()?prepared.imageName===$('acImage').value.trim():prepared.videoIdentity===identity(file?.blob))&&
   (!lip()||prepared.audioIdentity===identity(chorus));
- $('acSubmit').disabled=busy||!matches;
+ $('acSubmit').disabled=busy;
  return matches;
 }
 function restorePrepared(){
@@ -62,6 +62,8 @@ async function previewRepositoryImage(asset){
 const chorusPlayer=$('acChorusPlayer');
 const offset=()=>Math.round(Number($('acOffset').value)*1000)/1000;
 let chorus=null, decoded=null, fullUrl=null, chorusUrl=null, previewEnd=null;
+let confirmedCut=null;
+const selectedCut=()=>`${$('acCutStart').value}:${$('acCutEnd').value}`;
 const textDefaults=()=>({vertical:{hook:{font_size:70,center_x:540,center_y:384,max_width_ratio:.82,lines:'single'},caption:{font_size:52,center_x:540,center_y:1190,max_width_ratio:.82}},landscape:{hook:{font_size:86,center_x:960,center_y:216,max_width_ratio:.82,lines:'single'},caption:{font_size:60,center_x:960,center_y:670,max_width_ratio:.82}}});
 let textLayouts=textDefaults();
 const textDimensions=fmt=>fmt==='vertical'?[1080,1920]:[1920,1080];
@@ -106,7 +108,8 @@ function paintTextStyle(){
 }
 function val(){if(lip())return chorusPlayer.currentTime;return Number($('acPreview').currentTime||0);}
 function repaint(){
- if(lip()&&chorus&&!stock()){
+ paintLyricRows();
+ if(lip()&&chorus&&file&&!stock()){
   const video=$('acPreview'), target=offset()+val();
   if(!chorusPlayer.paused&&video.paused)video.play().catch(()=>{});
   if(chorusPlayer.paused&&!video.paused&&syncPlaying)video.pause();
@@ -136,11 +139,17 @@ function buildRows(){
   const text=document.createElement('input');text.value=line;text.setAttribute('aria-label','歌詞');
   const start=document.createElement('input');start.type='number';start.step='.01';start.min='0';start.value='';start.setAttribute('aria-label','開始秒');
   const end=document.createElement('input');end.type='number';end.step='.01';end.min='0';end.value='';end.setAttribute('aria-label','終了秒');
-  const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);repaint();};
-  const z=document.createElement('button');z.type='button';z.textContent='終了を記録';z.className='secondary';z.onclick=()=>{end.value=val().toFixed(2);repaint();};
-  box.append(text,start,end,a,z);root.append(box);rows.push({text,start,end});
+  const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);saveDraft();repaint();};
+  const z=document.createElement('button');z.type='button';z.textContent='終了を記録';z.className='secondary';z.onclick=()=>{end.value=val().toFixed(2);saveDraft();repaint();};
+  const seek=document.createElement('button');seek.type='button';seek.textContent='この行から再生';seek.className='secondary';
+  seek.onclick=()=>{if(start.value==='')return;const player=lip()?chorusPlayer:$('acPreview');
+   player.currentTime=Number(start.value);player.play().catch(e=>status(e.message));};
+  const timing=document.createElement('details');
+  const label=document.createElement('summary');label.textContent='歌詞の時刻';
+  timing.append(label,start,end,a,z);box.append(text,seek,timing);root.append(box);
+  rows.push({text,start,end,box,label,seek});
  }
- status(`${rows.length}行を取り込みました。自動設定または再生しながらの時刻入力ができます。`);
+
 }
 function compiledLyrics(partial=false){
  const clears=$('acClears').value.split(',').filter(v=>v.trim()).map(v=>Math.round(Number(v)*1000));
@@ -152,6 +161,7 @@ function compiledLyrics(partial=false){
   end_ms:r.end.value===''?null:Math.round(Number(r.end.value)*1000)})),clears,duration);
 }
 function script(id,meta){
+ if(builtLyrics!==$('acLyrics').value)throw Error('歌詞が変更されました。歌詞を自動同期してください。');
  validateLocalText();
  const title=$('acTitle').value.trim(),artist=$('acArtist').value.trim(),end=Math.round(Number($('acHook').value)*1000);
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
@@ -245,7 +255,8 @@ async function transferSource(blob,id,meta,pair){
  await upload(blob,await decrypt(await permission(id,meta,pair),pair.privateKey));
 }
 async function prepare(){
- if(busy)return;busy=true;ready();$('acPrepare').disabled=true;
+ if(busy)return false;busy=true;ready();
+ status('素材を転送しています。この画面を開いたままお待ちください。');
  try{
   const mode=$('acMode').value,visual=stock();
   if(!stock()&&!file)throw Error('先に動画を選択してください。');
@@ -273,9 +284,10 @@ async function prepare(){
   if(lip())payload.audio_source={...audioMeta,public_id:`v-generator/acapella/${audioId}`};
   localStorage.setItem(preparedKey(),JSON.stringify(prepared));
   localStorage.removeItem(retryKey);
-  status('素材の準備が完了しました。生成ボタンを押し、「受付済み」の表示を確認してから別アプリへ切り替えられます。');
+  return true;
  }catch(e){prepared=null;localStorage.removeItem(preparedKey());status(`素材の準備が完了していません。 ${e.message}`);}
- finally{busy=false;$('acPrepare').disabled=false;ready();}
+ finally{busy=false;ready();}
+ return false;
 }
 async function ensureInputRef(item){
  const ref=`git/ref/heads/ui-input/${item.receipt}`;
@@ -329,7 +341,7 @@ async function checkLyricResult(key, {receipt, sha, signature, lines, input, req
    if(builtLyrics!==$('acLyrics').value)buildRows();
    let matched=0;
    for(const [i,line] of timings.entries()){
-    if(line.start_ms===undefined)continue;
+    if(line.start_ms===undefined){rows[i].start.value='';rows[i].end.value='';continue;}
     rows[i].start.value=line.start_ms/1000;
     rows[i].end.value=Math.min(line.end_ms,Math.floor(media.duration*1000))/1000;
     matched++;
@@ -393,6 +405,7 @@ async function autoLyrics(resume=false){
   const duration_ms=Math.floor(media.duration*1000);
   if(!media.blob||!Number.isFinite(duration_ms)||duration_ms<=0||duration_ms>limit*1000)
    throw Error('先に完成動画に使う動画または音源を選択してください。');
+  if(!resume&&rows.some(row=>row.start.value!=='')&&!window.confirm('現在の歌詞の時刻を自動同期の結果で更新しますか？'))return;
   if(builtLyrics!==$('acLyrics').value)buildRows();
   const requestLines=lyricInput();
   if(!requestLines.length||requestLines.length>100||requestLines.some(line=>!line||line.length>100))
@@ -449,21 +462,23 @@ async function submit(){
   const commit=await api('git/commits','POST',{message:`Pages input ${receipt}`,tree:tree.sha,parents:[]});
   const item={receipt,sha:commit.sha,signature,mode:$('acMode').value,title:payload.title,createdAt:Date.now()};
   savePending([...pendingItems().filter(entry=>!entry.legacy),item]);
+  saveCurrentRun(item);
   await ensureInputRef(item);
   status(`受付ID ${receipt} を保存しました。GitHubへの受付を確認しています。`);
   await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:commit.sha,job_kind:'video'}});
   status(`受付依頼を送信しました（${receipt}）。「受付済み」になるまで画面を開いてください。`);
   await reconcilePending(false);
-  if(lip()&&project){
+  if(lip()&&(project||projectAudio)&&payload.title!=='口パク動画'&&$('acTitle').value.trim()){
+   project??={version:1,id:crypto.randomUUID(),layouts:{},lyrics:[],runs:{}};
    project.layouts[layoutKey()]??={};
    project.layouts[layoutKey()][stock()?'image':'video']=stock()?{...meta,name:imageName()}:{...payload.source,name:file.blob.name};
    project.runs??={};const key=layoutKey();
    project.runs[key]=[...runList(project.runs[key]),receipt];
-   try{await saveProject();}catch(e){status(`受付依頼済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);}
+   try{await saveProject();if(project.audio&&currentRun()?.receipt===receipt)saveCurrentRun({...currentRun(),projectId:project.id});}
+   catch(e){status(`受付依頼済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);}
   }
  }catch(e){status(e.message);}finally{busy=false;ready();}
 }
-$('acPrepare').onclick=prepare;
 $('acFile').onchange=()=>selectVideo($('acFile').files[0]);
 function selectImage(blob){
  if(imageUrl)URL.revokeObjectURL(imageUrl);
@@ -486,7 +501,7 @@ $('acVisualMode').onchange=()=>{updateVisualMode();saveDraft();};
 function selectVideo(blob){
  if(url)URL.revokeObjectURL(url);
  if(!blob){file=null;ready();return;}url=URL.createObjectURL(blob);file={blob,duration:NaN};$('acPreview').src=url;$('acBackground').src=url;ready();
- $('acPreview').onloadedmetadata=()=>{file.duration=$('acPreview').duration;status(`${file.duration.toFixed(1)}秒の動画を読み込みました。`);};
+ $('acPreview').onloadedmetadata=()=>{if(!file||file.blob!==blob)return;file.duration=$('acPreview').duration;status(`${blob.name}（${file.duration.toFixed(1)}秒）`);updateEditor();};
 }
 $('acPreview').ontimeupdate=repaint;
 function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');paintTextStyle();}
@@ -508,7 +523,7 @@ for(const id of ['acOverlay','acLipTitle']){
  node.onpointerup=node.onpointercancel=()=>{dragging=false;};
 }
 $('acLyricAuto').onclick=()=>autoLyrics();$('acLyricResult').onclick=()=>autoLyrics(true);
-$('acBuildLines').onclick=buildRows;$('acSubmit').onclick=submit;
+$('acBuildLines').onclick=()=>{if(builtLyrics!==$('acLyrics').value)buildRows();repaint();};
 async function recover(){
  await reconcilePending(true);
 }
@@ -516,7 +531,7 @@ $('acRecover').onclick=recover;
 let reconciling=false;
 async function reconcilePending(resend){
  if(reconciling)return;
- const items=pendingItems();
+ const items=pendingItems().filter(item=>!resend||!item.mode||item.mode===$('acMode').value);
  if(!items.length){if(resend)status('確認待ちの生成受付はありません。');return;}
  reconciling=true;
  try{
@@ -524,10 +539,10 @@ async function reconcilePending(resend){
   let found=0,remaining=0;
   for(const item of items){
    const run=runs.workflow_runs.find(r=>r.display_title===`Pages ${item.receipt}`);
-   if(run){forgetPending(item);found++;continue;}
+   if(run){forgetPending(item);found++;if(currentRun()?.receipt===item.receipt)showRun(item,run);continue;}
    try{
     await api(`git/ref/tags/ui-accepted-${item.receipt}`);
-    forgetPending(item);found++;continue;
+    forgetPending(item);found++;if(currentRun()?.receipt===item.receipt)showRun(item);continue;
    }catch(e){if(e.status!==404)throw e;}
    remaining++;
    if(resend){
@@ -535,7 +550,7 @@ async function reconcilePending(resend){
     await api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:item.receipt,input_sha:item.sha,job_kind:'video'}});
    }
   }
-  status(found?`受付済み ${found} 件。生成履歴の「更新」で進捗・結果を確認してください。`:
+  if(!currentRun()?.accepted||!found)status(found?`受付済み ${found} 件。別アプリに切り替えられます。`:
    resend?`同じ受付IDで ${remaining} 件の受付を再依頼しました。少し後に確認してください。`:
    `受付確認中 ${remaining} 件。「前回の受付を確認・再開」で同じIDを確認できます。`);
  }catch(e){status(`受付の照合に失敗しました。受付IDを保持しています。 ${e.message}`);}
@@ -544,12 +559,12 @@ async function reconcilePending(resend){
 if(pendingItems().length)status(`確認待ちの受付が ${pendingItems().length} 件あります。`);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcilePending(false);});
 window.addEventListener('pageshow',()=>reconcilePending(false));
-const pendingTimer=setInterval(()=>{if(pendingItems().length&&!document.hidden)reconcilePending(false);},5000);
+const pendingTimer=setInterval(()=>{if(document.hidden)return;if(pendingItems().length)reconcilePending(false);else if(editorStep===3)refreshCurrentRun();},5000);
 pendingTimer.unref?.();
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
-const draftFields=['acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
+const draftFields=['acCutStart','acCutEnd','acOutput','acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return file?[file.name,file.size,file.lastModified].join(':'):null;}
@@ -560,7 +575,7 @@ function saveDraft(){
 function restoreDraft(){
  try{
   const draft=JSON.parse(localStorage.getItem(draftKey()));
-  if(!draft)return;
+  if(!draft){applySnapshot(null);$('acHook').value=lip()?'0':'3';$('acOutput').value='vertical_only';return;}
   for(const id of draftFields)if(draft.fields[id]!==undefined)$(id).value=draft.fields[id];
    textLayouts=mergeTextLayouts(draft.textLayouts);loadTextFields();
   audioIdentity=draft.audioIdentity;
@@ -615,9 +630,13 @@ $('acMode').onchange=()=>{
  $('acLip').hidden=!lip();$('acPreview').muted=lip();
  $('acHook').min=lip()?'0':'0.1';$('acHook').value=lip()?'0':'3';
  $('acOutput').disabled=lip();$('acPreviewFormat').disabled=lip();
+ if(!project){decoded=null;projectAudio=null;$('acFull').value='';full.pause();full.removeAttribute('src');full.load();}
+ $('acChorus').value='';
  const videoLabel=$('acFile').parentElement;
- if(lip()){ $('acFilmedControls').insertBefore(videoLabel,$('acOffset').parentElement);$('acPreviewFormat').value=fullMode()?'landscape':'vertical';$('acTextFormat').value=$('acPreviewFormat').value;$('acTextFormat').disabled=true;if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range)setChorus(chorusWav(decoded,...project.range));}}else restoreDraft();previewLayout();}
- else { $('acPreviewFormat').parentElement.before(videoLabel);$('acTextFormat').disabled=false;chorusPlayer.pause();restoreDraft();}
+ file=null;chorus=null;audioIdentity=null;videoLabel.querySelector('input').value='';
+ for(const media of [$('acPreview'),$('acBackground'),chorusPlayer]){media.pause();media.removeAttribute('src');media.load();}
+ if(lip()){ $('acFilmedControls').insertBefore(videoLabel,$('acOffset').parentElement);$('acPreviewFormat').value=fullMode()?'landscape':'vertical';$('acTextFormat').value=$('acPreviewFormat').value;$('acTextFormat').disabled=true;if(project){file=null;chorus=null;audioIdentity=null;$('acFile').value='';$('acChorus').value='';restoreProjectLayout();if(decoded){if(fullMode())setChorus(chorusWav(decoded,0,decoded.duration,360));else if(project.range){setChorus(chorusWav(decoded,...project.range));confirmedCut=selectedCut();}}}else restoreDraft();previewLayout();}
+ else { $('acOriginalSource').append(videoLabel);$('acTextFormat').disabled=false;chorusPlayer.pause();restoreDraft();}
  loadTextFields();
  updateVisualMode();
  $('acSubmit').textContent=lip()?(fullMode()?'横型フルMVを生成':'縦型サビショートを生成'):'アカペラ動画を生成';
@@ -630,6 +649,8 @@ for(const [id,player,delta] of [['acFullBack',full,-5],['acFullForward',full,5],
 async function readFull(f){
  decoded=null;
  if(!f)return;
+  chorus=null;confirmedCut=null;
+  chorusPlayer.pause();chorusPlayer.removeAttribute('src');chorusPlayer.load();
   if(!/\.(mp3|wav|m4a)$/i.test(f.name))throw Error('MP3、WAV、M4Aを選択してください。');
   if(f.size>100_000_000)throw Error('フル音源は100 MB以下にしてください。');
   if(fullUrl)URL.revokeObjectURL(fullUrl);
@@ -644,7 +665,7 @@ async function readFull(f){
   }
   projectAudio=f;decoded=buffer;
   if(fullMode())setChorus(chorusWav(buffer,0,buffer.duration,360));
-  else if(project?.range)setChorus(chorusWav(buffer,...project.range));
+  else if(project?.range){setChorus(chorusWav(buffer,...project.range));confirmedCut=selectedCut();}
   if(!project?.range)$('acCutEnd').value=Math.min(60,buffer.duration);
   const canvas=$('acWave'), ctx=canvas.getContext('2d'), data=buffer.getChannelData(0);
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -654,12 +675,13 @@ async function readFull(f){
    for(let i=begin;i<end;i+=16)peak=Math.max(peak,Math.abs(data[i]));
    ctx.fillRect(x,32-peak*30,1,Math.max(1,peak*60));
   }
-  status('音源を読み込みました。開始と終了を指定してください。');
+  status(fullMode()?`${f.name}（${buffer.duration.toFixed(1)}秒）`:`${f.name}を読み込みました。サビの開始と終了を指定してください。`);
 }
 $('acWave').onclick=e=>{if(decoded)full.currentTime=e.offsetX/$('acWave').clientWidth*decoded.duration;};
 $('acCutMarkStart').onclick=()=>$('acCutStart').value=full.currentTime.toFixed(3);
 $('acCutMarkEnd').onclick=()=>$('acCutEnd').value=full.currentTime.toFixed(3);
-full.ontimeupdate=()=>{if(previewEnd!==null&&full.currentTime>=previewEnd){full.pause();previewEnd=null;}};
+full.ontimeupdate=()=>{if(previewEnd!==null&&full.currentTime>=previewEnd)full.currentTime=Number($('acCutStart').value);};
+full.addEventListener('pause',()=>{previewEnd=null;});
 $('acCutPreview').onclick=async()=>{try{
  const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
  if(!decoded||!(start>=0&&end>start&&end<=decoded.duration&&end-start<=120))throw Error('切り出し範囲を確認してください。');
@@ -669,6 +691,8 @@ const cutStatus=message=>{$('acCutStatus').textContent=message;};
 $('acCutSave').onclick=()=>{
  try{
   setChorus(cut());
+  confirmedCut=selectedCut();
+  full.pause();
   cutStatus('サビを確定しました。このまま動画制作に進めます。端末に保存する場合は下のボタンを使ってください。');
  }catch(e){cutStatus(e.message);}
 };
@@ -676,6 +700,7 @@ $('acWavShare').onclick=async()=>{
  try{if(chorus)await navigator.share({files:[chorus]});}
  catch(e){if(e.name!=='AbortError')cutStatus('共有できませんでした。「WAVをダウンロード」を使ってください。');}
 };
+chorusPlayer.addEventListener('loadedmetadata',()=>updateEditor());
 chorusPlayer.addEventListener('error',()=>{
  if(chorus)cutStatus('サビWAVを再生できません。WAVをダウンロードして端末で再生できるか確認してください。');
 });
@@ -684,7 +709,7 @@ $('acMarkOffset').onclick=()=>{$('acOffset').value=$('acPreview').currentTime.to
 chorusPlayer.onplay=()=>{
  if(!lip())return;
  syncPlaying=true;const video=$('acPreview');video.currentTime=offset()+val();
- video.play().catch(()=>{});repaint();
+ if(file&&!stock())video.play().catch(()=>{});repaint();
 };
 chorusPlayer.onpause=repaint;
 chorusPlayer.onseeked=()=>{if(lip()&&file)$('acPreview').currentTime=offset()+val();repaint();};
@@ -692,11 +717,11 @@ chorusPlayer.ontimeupdate=repaint;
 $('acNextLyric').onclick=()=>{
  const row=rows.find(r=>r.start.value==='');
  if(row)row.start.value=val().toFixed(3);
- repaint();
+ saveDraft();repaint();
 };
 $('acClearLyric').onclick=()=>{
  const field=$('acClears');field.value=[field.value,val().toFixed(3)].filter(Boolean).join(',');
- repaint();
+ saveDraft();repaint();
 };
 function chorusWav(buffer, start, end, limit=120) {
  const rate=buffer.sampleRate, first=Math.round(start*rate), last=Math.round(end*rate);
@@ -751,7 +776,7 @@ async function downloadProjectAsset(asset){
 }
 
 const projectFile=id=>`${projectDir}/${id}.json`;
-const projectFields=[...draftFields,'acCutStart','acCutEnd','acCandidate'];
+const projectFields=[...draftFields.filter(id=>id!=='acOutput'),'acCandidate'];
 const layoutKey=()=>fullMode()?'full':'short';
 function projectSnapshot(){
  return {fields:Object.fromEntries(projectFields.map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value])),
@@ -846,8 +871,8 @@ async function saveProject(){
  }
  if(stock())next.layouts[layoutKey()].image={...await repositoryImage(),name:imageName()};
  const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
- if(end>start&&start>=0&&end-start<=120)next.range=[start,end];
- if(chorus&&rows.length&&rows.every(row=>row.start.value!=='')){
+ if(!fullMode()&&$('acSource').value!=='wav'&&confirmedCut===selectedCut()&&end>start&&start>=0&&end-start<=120)next.range=[start,end];
+ if(chorus&&(fullMode()||($('acSource').value!=='wav'&&confirmedCut===selectedCut()))&&rows.length&&rows.every(row=>row.start.value!=='')){
   const shift=fullMode()?0:Math.round(start*1000);
   const timed=compiledLyrics().map(line=>({...line,start_ms:line.start_ms+shift,end_ms:line.end_ms+shift}));
   if(fullMode()){
@@ -887,7 +912,10 @@ $('acProjectList').onclick=async()=>{try{
  $('acProjects').value=project?.id??'';
  status(`${entries.length}曲を読み込みました。`);
 }catch(e){status(e.message);}};
-$('acProjects').onchange=async()=>{try{
+$('acProjects').onchange=async()=>{
+ if(busy||submitting)return;
+ busy=true;ready();
+ try{
  const id=$('acProjects').value;
  const entry=id?await api(projectFile(id)):null;
  project=entry?JSON.parse(new TextDecoder().decode(bytes(entry.content.replace(/\s/g,'')))):null;
@@ -908,7 +936,7 @@ $('acProjects').onchange=async()=>{try{
   }
   else if(!stock()&&layout.video)selectVideo(await downloadProjectAsset(layout.video));
  }else status(project?.audio?`フル音源「${project.audio.name}」を再選択してください。`:'曲の情報と素材を選択してください。');
-}catch(e){status(e.message);}};
+}catch(e){status(e.message);}finally{busy=false;ready();updateEditor();}};
 
 const maskCanvas=$('acMaskPreview');
 maskCanvas.style.touchAction='none';
@@ -1029,13 +1057,240 @@ const standardAreas=['pbSaveSection','autoLinkArea','pbSingleNarration','audioUp
 let shownMode='standard';
 function showProductionMode(){
  const mode=$('productionMode').value,ac=mode!=='standard';
+ if((busy||submitting)&&shownMode!==mode){$('productionMode').value=shownMode;return;}
  $('acapellaArea').hidden=!ac;
  for(const id of standardAreas)$(id).hidden=ac;
- if(ac){$('acapellaArea').querySelector('details').open=true;if(shownMode!==mode){$('acMode').value=mode;$('acMode').dispatchEvent(new Event('change'));}}
+ if(ac&&shownMode!==mode){$('acMode').value=mode;$('acMode').dispatchEvent(new Event('change'));openMusicEditor();}
  shownMode=mode;
 }
+
+
+
+const musicTitles={original:'アカペラ動画',lip:'縦型サビショート',full:'横型フルMV'};
+const lastMusicModeKey=()=>`acapella-editor-last-mode:${repo()}`;
+const stageKey=()=>`acapella-editor-step:${repo()}:${$('acMode').value}`;
+const runKey=()=>`acapella-editor-run:${repo()}:${$('acMode').value}`;
+let editorStep=0, furthestStep=0, latestRunRefreshing=false, submitting=false;
+function currentRun(){
+ try{return JSON.parse(localStorage.getItem(runKey())||'null');}catch{return null;}
+}
+function saveCurrentRun(run){localStorage.setItem(runKey(),JSON.stringify(run));}
+function showRun(item,run){
+ const completed=run?.status==='completed';
+ const successful=completed&&run.conclusion==='success';
+ saveCurrentRun({...currentRun(),...item,accepted:true,completed,successful});
+ $('acOpenHistory').hidden=false;
+ $('acOpenHistory').textContent=successful?'完成動画を確認':'生成履歴を確認';
+ $('acRecover').hidden=true;
+ $('acDerive').hidden=!(successful&&lip()&&(item.projectId||project?.audio));
+ status(successful?'動画が完成しました。':completed?'生成が終了しました。生成履歴で結果を確認してください。':'受付済み・生成中。別アプリに切り替えられます。');
+}
+async function refreshCurrentRun(){
+ const item=currentRun();
+ if(!item?.accepted||item.completed||latestRunRefreshing)return;
+ const key=runKey();
+ latestRunRefreshing=true;
+ try{
+  const response=await api('actions/workflows/generate_video_ui.yml/runs?per_page=100');
+  const run=response.workflow_runs.find(entry=>entry.display_title===`Pages ${item.receipt}`);
+  if(run&&key===runKey()&&currentRun()?.receipt===item.receipt)showRun(item,run);
+ }catch{/* Keep the last confirmed status while disconnected. */}
+ finally{latestRunRefreshing=false;}
+}
+function paintLyricRows(){
+ const now=val();
+ let missing=0,invalid=0,previous=0;
+ for(const row of rows){
+  const start=Number(row.start.value),end=Number(row.end.value);
+  const absent=row.start.value===''||row.end.value==='';
+  const overlaps=!absent&&(start<previous||end<=start);
+  if(absent)missing++;
+  if(overlaps)invalid++;
+  if(!absent)previous=Math.max(previous,end);
+  row.label.textContent=absent?'時刻を入力':overlaps?'重複・時間を確認':`${start.toFixed(2)}–${end.toFixed(2)} 秒`;
+  row.seek.disabled=row.start.value==='';
+  row.box.classList.toggle('ac-line-active',!absent&&now>=start&&now<end);
+ }
+ $('acLyricSummary').textContent=rows.length?`${rows.length}行${missing?` · 未設定 ${missing}行`:''}${invalid?` · 時刻を確認 ${invalid}行`:''}`:'';
+}
+function updateSourceFields(){
+ const source=$('acSource').value;
+ $('acProjectPicker').hidden=source!=='saved';
+ $('acFullSource').hidden=source==='wav';
+ $('acWavSource').hidden=source!=='wav'||fullMode();
+ $('acCutGroup').hidden=fullMode()||source==='wav';
+ $('acWavSource').querySelector('input').disabled=fullMode();
+}
+function updateEditor(){
+ const run=currentRun();
+ const title=musicTitles[$('acMode').value];
+ $('acEditorTitle').textContent=title;
+ $('acRatio').textContent=lip()?(fullMode()?'横 16:9':'縦 9:16'):
+  ({vertical_only:'縦 9:16',horizontal_only:'横 16:9',vertical_horizontal:'縦 9:16 ＋ 横 16:9'})[$('acOutput').value];
+ $('acOffsetLabel').textContent=fullMode()?'映像の曲開始位置（秒）':'映像のサビ開始位置（秒）';
+ $('acMarkOffset').textContent=fullMode()?'現在位置を曲開始にする':'現在位置をサビ開始にする';
+ $('acPreviewFormat').parentElement.hidden=lip()||editorStep!==2||$('acOutput').value!=='vertical_horizontal';
+ $('acTextFormat').parentElement.hidden=lip()||$('acOutput').value!=='vertical_horizontal';
+ $('acOutput').parentElement.hidden=lip();
+ $('acProjectOptions').hidden=!lip();
+ $('acSafeToggle').hidden=editorStep!==2;
+ $('acManualLyrics').hidden=!lip();
+ $('acSource').options[1].hidden=fullMode();
+ $('acMediaSummary').textContent=chorus&&Number.isFinite(chorusPlayer.duration)?`${chorus.name}（${chorusPlayer.duration.toFixed(1)}秒）`:'';
+ updateSourceFields();
+ document.querySelectorAll('[data-ac-panel]').forEach(panel=>{panel.hidden=Number(panel.dataset.acPanel)!==editorStep;});
+ for(const button of $('acSteps').querySelectorAll('button')){
+  const step=Number(button.dataset.acStep);
+  button.disabled=step>furthestStep;
+  if(step===editorStep)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');
+ }
+ $('acPreviewDock').hidden=editorStep===3||(editorStep===0&&(!lip()||(!chorus&&!file)));
+ $('acAudioDock').hidden=!lip();
+ $('acBack').hidden=editorStep===0;
+ $('acNext').hidden=editorStep===3;
+ $('acNext').textContent=['歌詞へ','仕上げへ','生成内容を確認'][editorStep]??'';
+ $('acLyricAuto').hidden=editorStep!==1;
+ $('acLyricAuto').classList.toggle('secondary',rows.length>0);
+ $('acNext').classList.toggle('secondary',editorStep===1&&!rows.length);
+ $('acSubmit').hidden=editorStep!==3;
+ $('acRecover').hidden=!pendingItems().some(item=>!item.mode||item.mode===$('acMode').value);
+ $('acOpenHistory').hidden=!run?.accepted;
+ $('acOpenHistory').textContent=run?.successful?'完成動画を確認':'生成履歴を確認';
+ $('acDerive').hidden=!(run?.successful&&lip()&&(item.projectId||project?.audio));
+ $('acDerive').textContent=fullMode()?'同じ曲でサビショートを作る':'同じ曲でフルMVを作る';
+ if(editorStep===3){
+  const details=$('acReview');
+  details.replaceChildren();
+  const duration=lip()?chorusPlayer.duration:file?.duration;
+  for(const [label,value] of [
+   ['出力',$('acRatio').textContent],['尺',Number.isFinite(duration)?`${duration.toFixed(1)} 秒`:'素材の再選択が必要'],
+   ['曲名',$('acTitle').value||'未入力'],['音声',lip()?chorus?.name??'未選択':'撮影動画の音声'],
+   ['映像',stock()?$('acImage').value:file?.blob.name??'未選択'],['歌詞',$('acLyricSummary').textContent||'未入力']
+  ]){
+   const term=document.createElement('dt');term.textContent=label;
+   const description=document.createElement('dd');description.textContent=value;
+   details.append(term,description);
+  }
+ }
+}
+function goToStep(next){
+ if(busy||submitting)return;
+ for(const player of [full,chorusPlayer,$('acPreview')])player.pause();
+ editorStep=next;
+ furthestStep=Math.max(furthestStep,next);
+ localStorage.setItem(stageKey(),String(next));
+ updateEditor();
+ $('acEditorTitle').focus();
+}
+function openMusicEditor(){
+ $('acSource').value=project&&lip()?'saved':fullMode()?'full':localStorage.getItem(`${stageKey()}:source`)||'full';
+ if(!lip())$('acOutput').onchange();
+ localStorage.setItem(lastMusicModeKey(),$('acMode').value);
+ $('acContinue').hidden=false;
+ const stored=Number(localStorage.getItem(stageKey()));
+ editorStep=Number.isInteger(stored)&&stored>=0&&stored<=3?stored:0;
+ furthestStep=editorStep;
+ updateEditor();
+ const run=currentRun();
+ if($('acRecover').hidden&&run?.accepted){
+  status(run.successful?'動画が完成しました。':'受付済み。生成履歴で進捗を確認できます。');
+  refreshCurrentRun();
+ }else if(!$('acRecover').hidden)status('受付を確認中です。前回の受付を確認できます。');
+ else if(editorStep>0&&!currentLyricMedia().blob)status('下書きを復元しました。「素材」で使用するファイルを選び直してください。');
+ else status('');
+}
+function checkSources(){
+ if(lip()&&!fullMode()&&chorus&&$('acSource').value!=='wav'&&confirmedCut!==selectedCut())throw Error('サビの開始と終了を確認し、「この区間を使う」を押してください。');
+ if(lip()&&(!chorus||!Number.isFinite(chorusPlayer.duration)))throw Error(fullMode()?'フル音源を選んでください。':'サビ音源を選ぶか、切り出し範囲を確定してください。');
+ if(stock()){imageName();return;}
+ if(!Number.isFinite(file?.duration))throw Error('撮影動画を選んで、読み込みが完了するまでお待ちください。');
+}
+$('acNext').onclick=()=>{
+ try{
+  if(editorStep===0)checkSources();
+  if(editorStep===1){
+   if(builtLyrics!==$('acLyrics').value)buildRows();
+   if(!rows.length)throw Error('歌詞を入力してください。');
+   repaint();
+  }
+  goToStep(editorStep+1);
+ }catch(e){status(e.message);}
+};
+$('acBack').onclick=()=>goToStep(editorStep-1);
+for(const button of $('acSteps').querySelectorAll('button'))button.onclick=()=>{
+ const step=Number(button.dataset.acStep);
+ if(step<=furthestStep)goToStep(step);
+};
+function chooseMusicMode(mode){
+ $('productionMode').value=mode;
+ $('productionMode').dispatchEvent(new Event('change'));
+}
+for(const button of $('acModeCards').querySelectorAll('[data-ac-mode]'))button.onclick=()=>chooseMusicMode(button.dataset.acMode);
+$('acContinue').hidden=!musicTitles[localStorage.getItem(lastMusicModeKey())];
+$('acContinue').onclick=()=>{chooseMusicMode(localStorage.getItem(lastMusicModeKey()));$('acEditorTitle').focus();};
+$('acSource').onchange=()=>{
+ const source=$('acSource').value;
+ localStorage.setItem(`${stageKey()}:source`,source);
+ if(source==='saved')$('acProjectList').click();
+ else {
+  project=null;projectSha=null;projectAudio=null;decoded=null;confirmedCut=null;
+  $('acProjects').value='';$('acFull').value='';$('acChorus').value='';
+  for(const player of [full,chorusPlayer]){player.pause();player.removeAttribute('src');player.load();}
+  chorus=null;
+ }
+ updateSourceFields();
+};
+$('acOutput').onchange=()=>{
+ const output=$('acOutput').value;
+ if(output!=='vertical_horizontal'){
+  $('acTextFormat').value=output==='horizontal_only'?'landscape':'vertical';
+  $('acTextFormat').onchange();
+ }
+ updateEditor();
+};
+$('acSafeToggle').onclick=()=>{
+ const button=$('acSafeToggle'),enabled=button.getAttribute('aria-pressed')!=='true';
+ button.setAttribute('aria-pressed',String(enabled));
+ $('acPreviewBox').classList.toggle('show-safe-area',enabled);
+};
+$('acOpenHistory').onclick=()=>{
+ $('refresh').click();
+ $('history').scrollIntoView?.({block:'start'});
+};
+$('acDerive').onclick=async()=>{
+ if(busy||submitting)return;
+ const projectId=currentRun()?.projectId??project?.id;
+ if(!projectId)return;
+ chooseMusicMode(fullMode()?'lip':'full');
+ goToStep(0);
+ $('acSource').value='saved';
+ updateSourceFields();
+ const select=$('acProjects');
+ if(!Array.from(select.options).some(option=>option.value===projectId))select.add(new Option('同じ曲',projectId));
+ select.value=projectId;
+ await select.onchange();
+};
+$('acSubmit').onclick=async()=>{
+ if(busy||submitting)return;
+ submitting=true;
+ const generate=async()=>{
+  try{
+   checkSources();
+   script('preview',stock()?{path:`media/${imageName()}`}:null);
+   if(ready()||await prepare())await submit();
+  }catch(e){status(e.message);}
+  finally{updateEditor();}
+ };
+ try{
+  if(navigator.locks)await navigator.locks.request(`v-generator-music:${repo()}`,{ifAvailable:true},async lock=>{
+   if(lock)await generate();else status('別のタブで動画の生成を受け付けています。');
+  });
+  else await generate();
+ }finally{submitting=false;ready();}
+};
+window.addEventListener('pageshow',refreshCurrentRun);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCurrentRun();});
+
 $('productionMode').onchange=showProductionMode;
 showProductionMode();
 restorePrepared();
-
-
