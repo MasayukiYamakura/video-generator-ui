@@ -1,11 +1,11 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "3bea828fd5d806c37d63a3b72dc281a5cc506d58",
+  "source_commit": "afc16b24e6e5e96b0bb9ba836ebae3c486bf9345",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "fda75eee7cb03c52a3767d7e7ba5a8f8b003aeb5059100a782e42d63530e7399",
     "README.md": "7f052661dc4c76a29a5c0a39f8b55da5231a87e572b00ac5cda829d2a54aaeca",
-    "acapella.mjs": "e90b0a37e2ba96de901792c0052540414a01775c00cf6929bf70f07a24c7346c",
+    "acapella.mjs": "8782e9bc29f984e5ad32a7df0b3b0309c9029562a268182d1a302edd31d3bb28",
     "ai-direct.mjs": "376319ecb0bff5d121c2adc90e96cd0b43b3a8679e1f9998862b2cda4b6b284b",
     "app.js": "91ab6dbab23b6700cb00fd205941cbf70472288fdf678bbf6fc7df89d758b9a3",
     "builder-entry.js": "1598b869f5d54348f3691b2565a86cba4d90ad26e469928606bcd49822170bfe",

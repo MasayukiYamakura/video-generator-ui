@@ -266,7 +266,7 @@ async function prepare(){
   const saved=JSON.parse(localStorage.getItem(`acapella-transfer:${repo()}:${$('acMode').value}`)||'null');
   const existing=lip()&&!stock()?project?.layouts?.[layoutKey()]?.video:null;
   const savedVideo=existing?.sha256===meta.sha256?existing:null;
-  const id=savedVideo?.public_id.split('/').at(-1)??(saved?.videoSha===meta.sha256?saved.videoId:null)??lyricSource(meta)?.id??crypto.randomUUID().replaceAll('-','');
+  const id=savedVideo?.public_id.split('/').at(-1)??(saved && meta.sha256 && saved.videoSha===meta.sha256?saved.videoId:null)??lyricSource(meta)?.id??crypto.randomUUID().replaceAll('-','');
   const payload=script(id,meta);
   const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
   const audioId=lip()?(saved?.audioSha===audioMeta.sha256?saved.audioId:lyricSource(audioMeta)?.id??crypto.randomUUID().replaceAll('-','')):null;
