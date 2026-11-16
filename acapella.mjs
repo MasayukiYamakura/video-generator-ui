@@ -127,18 +127,20 @@ function repaint(){
  $('acLipTitle').textContent=lip()&&hook?`${$('acTitle').value} / ${$('acArtist').value}`:'';
  paintTextStyle();
 }
+let builtLyrics;
 function buildRows(){
+ builtLyrics=$('acLyrics').value;
  const root=$('acLines');root.replaceChildren();rows=[];
  for(const line of $('acLyrics').value.split('\n').map(s=>s.trim()).filter(Boolean)){
   const box=document.createElement('div');box.className='ac-line';
   const text=document.createElement('input');text.value=line;text.setAttribute('aria-label','歌詞');
-  const start=document.createElement('input');start.type='number';start.step='.01';start.min='0';start.value=lip()?'':'0';start.setAttribute('aria-label','開始秒');
-  const end=document.createElement('input');end.type='number';end.step='.01';end.min='0';end.value=lip()?'':'0';end.setAttribute('aria-label','終了秒');
+  const start=document.createElement('input');start.type='number';start.step='.01';start.min='0';start.value='';start.setAttribute('aria-label','開始秒');
+  const end=document.createElement('input');end.type='number';end.step='.01';end.min='0';end.value='';end.setAttribute('aria-label','終了秒');
   const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);repaint();};
   const z=document.createElement('button');z.type='button';z.textContent='終了を記録';z.className='secondary';z.onclick=()=>{end.value=val().toFixed(2);repaint();};
   box.append(text,start,end,a,z);root.append(box);rows.push({text,start,end});
  }
- status(lip()?'サビを再生し、各行の開始を記録してください。':`${rows.length}行を取り込みました。動画を再生し、各行の開始・終了を記録してください。`);
+ status(`${rows.length}行を取り込みました。自動設定または再生しながらの時刻入力ができます。`);
 }
 function compiledLyrics(partial=false){
  const clears=$('acClears').value.split(',').filter(v=>v.trim()).map(v=>Math.round(Number(v)*1000));
@@ -179,6 +181,7 @@ function script(id,meta){
  if(title.length<1||artist.length<1||!rows.length||!file)throw Error('動画・曲名・アーティスト名・歌詞を入力してください。');
  if(!Number.isFinite(file.duration)||file.duration>120||end>file.duration*1000)throw Error('動画またはフックの長さを確認してください。');
  let previous=0;
+ if(rows.some(row=>row.start.value===''||row.end.value===''))throw Error('各行の開始・終了を設定してください。');
  for(const line of lyrics){if(!line.text||line.start_ms<previous||line.end_ms<=line.start_ms||line.end_ms>file.duration*1000+50)throw Error('歌詞の時刻が重複または動画の範囲外です。');previous=line.end_ms;}
  return result;
 }
@@ -252,15 +255,15 @@ async function prepare(){
   const saved=JSON.parse(localStorage.getItem(`acapella-transfer:${repo()}:${$('acMode').value}`)||'null');
   const existing=lip()&&!stock()?project?.layouts?.[layoutKey()]?.video:null;
   const savedVideo=existing?.sha256===meta.sha256?existing:null;
-  const id=savedVideo?.public_id.split('/').at(-1)??(saved?.videoSha===meta.sha256?saved.videoId:null)??crypto.randomUUID().replaceAll('-','');
+  const id=savedVideo?.public_id.split('/').at(-1)??(saved?.videoSha===meta.sha256?saved.videoId:null)??lyricSource(meta)?.id??crypto.randomUUID().replaceAll('-','');
   const payload=script(id,meta);
   const repository=await api('');if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
-  const audioId=lip()?(saved?.audioSha===audioMeta.sha256?saved.audioId:crypto.randomUUID().replaceAll('-','')):null;
+  const audioId=lip()?(saved?.audioSha===audioMeta.sha256?saved.audioId:lyricSource(audioMeta)?.id??crypto.randomUUID().replaceAll('-','')):null;
   const retryKey=`acapella-transfer:${repo()}:${$('acMode').value}`;
   localStorage.setItem(retryKey,JSON.stringify({videoSha:meta.sha256,videoId:id,audioSha:audioMeta?.sha256,audioId}));
   const pair=await keyPair();
-  if(!stock()&&!savedVideo)await transferSource(videoFile,id,meta,pair);
-  if(lip())await transferSource(audioFile,audioId,audioMeta,pair);
+  if(!stock()&&!savedVideo&&id!==lyricSource(meta)?.id)await transferSource(videoFile,id,meta,pair);
+  if(lip()&&audioId!==lyricSource(audioMeta)?.id)await transferSource(audioFile,audioId,audioMeta,pair);
   if(mode!==$('acMode').value||visual!==stock()||identity(videoFile)!==identity(file?.blob)||
      (lip()&&identity(audioFile)!==identity(chorus)))
    throw Error('準備中に素材または制作モードが変わりました。もう一度準備してください。');
@@ -287,6 +290,143 @@ async function ensureInputRef(item){
   const current=await api(ref);
   if(current.object?.sha!==item.sha)throw Error('受付IDの入力コミットが一致しません。生成を中止しました。');
  }
+}
+const lyricJobKey=()=>`acapella-lyric-job:${repo()}:${$('acMode').value}`;
+const lyricSourceKey=sha=>`acapella-lyric-source:${repo()}:${sha}`;
+function lyricSource(meta){
+ try{
+  const item=JSON.parse(localStorage.getItem(lyricSourceKey(meta.sha256))||'null');
+  return item?.sha===meta.sha256?item:null;
+ }catch{return null;}
+}
+function lyricInput(){
+ const pasted=$('acLyrics').value.split('\n').map(line=>line.trim()).filter(Boolean);
+ return builtLyrics===$('acLyrics').value&&rows.length===pasted.length?rows.map(row=>row.text.value.trim()):pasted;
+}
+function currentLyricMedia(){
+ return lip()?{blob:chorus,duration:chorusPlayer.duration}:{blob:file?.blob,duration:file?.duration};
+}
+async function checkLyricResult(key, {receipt, sha, signature, lines, input, requestedAt}, wait){
+ for(let attempt=0;attempt<(wait?80:1);attempt++){
+  try{
+   const data=await api(`contents/lyric-preview.json?ref=ui-preview%2F${receipt}`);
+   const timings=JSON.parse(new TextDecoder().decode(bytes(data.content.replace(/\s/g,''))));
+   if(key!==lyricJobKey())throw Error('照合した制作モードに戻って確認してください。');
+   if(input!==JSON.stringify(lyricInput())){
+    localStorage.removeItem(key);
+    throw Error('歌詞が変わりました。現在の歌詞で自動設定をやり直してください。');
+   }
+   const media=currentLyricMedia();
+   if(!media.blob)throw Error('照合時の動画または音源を選択してください。');
+   if((await fileMeta(media.blob,lip())).sha256!==signature){
+    localStorage.removeItem(key);
+    throw Error('素材が変わりました。現在の素材で自動設定をやり直してください。');
+   }
+   if(key!==lyricJobKey()||media.blob!==currentLyricMedia().blob||input!==JSON.stringify(lyricInput()))
+    throw Error('制作モード・素材・歌詞が変更されました。もう一度確認してください。');
+   if(timings.length!==lines.length||timings.some((line,i)=>line.text!==lines[i]))
+    throw Error('照合結果の歌詞が一致しません。');
+   if(builtLyrics!==$('acLyrics').value)buildRows();
+   let matched=0;
+   for(const [i,line] of timings.entries()){
+    if(line.start_ms===undefined)continue;
+    rows[i].start.value=line.start_ms/1000;
+    rows[i].end.value=Math.min(line.end_ms,Math.floor(media.duration*1000))/1000;
+    matched++;
+   }
+   saveDraft();repaint();localStorage.removeItem(key);
+   status(`${matched}/${lines.length}行の時刻を設定しました。${matched<lines.length?'照合できなかった行の時刻を確認・入力してください。':'再生して確認し、必要に応じて修正してください。'}`);
+   return;
+  }catch(e){if(e.status!==404)throw e;}
+  if(attempt%5===0){
+   const runs=await api('actions/workflows/generate_video_ui.yml/runs?event=workflow_dispatch&per_page=30');
+   const run=runs.workflow_runs.find(entry=>entry.display_title===`Pages ${receipt}`);
+   if(!run&&sha&&!wait&&Date.now()-requestedAt>30000){
+    await ensureInputRef({receipt,sha});
+    await dispatchLyrics(receipt,sha);
+   }
+   if(run?.status==='completed'&&run.conclusion!=='success'){
+    localStorage.removeItem(key);
+    throw Error(`歌詞の照合に失敗しました。GitHub Actionsで受付ID ${receipt} の結果を確認してください。`);
+   }
+  }
+  if(wait)await sleep(3000);
+ }
+ status('照合を実行中です。時間をおいて「照合結果を確認」を押してください。');
+}
+function dispatchLyrics(receipt,sha){
+ return api('actions/workflows/generate_video_ui.yml/dispatches','POST',{ref:'main',inputs:{receipt_id:receipt,input_sha:sha,job_kind:'lyric-preview'}});
+}
+async function reuseFullLyrics(vocal, media, lines){
+ const fullTiming=project?.fullLyricTiming;
+ if(vocal||!lip()||fullMode()||!fullTiming||!decoded||!projectAudio)return false;
+ const start=Number($('acCutStart').value),end=Number($('acCutEnd').value);
+ const currentProject=project, audio=projectAudio;
+ if(!(start>=0&&end>start&&end<=decoded.duration&&end-start<=120))return false;
+ if(await assetHash(audio)!==fullTiming.audioSha||currentProject!==project||audio!==projectAudio||
+    await assetHash(chorusWav(decoded,start,end))!==await assetHash(media.blob))return false;
+ if(currentProject!==project||audio!==projectAudio||fullMode()||!lip()||media.blob!==currentLyricMedia().blob||
+    JSON.stringify(lines)!==JSON.stringify(lyricInput()))return false;
+ const shift=Math.round(Math.round(start*decoded.sampleRate)*1000/decoded.sampleRate);
+ const duration=Math.floor(media.duration*1000);
+ const selected=fullTiming.lyrics.filter(line=>line.end_ms>shift&&line.start_ms<shift+duration);
+ if(selected.length!==lines.length||selected.some((line,i)=>line.text!==lines[i]))return false;
+ for(const [i,line] of selected.entries()){
+  rows[i].start.value=Math.max(0,line.start_ms-shift)/1000;
+  rows[i].end.value=Math.min(duration,line.end_ms-shift)/1000;
+ }
+ saveDraft();repaint();
+ status('保存済みのフルMVの時刻をサビに反映しました。再生して確認してください。');
+ return true;
+}
+async function autoLyrics(resume=false){
+ if(busy)return;
+ busy=true;ready();$('acLyricAuto').disabled=true;$('acLyricResult').disabled=true;
+ const key=lyricJobKey();
+ try{
+  const previous=JSON.parse(localStorage.getItem(key)||'null');
+  if(previous){await checkLyricResult(key,previous,!resume);return;}
+  if(resume){status('確認待ちの照合はありません。');return;}
+  const repository=await api('');
+  if(!repository.private)throw Error('非公開リポジトリへ接続してください。');
+  const media=currentLyricMedia(),isSong=lip(),limit=fullMode()?360:120;
+  const duration_ms=Math.floor(media.duration*1000);
+  if(!media.blob||!Number.isFinite(duration_ms)||duration_ms<=0||duration_ms>limit*1000)
+   throw Error('先に完成動画に使う動画または音源を選択してください。');
+  if(builtLyrics!==$('acLyrics').value)buildRows();
+  const requestLines=lyricInput();
+  if(!requestLines.length||requestLines.length>100||requestLines.some(line=>!line||line.length>100))
+   throw Error('歌詞を1〜100行、各行1〜100文字で入力してください。');
+  const input=JSON.stringify(lyricInput());
+  const vocal=$('acLyricVocal').files[0], blob=vocal||media.blob;
+  if(await reuseFullLyrics(vocal,media,requestLines))return;
+  const meta=await fileMeta(blob,!!vocal||isSong);
+  const mainMeta=vocal?await fileMeta(media.blob,isSong):meta;
+  const saved=lyricSource(meta);
+  const existing=ready()&&!vocal?(isSong?prepared.audioId:prepared.id):null;
+  const id=existing??saved?.id??crypto.randomUUID().replaceAll('-','');
+  if(!existing&&!saved){
+   await transferSource(blob,id,meta,await keyPair());
+   if(key===lyricJobKey())localStorage.setItem(lyricSourceKey(meta.sha256),JSON.stringify({sha:meta.sha256,id}));
+  }
+  if(key!==lyricJobKey()||currentLyricMedia().blob!==media.blob||vocal!==$('acLyricVocal').files[0]||input!==JSON.stringify(lyricInput()))
+   throw Error('素材・制作モード・歌詞が変更されました。');
+  const runs=await api('actions/workflows/generate_video_ui.yml/runs?per_page=30');
+  if(runs.workflow_runs.some(run=>run.status!=='completed'))
+   throw Error('生成中の処理が完了してから歌詞を照合してください。');
+  const payload={source:{...meta,public_id:`v-generator/acapella/${id}`},duration_ms,limit,lines:requestLines};
+  const receipt=crypto.randomUUID();
+  const uploaded=await api('git/blobs','POST',{content:JSON.stringify(payload),encoding:'utf-8'});
+  const tree=await api('git/trees','POST',{tree:[{path:'input/script.json',mode:'100644',type:'blob',sha:uploaded.sha}]});
+  const commit=await api('git/commits','POST',{message:`Lyric preview ${receipt}`,tree:tree.sha,parents:[]});
+  await ensureInputRef({receipt,sha:commit.sha});
+  const item={receipt,sha:commit.sha,signature:mainMeta.sha256,lines:requestLines,input,requestedAt:Date.now()};
+  localStorage.setItem(key,JSON.stringify(item));saveDraft();
+  await dispatchLyrics(receipt,commit.sha);
+  status('歌詞を照合しています。画面を離れた場合は「照合結果を確認」で再開できます。');
+  await checkLyricResult(key,item,true);
+ }catch(e){status(e.message);}
+ finally{busy=false;ready();$('acLyricAuto').disabled=false;$('acLyricResult').disabled=false;}
 }
 async function submit(){
  if(busy||!ready())return;busy=true;ready();
@@ -367,6 +507,7 @@ for(const id of ['acOverlay','acLipTitle']){
   $('acTextFormat').value=fmt;loadTextFields();saveDraft();repaint();};
  node.onpointerup=node.onpointercancel=()=>{dragging=false;};
 }
+$('acLyricAuto').onclick=()=>autoLyrics();$('acLyricResult').onclick=()=>autoLyrics(true);
 $('acBuildLines').onclick=buildRows;$('acSubmit').onclick=submit;
 async function recover(){
  await reconcilePending(true);
@@ -709,6 +850,11 @@ async function saveProject(){
  if(chorus&&rows.length&&rows.every(row=>row.start.value!=='')){
   const shift=fullMode()?0:Math.round(start*1000);
   const timed=compiledLyrics().map(line=>({...line,start_ms:line.start_ms+shift,end_ms:line.end_ms+shift}));
+  if(fullMode()){
+   delete next.fullLyricTiming;
+   if(decoded&&projectAudio&&await assetHash(chorus)===await assetHash(chorusWav(decoded,0,decoded.duration,360)))
+    next.fullLyricTiming={audioSha:await assetHash(projectAudio),lyrics:timed};
+  }
   next.lyrics=fullMode()?timed:[...next.lyrics.filter(line=>line.end_ms<=shift||line.start_ms>=Math.round(end*1000)),...timed].sort((a,b)=>a.start_ms-b.start_ms);
  }
  if(projectAudio&&!next.audio?.public_id){
@@ -891,4 +1037,5 @@ function showProductionMode(){
 $('productionMode').onchange=showProductionMode;
 showProductionMode();
 restorePrepared();
+
 
