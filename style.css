@@ -76,3 +76,11 @@ input[type=radio]{width:20px;height:20px;flex-shrink:0}#youtubeSelected{overflow
 @media (min-width: 760px) {
   .ac-editor:has(#acPreviewDock:not([hidden])) { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); gap: 20px; }
 }
+
+.ac-lyrics-input{display:grid;grid-template-columns:3rem minmax(0,1fr);min-width:0}
+#acLyricNumbers,#acLyrics{font:16px/1.5 monospace;white-space:pre;box-sizing:border-box}
+#acLyricNumbers{height:9.5rem;overflow:hidden;text-align:right;padding:8px 8px 8px 0;color:#a7c6d8;border:1px solid #596777;border-right:0;border-radius:8px 0 0 8px}
+#acLyrics{width:100%;height:9.5rem;margin:0;resize:vertical;border-radius:0 8px 8px 0;overflow:auto;padding:8px}
+#acLines .ac-line-number{font-weight:700;grid-column:1 / -1;color:#8bd6bd}
+#acLines .ac-line-error{border-color:#f4a7a7;background:#40282b}
+.ac-preview .ac-overlay.hook[data-release-label]:not([data-release-label=""])::before{content:attr(data-release-label);display:block;font-size:.6em;line-height:1.35}
