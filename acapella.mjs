@@ -92,15 +92,17 @@ function paintTextStyle(){
  for(const [id,kind] of [['acLipTitle','hook'],['acOverlay',lip()?'caption':Number($('acPreview')?.currentTime||0)<Number($('acHook').value)*1?'hook':'caption']]){
   const node=$(id),style=slot[kind];if(!node)continue;
   const parts=kind==='hook'&&style.lines==='double'?[$('acTitle').value,$('acArtist').value]:[kind==='hook'?`${$('acTitle').value}  /  ${$('acArtist').value}`:node.textContent];
+  if(kind==='hook'&&$('acReleaseLabel').value.trim())parts.push($('acReleaseLabel').value.trim());
   let effective=style.font_size;
   const context=document.createElement('canvas').getContext?.('2d');
   const measure=(part,size)=>{if(context){context.font=`700 ${size}px sans-serif`;return context.measureText(part).width+6;}return part.length*size;};
-  while(parts.some(part=>measure(part,effective)>width*style.max_width_ratio)&&effective>16)effective-=2;
+  while(parts.some((part,index)=>measure(part,effective*(kind==='hook'&&index===parts.length-1&&$('acReleaseLabel').value.trim()?.6:1))>width*style.max_width_ratio)&&effective>16)effective-=2;
   actual.push(`${kind==='hook'?'フック':'歌詞'} ${effective}px${effective<style.font_size?'（幅に合わせ縮小）':''}`);
   node.style.left=`${style.center_x/width*100}%`;node.style.top=`${style.center_y/height*100}%`;
   node.style.maxWidth=`${style.max_width_ratio*100}%`;node.style.width=`${style.max_width_ratio*100}%`;
   node.style.fontSize=`${Math.max(12,effective*scale)}px`;
   node.style.whiteSpace=kind==='hook'&&style.lines==='double'?'pre-line':'nowrap';
+  if(kind==='hook')node.dataset.releaseLabel=$('acReleaseLabel').value.trim();else delete node.dataset.releaseLabel;
   if(kind==='hook'&&style.lines==='double')node.textContent=node.textContent.replace(' / ','\n');
  }
  const hook=slot.hook,caption=slot.caption;
@@ -131,12 +133,33 @@ function repaint(){
  paintTextStyle();
 }
 let builtLyrics;
+function updateLyricNumbers(){
+ const lines=$('acLyrics').value.split('\n');
+ let number=0;
+ $('acLyricNumbers').textContent=lines.map(line=>line.trim()?String(++number):' ').join('\n');
+ $('acLyricNumbers').scrollTop=$('acLyrics').scrollTop;
+}
+$('acLyrics').addEventListener('input',updateLyricNumbers);
+$('acLyrics').addEventListener('scroll',()=>{$('acLyricNumbers').scrollTop=$('acLyrics').scrollTop;});
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{$('acLyricNumbers').style.height=`${$('acLyrics').offsetHeight}px`;}).observe($('acLyrics'));
+function focusLyricError(message){
+ const match=String(message).match(/歌詞\s*(\d+)\s*行目/);
+ if(!match)return;
+ const row=rows[Number(match[1])-1];if(!row)return;
+ editorStep=1;furthestStep=Math.max(furthestStep,1);updateEditor();
+ rows.forEach(item=>item.box.classList.remove('ac-line-error'));
+ row.box.classList.add('ac-line-error');row.box.querySelector('details').open=true;
+ row.box.scrollIntoView({block:'center'});row.start.focus();
+}
 function buildRows(){
  builtLyrics=$('acLyrics').value;
+ updateLyricNumbers();
  const root=$('acLines');root.replaceChildren();rows=[];
  for(const line of $('acLyrics').value.split('\n').map(s=>s.trim()).filter(Boolean)){
+  const number=rows.length+1;
   const box=document.createElement('div');box.className='ac-line';
-  const text=document.createElement('input');text.value=line;text.setAttribute('aria-label','歌詞');
+  const numberLabel=document.createElement('strong');numberLabel.className='ac-line-number';numberLabel.textContent=`${number}行目`;
+  const text=document.createElement('input');text.value=line;text.setAttribute('aria-label',`${number}行目の歌詞`);
   const start=document.createElement('input');start.type='number';start.step='.01';start.min='0';start.value='';start.setAttribute('aria-label','開始秒');
   const end=document.createElement('input');end.type='number';end.step='.01';end.min='0';end.value='';end.setAttribute('aria-label','終了秒');
   const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);saveDraft();repaint();};
@@ -146,7 +169,7 @@ function buildRows(){
    player.currentTime=Number(start.value);player.play().catch(e=>status(e.message));};
   const timing=document.createElement('details');
   const label=document.createElement('summary');label.textContent='歌詞の時刻';
-  timing.append(label,start,end,a,z);box.append(text,seek,timing);root.append(box);
+  timing.append(label,start,end,a,z);box.append(numberLabel,text,seek,timing);root.append(box);
   rows.push({text,start,end,box,label,seek});
  }
 
@@ -163,10 +186,11 @@ function compiledLyrics(partial=false){
 function script(id,meta){
  if(builtLyrics!==$('acLyrics').value)throw Error('歌詞が変更されました。歌詞を自動同期してください。');
  validateLocalText();
- const title=$('acTitle').value.trim(),artist=$('acArtist').value.trim(),end=Math.round(Number($('acHook').value)*1000);
+ const title=$('acTitle').value.trim(),artist=$('acArtist').value.trim(),releaseLabel=$('acReleaseLabel').value.trim(),end=Math.round(Number($('acHook').value)*1000);
+ if(releaseLabel.length>40||[...releaseLabel].some(c=>c.charCodeAt(0)<32))throw Error('リリース表記は40文字以内で入力してください。');
  const lyrics=lip()?compiledLyrics():rows.map(r=>({start_ms:Math.round(Number(r.start.value)*1000),end_ms:Math.round(Number(r.end.value)*1000),text:r.text.value.trim()}));
  const output=lip()?(fullMode()?'horizontal_only':'vertical_only'):$('acOutput').value,framing=$('acFraming').value;
- const result={schema_version:1,production_type:'acapella',title,artist,hook_end_ms:end,lyrics,
+ const result={schema_version:1,production_type:'acapella',title,artist,...(releaseLabel?{release_label:releaseLabel}:{}),hook_end_ms:end,lyrics,
    framing:{vertical:framing,landscape:framing},text_layout:structuredClone(textLayouts),global_settings:{format:'vertical',output_mode:output},auto_link:$('acAutoLink').checked};
  if(stock()){
   const pct=Number($('acStockPercent').value),keywords=$('acStockKeywords').value.split('\n').map(v=>v.trim()).filter(Boolean);
@@ -192,7 +216,7 @@ function script(id,meta){
  if(!Number.isFinite(file.duration)||file.duration>120||end>file.duration*1000)throw Error('動画またはフックの長さを確認してください。');
  let previous=0;
  if(rows.some(row=>row.start.value===''||row.end.value===''))throw Error('各行の開始・終了を設定してください。');
- for(const line of lyrics){if(!line.text||line.start_ms<previous||line.end_ms<=line.start_ms||line.end_ms>file.duration*1000+50)throw Error('歌詞の時刻が重複または動画の範囲外です。');previous=line.end_ms;}
+ for(const [i,line] of lyrics.entries()){if(!line.text||line.start_ms<previous||line.end_ms<=line.start_ms||line.end_ms>file.duration*1000+50)throw Error(`歌詞 ${i+1} 行目の時刻が重複または動画の範囲外です。`);previous=line.end_ms;}
  return result;
 }
 function validateLocalText(){
@@ -477,7 +501,7 @@ async function submit(){
    try{await saveProject();if(project.audio&&currentRun()?.receipt===receipt)saveCurrentRun({...currentRun(),projectId:project.id});}
    catch(e){status(`受付依頼済み ${receipt}。曲プロジェクトの保存に失敗しました。 ${e.message}`);}
   }
- }catch(e){status(e.message);}finally{busy=false;ready();}
+ }catch(e){status(e.message);focusLyricError(e.message);}finally{busy=false;ready();}
 }
 $('acFile').onchange=()=>selectVideo($('acFile').files[0]);
 function selectImage(blob){
@@ -507,7 +531,7 @@ $('acPreview').ontimeupdate=repaint;
 function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');paintTextStyle();}
 $('acPreviewFormat').onchange=previewLayout;$('acFraming').onchange=previewLayout;
 previewLayout();
-for(const id of ['acTitle','acArtist','acHook'])$(id).oninput=repaint;
+for(const id of ['acTitle','acArtist','acReleaseLabel','acHook'])$(id).oninput=repaint;
 $('acTextFormat').onchange=()=>{if(!lip()){$('acPreviewFormat').value=$('acTextFormat').value;previewLayout();}loadTextFields();};
 for(const fields of Object.values(textFields))for(const id of Object.values(fields))$(id).addEventListener('input',()=>{saveTextFields();repaint();});
 $('acTextReset').onclick=()=>{const fmt=$('acTextFormat').value;textLayouts[fmt]=textDefaults()[fmt];loadTextFields();saveDraft();repaint();};
@@ -564,7 +588,7 @@ pendingTimer.unref?.();
 
 let syncPlaying=false;
 const full=$('acFullPlayer');
-const draftFields=['acCutStart','acCutEnd','acOutput','acTitle','acArtist','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
+const draftFields=['acCutStart','acCutEnd','acOutput','acTitle','acArtist','acReleaseLabel','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
 function identity(file){return file?[file.name,file.size,file.lastModified].join(':'):null;}
@@ -802,6 +826,7 @@ function restoreProjectLayout(){
  if(!project)return;
  $('acTitle').value=project.title;
  $('acArtist').value=project.artist;
+ $('acReleaseLabel').value=saved?.fields?.acReleaseLabel??project.release_label??'';
  $('acCandidate').checked=project.candidate;
  if(project.range){$('acCutStart').value=project.range[0];$('acCutEnd').value=project.range[1];}
  if(fullMode()&&!saved&&project.lyrics?.length){
@@ -859,7 +884,7 @@ async function saveProject(){
  const title=$('acTitle').value.trim();
  if(!title)throw Error('曲名を入力してください。');
  const next=structuredClone(project??{version:1,id:crypto.randomUUID(),layouts:{},lyrics:[],runs:{}});
- next.title=title;next.artist=$('acArtist').value.trim();next.candidate=$('acCandidate').checked;
+ next.title=title;next.artist=$('acArtist').value.trim();next.release_label=$('acReleaseLabel').value.trim();next.candidate=$('acCandidate').checked;
  next.layouts[layoutKey()]={...next.layouts[layoutKey()],...projectSnapshot()};
  if(!stock()&&file?.blob){
   const videoMeta=await fileMeta(file.blob);
@@ -1082,7 +1107,7 @@ function showRun(item,run){
  $('acOpenHistory').hidden=false;
  $('acOpenHistory').textContent=successful?'完成動画を確認':'生成履歴を確認';
  $('acRecover').hidden=true;
- $('acDerive').hidden=!(successful&&lip()&&(item.projectId||project?.audio));
+ $('acDerive').hidden=!(successful&&lip()&&(run?.projectId||project?.audio));
  status(successful?'動画が完成しました。':completed?'生成が終了しました。生成履歴で結果を確認してください。':'受付済み・生成中。別アプリに切り替えられます。');
 }
 async function refreshCurrentRun(){
@@ -1164,7 +1189,7 @@ function updateEditor(){
   const duration=lip()?chorusPlayer.duration:file?.duration;
   for(const [label,value] of [
    ['出力',$('acRatio').textContent],['尺',Number.isFinite(duration)?`${duration.toFixed(1)} 秒`:'素材の再選択が必要'],
-   ['曲名',$('acTitle').value||'未入力'],['音声',lip()?chorus?.name??'未選択':'撮影動画の音声'],
+   ['曲名',$('acTitle').value||'未入力'],['リリース表記',$('acReleaseLabel').value.trim()||'なし'],['音声',lip()?chorus?.name??'未選択':'撮影動画の音声'],
    ['映像',stock()?$('acImage').value:file?.blob.name??'未選択'],['歌詞',$('acLyricSummary').textContent||'未入力']
   ]){
    const term=document.createElement('dt');term.textContent=label;
