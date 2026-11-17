@@ -84,3 +84,84 @@ input[type=radio]{width:20px;height:20px;flex-shrink:0}#youtubeSelected{overflow
 #acLines .ac-line-number{font-weight:700;grid-column:1 / -1;color:#8bd6bd}
 #acLines .ac-line-error{border-color:#f4a7a7;background:#40282b}
 .ac-preview .ac-overlay.hook[data-release-label]:not([data-release-label=""])::before{content:attr(data-release-label);display:block;font-size:.6em;line-height:1.35}
+
+/* Display theme */
+.display-theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.display-theme select {
+  width: auto;
+  margin: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --page: #f4f5f7;
+  --panel: #fff;
+  --raised: #e8edf3;
+  --ink: #172536;
+  --muted: #46566b;
+  --line: #8998a9;
+  --accent: #176853;
+  background: var(--page);
+  color: var(--ink);
+}
+[data-theme="light"] section,
+[data-theme="light"] details {
+  background: var(--panel);
+  border-color: #cbd4df;
+}
+[data-theme="light"] :is(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+}
+[data-theme="light"] :is(header p, .muted, footer, #acRatio, #acLyricSummary, #acLyricNumbers, .posting-selection p) {
+  color: var(--muted);
+}
+[data-theme="light"] :is(a, .eyebrow, h2 span, #pbBatchEntries summary, #acLines .ac-line-number) {
+  color: var(--accent);
+}
+[data-theme="light"] button {
+  background: var(--accent);
+  color: #fff;
+}
+[data-theme="light"] :is(button.secondary, #acSteps button:not([aria-current="step"]), .posting-selection, #acLines .ac-line-active) {
+  background: var(--raised);
+  color: var(--ink);
+}
+[data-theme="light"] .posting-title {
+  background: transparent;
+  color: inherit;
+}
+[data-theme="light"] #acSteps [aria-current="step"] {
+  background: var(--accent);
+  color: #fff;
+}
+[data-theme="light"] :is(.item, .posting-card, #postingWorkspace, #acLyricNumbers, .tarot-card-input) {
+  border-color: var(--line);
+}
+[data-theme="light"] :is(#pbTarotArea, #pbBatchArea) {
+  background: #fcf8ef;
+  border-color: #aa8c56;
+}
+[data-theme="light"] #pbBatchEntries details {
+  background: var(--panel);
+}
+[data-theme="light"] #acLines .ac-line-error {
+  background: #ffeded;
+  border-color: #a34049;
+}
+[data-theme="light"] .ac-editor-actions {
+  background: var(--page);
+}
+[data-theme="light"] :is(input, textarea, select, button, a, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
