@@ -461,3 +461,62 @@ dialog p {
 #upload-preview[hidden] {display:none;}
 progress {width:100%; accent-color:var(--accent, #31b6a5);}
 #reference-history .take {margin-top:12px;}
+
+/* Display theme */
+.display-theme {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.display-theme select {
+  width: auto;
+  margin: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+}
+
+header .display-theme {
+  display: inline-flex;
+  margin: 0 0 0 12px;
+  vertical-align: middle;
+}
+header .display-theme select {
+  border-color: #71818b;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #eef3fa;
+  --muted: #b4c1cc;
+  --paper: #10151c;
+  --line: #50616d;
+  --accent: #efab80;
+  --panel: #19232c;
+  --raised: #243440;
+}
+[data-theme="dark"] :is(details, section, dialog) {
+  background: var(--panel);
+}
+[data-theme="dark"] :is(.reference-setup, .notice, .status, .character-image) {
+  background: var(--raised);
+}
+[data-theme="dark"] :is(input, select) {
+  background: var(--paper);
+  border-color: #788a98;
+}
+[data-theme="dark"] :is(button, .download) {
+  color: #17232c;
+}
+[data-theme="dark"] :is(button.secondary, .download) {
+  background: var(--raised);
+  border-color: #788a98;
+  color: var(--ink);
+}
+[data-theme="dark"] :is(.pending, .notice.error) {
+  background: #432d25;
+}
+[data-theme="dark"] a:not(.back, .download) {
+  color: #a8daef;
+}
