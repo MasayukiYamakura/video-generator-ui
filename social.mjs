@@ -1,4 +1,4 @@
-import {identity,matches,newest,sourceLink,previewLink} from './video-list.mjs?v=posting-20261022';
+import {identity,matches,newest,sourceLink,previewLink,postingTitle} from './video-list.mjs?v=posting-title-20261118';
 import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
@@ -14,7 +14,7 @@ export function utcFromJst(value){if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))
 export function filenameTitle(filename){if(typeof filename!=='string'||!filename.toLowerCase().endsWith('.mp4')||filename.length<=4||/[\\/]/.test(filename))throw Error('動画ファイル名が不正です');return filename.slice(0,-4);}
 export function composeRows(videos,channels,body,start,interval){
  const base=new Date(utcFromJst(start)).getTime();if(!Number.isFinite(interval)||interval<1||interval>10080)throw Error('投稿間隔は1〜10080分にしてください');
- return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:filenameTitle(v.filename),body:socialBody(v.social,v.tarot?.zodiac,body),due_at:new Date(base+i*interval*60000).toISOString()})));
+ return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:postingTitle(v),body:socialBody(v.social,v.tarot?.zodiac,body),due_at:new Date(base+i*interval*60000).toISOString()})));
 }
 
 export function isCompletedVideo(video, posts, channels){
@@ -127,12 +127,12 @@ export function mountSocial(){
   $('socialSubmit').textContent=queueReview?'確認した内容で補充待機に戻す':'確認した内容で一括予約（公開投稿）';
   $('socialReview').replaceChildren();$('socialCount').textContent=`${new Set(rows.map(r=>r.video_id)).size}動画・${rows.length}投稿を確認中。予約枠不足の分はBuffer未登録で保存します。補充は${state.settings?.auto_refill?'自動（約6時間ごと）または手動':'手動（自動登録はOFF）'}です。`;
   rows.forEach((r,i)=>{
-   const video=state.videos[r.video_id];if(video?.filename)r.title=filenameTitle(video.filename);
+   const video=state.videos[r.video_id];if(video?.filename)r.title=postingTitle(video);
    const box=el('details');box.open=rows.length===1;box.className='item';const c=state.channels.find(c=>c.id===r.channel_id);box.append(el('summary',`${i+1}. ${r.title} ／ ${MEDIA[r.service]}・${c?.name||r.channel_id}`));
    box.append(el('p',r.service==='youtube'?'場所・0秒カバー：Buffer経由では非対応':`カバー：開始0秒${r.service==='instagram'?` ／ 場所：${state.settings?.instagram_location?.text||'未設定（場所を付けずに予約）'}`:''}`));
    if(r.retry_buffer_id)box.append(el('p','失敗したBuffer投稿を同じIDで再予約します。成功済みの投稿先には再送しません。'));
    const time=field(box,'投稿日時（日本時間）',jstInput(r.due_at),'datetime-local');time.onchange=()=>{try{r.due_at=utcFromJst(time.value);}catch(e){say(e.message);}};
-   const title=field(box,'タイトル（動画ファイル名・拡張子なし）',r.title);title.readOnly=true;
+   const title=field(box,'投稿タイトル',r.title);title.readOnly=true;
    const body=field(box,r.service==='youtube'?'説明文':'本文（冒頭にタイトルを自動追加）',r.body,'textarea');body.rows=4;body.oninput=()=>r.body=body.value;
    const remove=el('button','この投稿を対象から外す');remove.className='secondary';remove.onclick=()=>{rows.splice(i,1);renderRows();};box.append(remove);$('socialReview').append(box);
   });
@@ -140,7 +140,7 @@ export function mountSocial(){
  }
  async function refresh(){
   const repository=$('repo').value.trim();
-  try{const result=await api(STATE);if(repository!==$('repo').value.trim())return;state=decode(result.content);for(const v of Object.values(state.videos))v.title=filenameTitle(v.filename);}catch(e){if(e.status!==404)throw e;}
+  try{const result=await api(STATE);if(repository!==$('repo').value.trim())return;state=decode(result.content);for(const v of Object.values(state.videos))v.title=postingTitle(v);}catch(e){if(e.status!==404)throw e;}
   if(!pending&&/^Buffer・縦型投稿：GitHub接続用トークン/.test($('socialStatus').textContent))say('');
    if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
@@ -197,4 +197,5 @@ export function mountSocial(){
  window.addEventListener('github-connected',()=>{if(/^Buffer・縦型投稿：GitHub接続用トークン/.test($('socialStatus').textContent))say('');});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
+
 
