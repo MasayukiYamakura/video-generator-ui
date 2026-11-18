@@ -1,13 +1,13 @@
 {
   "source_repository": "MasayukiYamakura/video-generator",
-  "source_commit": "6b6e5461625b3e6f26f7349c78e2c5a147887971",
+  "source_commit": "012adc0afa6598b28b2deb89edf3f481c36b4a41",
   "files": {
     ".nojekyll": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "AGENTS.md": "fda75eee7cb03c52a3767d7e7ba5a8f8b003aeb5059100a782e42d63530e7399",
     "README.md": "2f9bc5c09e6e68c064b72c52ff9b3709fb87287b5027f1069a01e062be34fc81",
     "acapella.mjs": "1f460b241f1318ce66265e9acea7e6f7ccf6e4664785fcad2ca4be3bdc108c43",
     "ai-direct.mjs": "376319ecb0bff5d121c2adc90e96cd0b43b3a8679e1f9998862b2cda4b6b284b",
-    "app.js": "91ab6dbab23b6700cb00fd205941cbf70472288fdf678bbf6fc7df89d758b9a3",
+    "app.js": "84b0d78a5fb1a78ba48c3bf9e446c2842b0cece7b30ddf38dc8d049ccee38c76",
     "builder-entry.js": "1598b869f5d54348f3691b2565a86cba4d90ad26e469928606bcd49822170bfe",
     "builder/batch-editor.mjs": "d593c633f5f6fe6324f217cb9a2fe83ea8d9a8ec7bc38ee5b667d00298a3cb13",
     "builder/batch.mjs": "84932a70c9b32ca5b1ba57894d2669c593e3006547008bfb1c9f6b2933cc579e",
@@ -40,7 +40,7 @@
     "posting-tools.mjs": "526c9b4208f46b42e4e397e5a9c3d5319620927114ccbff5a3c148846bdc00b7",
     "privacy.html": "25bd2a34199a0380699c2356821757c7d0a1e59f8cc78cedac1282a8548423bc",
     "social-entry.mjs": "9e932c7c9200d0cc30a51c6f094571d84b2c1269a22c29044b52f6acb5342e0c",
-    "social.mjs": "50343d6ef127da2401a6560154309e888396e1f718528ef078008fd7ceb32e67",
+    "social.mjs": "890ec5a01aa57d66d8a34ef49b08f0b310fd9b7783774ea8d0c8df28b551f271",
     "studio-features.mjs": "9f050d4f03ee74dcb71770ad39fc61e86dce431d38e3fcbe7e04e069271d6bf9",
     "style.css": "008e194558a537c9e4aba87c21b902f4a487471e8ea9e448fb624112588c9c5d",
     "theme.js": "ae42b772226fbec51caa31cd282a4fb4f923ffcb7c61c7e67d7adf70408efe2c",
@@ -49,7 +49,7 @@
     "x-publishing.mjs": "29cd790fcb0f9f90dfc7a76367de1b15d0aef1647f1459eb5e8389c6670025ba",
     "x-text.mjs": "a04c9db9fca345743922927b9bdb8579dbfc7409e916f4ad2f371245ec4924f8",
     "youtube-publication.mjs": "4982b2e7feeecd7a1e3ae19d79b9fdf7acd6f46c24f7b46bdb30b24dc108767c",
-    "youtube.mjs": "85ed681086a650b839d11f287346a71cd80b5f97e2feefee41419674c129cd2c",
+    "youtube.mjs": "1a3a075fb5cacf6a577ed05a71666f38dffc8af7623f08b71973d15cd1e1f650",
     "zodiac-display.mjs": "87b9344cf4e01cb6bed6ea75e350e120150d4e78551bc8d290bfcf813d99bccb"
   }
 }

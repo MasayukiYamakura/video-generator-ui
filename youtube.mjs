@@ -19,7 +19,7 @@ export function mountYouTube(){
  const key=()=>`youtube-request-v1:${repo()}`;
  const load=()=>{try{pending=JSON.parse(localStorage.getItem(key())||'null');}catch{pending=null;}};
  const save=()=>{if(pending)localStorage.setItem(key(),JSON.stringify(pending));else localStorage.removeItem(key());};
- const say=text=>{$('youtubeStatus').textContent=text;if(!$('productionPanel').hidden)$('status').textContent=text;};
+ const say=text=>{$('youtubeStatus').textContent=text?`YouTube直接投稿：${text}`:'';if(!$('productionPanel').hidden)$('status').textContent=text;};
  const api=(...args)=>{if(!window.videoStudioApi)throw Error('GitHubへ接続してください');if(busy&&pending&&pending.repo!==repo())throw Error('受付時のリポジトリに戻してください');return window.videoStudioApi(...args);};
  const decode=text=>JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(text.replace(/\s/g,'')),c=>c.charCodeAt(0))));
  const invalidate=()=>{review=null;$('youtubeReview').replaceChildren();controls();};
@@ -114,6 +114,7 @@ export function mountYouTube(){
   const repository=repo();
   try{const result=await api('contents/view.json?ref=youtube-state');if(repository!==repo())return;state=decode(result.content);}
   catch(e){if(e.status!==404)throw e;state={videos:{},uploads:{},requests:{}};}
+  if(!pending&&/^YouTube直接投稿：GitHub接続用トークン/.test($('youtubeStatus').textContent))say('');
   if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
    if(['completed','failed'].includes(result.status)){pending=null;save();invalidate();}
@@ -172,6 +173,7 @@ export function mountYouTube(){
  document.querySelector('[data-studio-tab="social"]')?.addEventListener('click',()=>refresh().catch(e=>say(e.message)));
  window.postingAdapters ||= {};
  window.postingAdapters.youtube={snapshot:()=>state,refresh,importVertical:id=>run({action:'import_vertical',source_id:id}),manage:request=>run({action:'manage',...request}),select:id=>{ $('youtubeVideo').value=id;selectVideo();},busy:()=>busy||Boolean(pending)};
+ window.addEventListener('github-connected',()=>{if(/^YouTube直接投稿：GitHub接続用トークン/.test($('youtubeStatus').textContent))say('');});
  load();render();polling();
 }
 
