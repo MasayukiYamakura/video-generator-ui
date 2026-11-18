@@ -2,7 +2,7 @@ import {motionSettings} from '../motion/settings.mjs?v=readable-20261101';
 import {subjectKind,subjectMeta,subjects} from './subjects.mjs?v=tarot-display-20261021';
 import {formatConfig,promptConfig,requestedFormats} from './presentation.mjs?v=readable-20261101';
 import {tarotBrand} from './tarot-brand.mjs?v=readable-20261101';
-import {mountPresentationEditor} from './presentation-editor.mjs?v=readable-20261101';
+import {mountPresentationEditor} from './presentation-editor.mjs?v=production-picker-1';
 import {VIDEO_FIELDS,LAYOUT_LABELS} from './fields.mjs?v=readable-20261101';
 import {el,options,field} from './dom.mjs?v=maintenance-20261016';
 import {mountSingleEditor} from './single-editor.mjs?v=readable-20261101';
@@ -35,6 +35,12 @@ export function mountBuilder(apiProvider) {
     }
   }
   const status=text=>{$('builderStatus').textContent=text;};
+  const presetStatus=text=>{$('pbManageStatus').textContent=text;status(text);};
+  const selectionKey=()=>`vg:normal-preset:${$('repo').value.trim()}`;
+  const rememberedPreset=()=>{try{return localStorage.getItem(selectionKey());}catch{return null;}};
+  function rememberPreset(){
+    try{localStorage.setItem(selectionKey(),session.video_preset);}catch{}
+  }
   const connection=()=>{
     const expected=$('repo').value.trim();
     return async(...args)=>{
@@ -44,7 +50,18 @@ export function mountBuilder(apiProvider) {
       return r;
     };
   };
-  async function run(action) {if(working)return;working=true;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=true;try{await action();}catch(e){status(e.message);}finally{working=false;for(const id of ['pbLoad','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'])$(id).disabled=false;}}
+  async function run(action, report=status, lockEditor=false) {
+    if(working)return;
+    working=true;
+    const buttons=['pbLoad','pbResetPreset','pbSaveVideo','pbOverwriteVideo','pbBackgroundPreview'].map($);
+    buttons.forEach(button=>{button.disabled=true;});
+    if(lockEditor)for(const id of ['standardProduction','pbVideo','pbSaveMode','pbNewPresetFields'])$(id).inert=true;
+    try{await action();}catch(e){report(e.message);}
+    finally{
+      working=false;buttons.forEach(button=>{button.disabled=false;});
+      if(lockEditor)for(const id of ['standardProduction','pbVideo','pbSaveMode','pbNewPresetFields'])$(id).inert=false;
+    }
+  }
   function config() {return resolveConfig(registry,session,{draft:true});}
   const designFormat=(c=config())=>session.designFormat||(c.video.output_mode==='horizontal_only'?'landscape':c.video.format);
   function previewConfig() {const c=config();if(c.video.template==='tarot_monthly')return c;const format=designFormat(c);return formatConfig(c,format);}
@@ -137,7 +154,24 @@ export function mountBuilder(apiProvider) {
     relabelSubject(v.tarot_subject);presentationEditor?.render();$('pbPreviewError').textContent='';paint();
   }
   function lists() {
-    options($('pbVideo'),catalog(registry,'video').map(p=>[p.id,p.name+(p.name.includes('〈')?'':resolvePreset(registry,'video',p.id).values.motion_enabled?'〈モーション試用版〉':'〈安定版〉')]),visiblePreset(session.video_preset));
+    const groups=new Map(['保存済み','標準プリセット','モーション試用版'].map(name=>[name,el('optgroup')]));
+    for(const [name,group] of groups)group.label=name;
+    const active=visiblePreset(session.video_preset), select=$('pbVideo');
+    let familyName='';
+    for(const preset of catalog(registry,'video')){
+      const trial=resolvePreset(registry,'video',preset.id).values.motion_enabled;
+      const name=preset.name.includes('〈')?preset.name:preset.name+(trial?'〈モーション試用版〉':'〈安定版〉');
+      const option=el('option',name);option.value=preset.id;
+      const saved=registry.video_presets.some(item=>item.id===preset.id);
+      groups.get(saved?'保存済み':trial?'モーション試用版':'標準プリセット').append(option);
+      if(preset.id===active)familyName=name;
+    }
+    select.replaceChildren(...[...groups.values()].filter(group=>group.children.length));
+    select.value=active;
+    const name=resolvePreset(registry,'video',session.video_preset).name;
+    $('pbActivePreset').textContent=active===session.video_preset?familyName:`${familyName} / ${name}`;
+    $('pbEditorTitle').textContent='制作設定 — '+$('pbActivePreset').textContent;
+    $('pbOverwriteVideo').textContent=`「${name}」を上書き保存`;
     options($('pb_bgm_track'),[['','曲を選択'],...(bgmCatalog?.tracks||[]).map(t=>[t.id,t.title])]);
     renderFields();
   }
@@ -172,7 +206,9 @@ export function mountBuilder(apiProvider) {
     session.overrides.video.motion_enabled=false;
     $('pbSaveId').value='stable_'+session.video_preset.replace(/[^a-zA-Z0-9_-]/g,'');
     $('pbSaveName').value=resolvePreset(registry,'video',session.video_preset).name.replace('〈モーション試用版〉','')+'〈安定版〉';
-    invalidate();renderFields();status('安定版へ切り替えました。設定の保存エリアから「新規保存」で複製できます。');
+    $('pbSaveArea').open=true;$('pbSaveMode').value='new';$('pbSaveMode').onchange();
+    invalidate();renderFields();presetStatus('安定版の設定に切り替えました。「別名で保存」で複製できます。');
+    $('pbSaveName').focus();
   };
   $('pbMotionPreview').onclick=async()=>{
     $('pbMotionStatus').textContent='動作サンプルを準備中…';
@@ -196,8 +232,13 @@ export function mountBuilder(apiProvider) {
   function refreshBackground() {
     if(loadedRepo===$('repo').value.trim())loadBackgroundPreview().catch(e=>status(e.message));
   }
-  function selectPreset(id) {
-    try{presentationEditor.assertValid();}catch(e){status(e.message);$('pbVideo').value=visiblePreset(session.video_preset);$('pbTikTokStyle').value=config().video.tiktok_style;$('pbProductionMode').value=isBatch(config().video)?'batch':'single';return false;}
+  let selectionChanged=false;
+  function canLeave(){
+    try{presentationEditor.assertValid();return true;}
+    catch(e){presentationEditor.focusError();presetStatus(e.message);return false;}
+  }
+  function selectPreset(id,{remember=true}={}) {
+    if(!canLeave()){$('pbVideo').value=visiblePreset(session.video_preset);$('pbTikTokStyle').value=config().video.tiktok_style;$('pbProductionMode').value=isBatch(config().video)?'batch':'single';return false;}
     const previous={...VIDEO_DEFAULTS,...resolvePreset(registry,'video',session.video_preset).values,...session.overrides.video};
     if(previous.template==='tarot_monthly'&&!isBatch(previous))singleTarot.capture();
     modeSessions.set(session.video_preset,clone(session));
@@ -209,6 +250,7 @@ export function mountBuilder(apiProvider) {
     // A newly selected mode must use fresh screen settings, not the previous JSON's audio mode.
     $('pbApplyOnSend').checked=true;
     presentationEditor.reset();invalidate();lists();refreshBackground();
+    if(remember){selectionChanged=true;rememberPreset();}
   }
   $('pbVideo').onchange=()=>selectPreset($('pbVideo').value);
   $('pbTikTokStyle').onchange=()=>selectPreset($('pbTikTokStyle').value==='legacy_vertical'?'tiktok_vertical_hook':'tiktok_standard');
@@ -231,27 +273,63 @@ export function mountBuilder(apiProvider) {
   $('pbTranscript').addEventListener('input',invalidate);$('pbOutputMode').onchange=invalidate;
   $('pbPreviewIntro').onchange=paint;$('pbPreviewScenery').onchange=paint;$('pbSafe').onchange=paint;
   $('pbBackgroundPreview').onclick=()=>run(()=>loadBackgroundPreview(true));
-  $('pbLoad').onclick=()=>run(async()=>{
+  const hasSettingsEdits=()=>Boolean(session.presentation||Object.keys(session.overrides.video).length||Object.keys(session.overrides.layout).length);
+  function resetToSaved(){
+    delete session.presentation;session.overrides={video:{},layout:{}};
+    session.layout_preset=defaultLayout(registry,session.video_preset);
+    session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';
+    modeSessions.delete(session.video_preset);presentationEditor.reset();image=null;
+    invalidate();lists();refreshBackground();
+  }
+  function availablePreset(next,id){
+    if(!id)return false;
+    try{resolvePreset(next,'video',id);return catalog(next,'video').some(preset=>preset.id===visiblePreset(id));}
+    catch{return false;}
+  }
+  const loadSaved=()=>run(async()=>{
     const api=connection(), expected=$('repo').value.trim();
     const {preset:r,bgm}=await loadPresetData(api);
-    registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;
-    modeSessions.clear();delete session.presentation;session.overrides={video:{},layout:{}};
-    presentationEditor.reset();
-    session.background=resolvePreset(registry,'video',session.video_preset).background||'background.png';image=null;
-    invalidate();lists();status('保存済みプリセットとBGM一覧を読み込みました');refreshBackground();
-  });
-  async function save(kind, overwrite=false) {
-    presentationEditor.assertValid();
-    if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済み設定を読込」を押してください');
-    const c=config(), id=overwrite?session.video_preset:$('pbSaveId').value.trim(), name=overwrite?resolvePreset(registry,'video',session.video_preset).name:$('pbSaveName').value.trim();
-    const written=await savePresetSettings({api:connection(),registry,sha,session,config:c,id,name,kind,overwrite});
-    registry=written.registry;sha=written.sha;
-    if(kind==='video'){modeSessions.delete(id);delete session.presentation;session.video_preset=id;session.overrides.video={};session.background=resolvePreset(registry,'video',id).background||'background.png';}else{session.layout_preset=id;session.overrides.layout={};}
-    invalidate();lists();status(`${name}を保存しました。プリセット保存では動画生成を実行しません。`);refreshBackground();
+    if(!availablePreset(r.registry,session.video_preset))throw Error('選択中のプリセットが保存先に見つかりません。別のプリセットを選んでから再取得してください。');
+    const firstLoad=registryRepo!==expected;
+    const previous=rememberedPreset();
+    registry=r.registry;sha=r.sha;registryRepo=expected;bgmCatalog=bgm;loadedRepo=expected;image=null;
+    if(firstLoad&&!selectionChanged&&!hasSettingsEdits()){
+      if(previous!==session.video_preset&&availablePreset(registry,previous))selectPreset(previous,{remember:false});
+      else resetToSaved();
+    }else{invalidate();lists();refreshBackground();}
+    presetStatus('保存済みプリセットとBGM一覧を読み込みました');
+  },presetStatus);
+  $('pbLoad').onclick=loadSaved;
+  $('pbResetPreset').onclick=()=>{
+    if(!window.confirm('選択中のプリセットを保存済みの設定に戻します。今回の設定変更を破棄しますか？'))return;
+    resetToSaved();presetStatus('選択中のプリセットを保存済みの設定に戻しました');
+  };
+  function presetIdExists(id){
+    try{resolvePreset(registry,'video',id);return true;}catch{return false;}
+  }
+  async function save(overwrite=false) {
+    if(!canLeave())return;
+    if(registryRepo!==$('repo').value.trim())throw Error('先に「保存済みプリセットを取得」を押してください');
+    const current=session.video_preset;
+    const name=overwrite?resolvePreset(registry,'video',current).name:$('pbSaveName').value.trim();
+    if(!name)throw Error('表示名を入力してください');
+    let id=overwrite?current:$('pbSaveId').value.trim();
+    if(!id){
+      const slug=name.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,32);
+      const prefix=slug||'video_preset';
+      id=prefix;
+      for(let suffix=2;presetIdExists(id);suffix++)id=`${prefix}_${suffix}`;
+    }
+    if(overwrite&&!window.confirm(`「${name}」に上書き保存しますか？`))return;
+    const written=await savePresetSettings({api:connection(),registry,sha,session,config:config(),id,name,overwrite});
+    registry=written.registry;sha=written.sha;modeSessions.delete(current);
+    session.video_preset=id;selectionChanged=true;rememberPreset();resetToSaved();
+    $('pbSaveId').value='';$('pbSaveName').value='';
+    presetStatus(`${name}を保存しました。`);
   }
   $('pbSaveMode').onchange=()=>{const fresh=$('pbSaveMode').value==='new';$('pbNewPresetFields').hidden=!fresh;$('pbSaveVideo').hidden=!fresh;$('pbOverwriteVideo').hidden=fresh;};
-  $('pbSaveVideo').onclick=()=>run(()=>save('video'));
-  $('pbOverwriteVideo').onclick=()=>run(()=>save('video',true));
+  $('pbSaveVideo').onclick=()=>run(()=>save(),presetStatus,true);
+  $('pbOverwriteVideo').onclick=()=>run(()=>save(true),presetStatus,true);
   $('pbBuild').onclick=()=>{try{presentationEditor.assertValid();const c=configuredInput();if(c.video.voice_mode==='tts'&&!$('pbTranscript').value.trim())throw Error('ナレーション原稿を入力してください');if(c.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('BGMを使用する場合は登録一覧を読み込んでください');$('pbPrompt').value=buildPrompt(c,$('pbTranscript').value,bgmCatalog,$('pbOutputMode').value);snapshot=clone(c);snapshot.social_required=true;snapshot.stock_plan_required=true;$('pbApplyOnSend').checked=true;renderFields();status('プロンプトを生成しました。AIの返答をscript.json欄へ貼り付けてください。');}catch(e){status(e.message);}};
   $('pbCopy').onclick=async()=>{try{if(!$('pbPrompt').value)throw Error('先にプロンプトを生成してください');await navigator.clipboard.writeText($('pbPrompt').value);status('コピーしました');}catch{$('pbPrompt').focus();$('pbPrompt').select();status('プロンプト欄を選択しました。iPhoneの「コピー」を使用してください。');}};
   function prepare(script) {
@@ -261,9 +339,11 @@ export function mountBuilder(apiProvider) {
     if(snapshot.video.bgm_mode!=='off'&&loadedRepo!==$('repo').value.trim())throw Error('現在のリポジトリのBGM登録一覧を読み込んでください');
     presentationEditor.assertValid();return applyConfig(snapshot.stock_plan_required&&promptConfig(snapshot).video.background_mode==='mixed'?{...script,stock_plan:1}:script,snapshot,bgmCatalog);
   }
-  $('repo').addEventListener('input',()=>{registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};presentationEditor.reset();invalidate();lists();});
+  $('repo').addEventListener('input',()=>{selectionChanged=false;registry=emptyRegistry();sha=null;registryRepo=null;bgmCatalog=null;loadedRepo='';image=null;imageRequest++;modeSessions.clear();session={video_preset:'tiktok_standard',layout_preset:'portrait_standard',background:'background.png',overrides:{video:{},layout:{}},ai:{}};presentationEditor.reset();invalidate();lists();});
   lists();
-  return {prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
+  window.addEventListener('github-connected',loadSaved);
+  if($('token').value.trim())loadSaved();
+  return {canLeave,prepareScript:prepare, previewConfig:config, batch:{active:()=>isBatch(config().video),manifest:()=>batchEditor.manifest()}};
 }
 
 
