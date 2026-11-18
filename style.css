@@ -51,7 +51,17 @@ input[type=radio]{width:20px;height:20px;flex-shrink:0}#youtubeSelected{overflow
 
 #acapellaArea [hidden] { display: none !important; }
 #acModeCards, #acSteps { display: grid; gap: 8px; margin-block: 12px; }
-#acModeCards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#acModeCards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#productionTitle { margin-bottom: 12px; }
+#productionChooser button small { display: block; font-size: .78em; margin-top: 3px; }
+#productionChooser [data-ac-mode] { position: relative; border: 2px solid transparent; padding: 24px 4px 12px; min-height: 68px; }
+#productionChooser [aria-pressed="true"] { border-color: var(--accent, #8bd6bd); }
+#productionChooser [aria-pressed="true"]::before { content: "✓"; position: absolute; inset: 2px 0 auto; color: var(--accent, #8bd6bd); }
+#pbSaveArea { margin-bottom: 0; }
+#pbActivePreset, #pbOverwriteVideo { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  #acModeCards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 #acSteps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 #acSteps button, #acModeCards button { padding-inline: 4px; }
 #acSteps [aria-current="step"] { background: #8bd6bd; color: #10221d; }

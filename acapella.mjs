@@ -1079,17 +1079,36 @@ $('acPreview').addEventListener('loadeddata',paintMask);
 maskCanvas.closest('details').addEventListener('toggle',paintMask);
 
 const standardAreas=['pbSaveSection','autoLinkArea','pbSingleNarration','audioUpload','promptBuilder','pbSingleScript','standardGenerate'];
-let shownMode='standard';
+let shownMode='standard', openedMusicMode=null;
+let standardVisibility;
 function showProductionMode(){
- const mode=$('productionMode').value,ac=mode!=='standard';
- if((busy||submitting)&&shownMode!==mode){$('productionMode').value=shownMode;return;}
- $('acapellaArea').hidden=!ac;
- for(const id of standardAreas)$(id).hidden=ac;
- if(ac&&shownMode!==mode){$('acMode').value=mode;$('acMode').dispatchEvent(new Event('change'));openMusicEditor();}
+ const mode=$('productionMode').value;
+ if(mode===shownMode)return;
+ const feedback=$('productionModeStatus');
+ if(busy||submitting||!mode||(
+   shownMode==='standard'&&window.videoConfigurator?.canLeave?.()===false)){
+  $('productionMode').value=shownMode;
+  feedback.textContent=busy||submitting?'処理が完了してから動画の種類を切り替えてください。':'通常動画の設定にある入力エラーを修正してください。';
+  feedback.hidden=false;
+  return;
+ }
+ feedback.hidden=true;
+ const music=mode!=='standard';
+ if(shownMode==='standard')standardVisibility=standardAreas.map(id=>$(id).hidden);
+ standardAreas.forEach((id,index)=>{$(id).hidden=music||standardVisibility[index];});
+ $('acapellaArea').hidden=!music;
+ $('standardProduction').hidden=music;
+ for(const button of $('acModeCards').querySelectorAll('[data-ac-mode]'))
+  button.setAttribute('aria-pressed',String(button.dataset.acMode===mode));
  shownMode=mode;
+ if(!music){for(const player of [full,chorusPlayer,$('acPreview')])player.pause();return;}
+ if(openedMusicMode!==mode){
+  $('acMode').value=mode;
+  $('acMode').dispatchEvent(new Event('change'));
+  openedMusicMode=mode;
+  openMusicEditor();
+ }
 }
-
-
 
 const musicTitles={original:'アカペラ動画',lip:'縦型サビショート',full:'横型フルMV'};
 const lastMusicModeKey=()=>`acapella-editor-last-mode:${repo()}`;
@@ -1211,7 +1230,7 @@ function openMusicEditor(){
  $('acSource').value=project&&lip()?'saved':fullMode()?'full':localStorage.getItem(`${stageKey()}:source`)||'full';
  if(!lip())$('acOutput').onchange();
  localStorage.setItem(lastMusicModeKey(),$('acMode').value);
- $('acContinue').hidden=false;
+ updateContinueButton();
  const stored=Number(localStorage.getItem(stageKey()));
  editorStep=Number.isInteger(stored)&&stored>=0&&stored<=3?stored:0;
  furthestStep=editorStep;
@@ -1246,13 +1265,22 @@ for(const button of $('acSteps').querySelectorAll('button'))button.onclick=()=>{
  const step=Number(button.dataset.acStep);
  if(step<=furthestStep)goToStep(step);
 };
-function chooseMusicMode(mode){
+function chooseProductionMode(mode){
+ if(!mode)return;
  $('productionMode').value=mode;
  $('productionMode').dispatchEvent(new Event('change'));
+ if(shownMode===mode&&mode!=='standard')$('acEditorTitle').focus();
 }
-for(const button of $('acModeCards').querySelectorAll('[data-ac-mode]'))button.onclick=()=>chooseMusicMode(button.dataset.acMode);
-$('acContinue').hidden=!musicTitles[localStorage.getItem(lastMusicModeKey())];
-$('acContinue').onclick=()=>{chooseMusicMode(localStorage.getItem(lastMusicModeKey()));$('acEditorTitle').focus();};
+function updateContinueButton(){
+ const title=musicTitles[localStorage.getItem(lastMusicModeKey())];
+ $('acContinue').hidden=!title;
+ if(title)$('acContinue').textContent='前回の続き：'+title;
+}
+for(const button of $('acModeCards').querySelectorAll('[data-ac-mode]'))
+ button.onclick=()=>chooseProductionMode(button.dataset.acMode);
+updateContinueButton();
+$('repo').addEventListener('input',updateContinueButton);
+$('acContinue').onclick=()=>chooseProductionMode(localStorage.getItem(lastMusicModeKey()));
 $('acSource').onchange=()=>{
  const source=$('acSource').value;
  localStorage.setItem(`${stageKey()}:source`,source);
