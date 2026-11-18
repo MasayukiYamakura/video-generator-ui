@@ -47,7 +47,7 @@ async function api(path, method='GET', body) {
   const controller = new AbortController(), timer = setTimeout(()=>controller.abort(),60000);
   const url = `https://api.github.com/repos/${repo()}${path ? `/${path}` : ''}`;
   try { const r = await fetch(url, { method, headers: { Authorization:`Bearer ${token}`, Accept:'application/vnd.github+json', 'Content-Type':'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal:controller.signal });
-    if (!r.ok) { const error = Error(r.status===401 ? '認証期限切れ、またはトークンが無効です' : r.status===403 ? '権限不足、またはAPIの利用制限です' : `GitHubへの接続でエラー (${r.status})`); error.status=r.status; throw error; }
+    if (!r.ok) { const error = Error(r.status===401 ? 'GitHub接続用トークンが期限切れ、または無効です。接続設定で入れ直してください' : r.status===403 ? 'GitHub接続用トークンの権限不足、またはGitHub APIの利用制限です。接続設定を確認してください' : `GitHubへの接続でエラー (${r.status})`); error.status=r.status; throw error; }
     return r.status===204 ? null : await r.json();
   } catch(error) {
     if(controller.signal.aborted||error.name==='AbortError'||/fetch is aborted/i.test(error.message))throw Error('GitHubへの通信が中断または時間切れになりました。通信を確認して再操作してください。');
@@ -218,7 +218,7 @@ function validate(file,text) {
 }
 async function base64(file){const bytes=new Uint8Array(await file.arrayBuffer());let s='';for(let i=0;i<bytes.length;i+=32768)s+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(s);}
 async function dispatch(){message('実行依頼中。画面を開いたままお待ちください。');pending.dispatched=true;persist();await api(`actions/workflows/${WORKFLOW}/dispatches`,'POST',{ref:'main',inputs:{receipt_id:pending.id,input_sha:pending.sha,job_kind:pending.kind||'video',...(pending.resumeFrom?{resume_run_id:String(pending.resumeFrom)}:{})}});await recover();}
-$('connect').onclick=async()=>{try{const r=await api('');if(!r.private)throw Error('接続先は非公開リポジトリにしてください');await api(`actions/workflows/${WORKFLOW}`);persist();$('connectionStatus').textContent='接続できました';await refresh();}catch(e){$('connectionStatus').textContent=e.message;}};
+$('connect').onclick=async()=>{try{const r=await api('');if(!r.private)throw Error('接続先は非公開リポジトリにしてください');await api(`actions/workflows/${WORKFLOW}`);persist();$('connectionStatus').textContent='接続できました';window.dispatchEvent(new Event('github-connected'));await refresh();}catch(e){$('connectionStatus').textContent=e.message;}};
 $('forget').onclick=()=>{token='';$('token').value='';$('remember').checked=false;persist();$('connectionStatus').textContent='トークンを削除しました。履歴は保持しています。';};
 $('jsonFile').onchange=async()=>{const f=$('jsonFile').files[0];if(f){if(f.size>1024*1024)return message('JSONは1 MiBまでです');$('script').value=await f.text();$('script').dispatchEvent(new Event('input'));}};
 async function submit(kind='video'){if(busy||pending)return;busy=true;controls();try{message('入力確認中');const file=$('audio').files[0];let script,ext,mode;

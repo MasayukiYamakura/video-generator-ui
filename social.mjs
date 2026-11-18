@@ -50,7 +50,7 @@ export function mountSocial(){
  refillPanel.append(autoLabel,el('p','Buffer未登録の補充対象だけを登録します。希望日時までの登録は保証されません。API・GitHub Actionsの上限時は手動でも処理できません。'),refillButton,summary,last,receipts);panel.prepend(refillPanel);
  const api=(...args)=>{if(!window.videoStudioApi)throw Error('GitHubへ接続してください');return window.videoStudioApi(...args);};
  const key=()=>`social-request-v1:${$('repo').value.trim()}`;
- const say=t=>{$('socialStatus').textContent=t;if(!$('productionPanel').hidden)$('status').textContent=t;};
+ const say=t=>{$('socialStatus').textContent=t?`Buffer・縦型投稿：${t}`:'';if(!$('productionPanel').hidden)$('status').textContent=t;};
  const savePending=()=>{if(pending)localStorage.setItem(key(),JSON.stringify(pending));else localStorage.removeItem(key());};
  const loadPending=()=>{try{pending=JSON.parse(localStorage.getItem(key())||'null');}catch{pending=null;}};
  const control=()=>{for(const b of panel.querySelectorAll('button[data-social-action]'))b.disabled=busy||Boolean(pending);$('socialSubmit').disabled=!rows.length||busy||Boolean(pending);$('socialResume').hidden=!pending;$('socialResume').disabled=busy;auto.disabled=busy||Boolean(pending);};
@@ -141,7 +141,8 @@ export function mountSocial(){
  async function refresh(){
   const repository=$('repo').value.trim();
   try{const result=await api(STATE);if(repository!==$('repo').value.trim())return;state=decode(result.content);for(const v of Object.values(state.videos))v.title=filenameTitle(v.filename);}catch(e){if(e.status!==404)throw e;}
-  if(pending&&state.requests?.[pending.id]){
+  if(!pending&&/^Buffer・縦型投稿：GitHub接続用トークン/.test($('socialStatus').textContent))say('');
+   if(pending&&state.requests?.[pending.id]){
    const result=state.requests[pending.id];say(result.message||'処理中です。受付後は画面を閉じられます。');
    if(['completed','failed'].includes(result.status)){pending=null;savePending();}
   }
@@ -193,6 +194,7 @@ export function mountSocial(){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!panel.hidden)refresh().catch(e=>say(e.message));});
  window.postingAdapters ||= {};
  window.postingAdapters.social={snapshot:()=>state,refresh,xAction:request=>run(request),saveDraft:draft=>run({action:'foundation_save',draft}),cancelDraft:draft=>run({action:'foundation_cancel',draft}),withdraw:id=>run({action:'withdraw',video_id:id}),withdrawBulk:ids=>run({action:'withdraw_skipped_bulk',video_ids:ids}),canWithdraw:id=>canWithdrawVideo(state.videos[id],state.posts),manage:request=>run({action:'manage',...request}),select:ids=>{ const old=selectedVideos().map(v=>v.id).sort().join('|');if(old!==[...ids].sort().join('|')){rows=[];renderRows();} $('socialFilter').value='all';render();for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=ids.includes(input.dataset.video)&&!input.disabled;},busy:()=>busy||Boolean(pending)};
+ window.addEventListener('github-connected',()=>{if(/^Buffer・縦型投稿：GitHub接続用トークン/.test($('socialStatus').textContent))say('');});
  loadPending();navigate($('token').value.trim()?'production':'settings');control();
 }
 
