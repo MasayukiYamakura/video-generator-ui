@@ -4,6 +4,16 @@ export function generatedTime(video){
  return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value));
 }
 export function identity(video){return `${generatedTime(video)}（日本時間） ／ 実行ID：${video.run_id||'不明'} ／ 動画ID：${video.id}`;}
+export function postingTitle(video){
+ if(typeof video.posting_title==='string'&&video.posting_title.trim()&&Array.from(video.posting_title.trim()).length<=100)return video.posting_title.trim();
+ const music=video.music;
+ if(music&&typeof music.title==='string'&&music.title.trim()&&typeof music.artist==='string'&&music.artist.trim()){
+  const label=typeof music.release_label==='string'?music.release_label.trim():'';
+  const value=`【${music.artist.trim()}】${label?label+' ':''}${music.title.trim()}`;
+  if(Array.from(value).length<=100)return value;
+ }
+ return video.filename?.replace(/\.mp4$/i,'')||video.title||video.id;
+}
 export function matches(video,query){return `${video.filename||''} ${video.id||''} ${video.run_id||''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());}
 export function newest(videos){return Object.values(videos||{}).reverse().sort((a,b)=>(Date.parse(b.generated_at)||0)-(Date.parse(a.generated_at)||0));}
 export function youtubeGroup(video,uploads){
@@ -19,4 +29,5 @@ export function sourceLink(video,repo){
 export function previewLink(video){
  try{const url=new URL(video.cloud?.url);return url.protocol==='https:'&&url.hostname==='res.cloudinary.com'?url.href:null;}catch{return null;}
 }
+
 

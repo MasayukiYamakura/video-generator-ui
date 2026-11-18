@@ -1,4 +1,4 @@
-import {generatedTime,sourceLink,previewLink} from './video-list.mjs?v=posting-20261022';
+import {generatedTime,sourceLink,previewLink,postingTitle} from './video-list.mjs?v=posting-title-20261118';
 const GROUP={attention:'要対応',progress:'進行中',completed:'完了',skipped:'見送り',all:'すべて'};
 const STATUS={rejected:'公開設定の変更が拒否されました',ready:'未送信',waiting:'予約枠待ち',api_wait:'API利用上限による保留',channel_wait:'投稿先の対応待ち',unknown:'結果不明・照合が必要',scheduled:'予約済み',sending:'公開処理中',published:'公開済み',unlisted:'限定公開',failed:'失敗',expired:'期限切れ',approval_required:'承認待ち',manual_required:'手動投稿待ち',private_ready:'非公開・公開判断待ち',processing:'YouTube処理中',overdue:'予約時刻経過・未確認',needs_review:'状態確認が必要',unavailable:'状態を取得できません',uploaded:'非公開送信済み・要照合',resumable:'送信の確認・再開が必要',pending:'転送待ち',setup_required:'接続設定待ち',error:'転送失敗',deleted:'配信用ファイル削除済み',withdrawn:'取り下げ済み'};
 const MEDIA={youtube:'YouTubeショート',instagram:'Instagramリール',tiktok:'TikTok'};
@@ -51,7 +51,8 @@ export function postingRows(adapters){
    const lines=[fileStatus(kind,video),...posts.map(p=>`${kind==='youtube'?'YouTube':MEDIA[p.service]||p.service}：${(status(p)==='private_ready'&&(decision==='skipped'||decision==='private_complete')?'非公開で保存済み':STATUS[status(p)]||status(p))}${skipped.includes(p.channel_id)?'（この投稿先は見送り）':''}`)];
    if(kind==='social'&&state.foundation?.protected_video_ids?.includes(video.id))lines.push('配信用素材：新しい投稿下書きで利用予定（削除保護中）');
    if(!posts.length)lines.push(kind==='youtube'?'YouTube：未送信':'投稿先：未登録');
-   result.push({key:`${kind}/${video.id}`,kind,video,posts,group,unresolved,lines,type:video.tarot?(video.tarot.subject_kind==='mbti'?'MBTI':'星座'):'思想'});
+   const music=video.music||/ アカペラ\.mp4$/i.test(video.filename||'');
+   result.push({key:`${kind}/${video.id}`,kind,video,posts,group,unresolved,lines,type:music?(kind==='youtube'?'音楽／横型フルMV':'音楽／アカペラ・縦型'):video.tarot?(video.tarot.subject_kind==='mbti'?'MBTI':'星座'):'思想'});
   }
  }
  return result.sort((a,b)=>(Date.parse(b.video.generated_at)||0)-(Date.parse(a.video.generated_at)||0));
@@ -65,11 +66,11 @@ export function mountPostingManager(){
  const tools=el('div');tools.className='posting-tools';
  const search=el('input');search.type='search';search.placeholder='動画名・生成日・星座・MBTI・実行IDを検索';search.setAttribute('aria-label','動画を検索');
  const format=el('select');format.setAttribute('aria-label','動画形式');for(const [v,t] of [['all','縦型・横型すべて'],['social','縦型'],['youtube','横型']]){const o=el('option',t);o.value=v;format.append(o);}
- const type=el('select');type.setAttribute('aria-label','動画種類');for(const t of ['すべての種類','思想','星座','MBTI']){const o=el('option',t);o.value=t;type.append(o);}
+ const type=el('select');type.setAttribute('aria-label','動画種類');for(const t of ['すべての種類','思想','星座','MBTI','音楽／横型フルMV','音楽／アカペラ・縦型']){const o=el('option',t);o.value=t;type.append(o);}
  const service=el('select');service.setAttribute('aria-label','投稿先で絞り込み');for(const [v,t] of [['all','すべての投稿先'],['youtube','YouTube通常動画'],['shorts','YouTubeショート'],['instagram','Instagram'],['tiktok','TikTok']]){const o=el('option',t);o.value=v;service.append(o);}
- const refresh=el('button','画面を更新');refresh.className='secondary';const sync=el('button','投稿先の最新状態を確認');sync.className='secondary';
+ const refresh=el('button','一覧を更新');refresh.className='secondary';
  const message=el('p');message.id='postingMessage';message.setAttribute('role','status');
- tools.append(search,format,type,service,refresh,sync);manager.append(title,tabs,tools,message);
+ tools.append(search,format,type,service,refresh);manager.append(title,tabs,tools,message);
  const refillPanel=$('socialRefillPanel');if(refillPanel)manager.append(refillPanel);
   const quick=el('div');quick.className='actions posting-quick';
   const bulk=el('div');bulk.className='actions posting-selection';bulk.hidden=true;
@@ -92,25 +93,29 @@ export function mountPostingManager(){
  moveRange($('socialSetup'),$('socialStatus'));
  moveRange($('socialLocationStatus').previousElementSibling,$('socialChannels').previousElementSibling);
  moveRange($('socialBody').parentElement,$('socialStart').parentElement);
+ // Keep the original handlers for internal operations, but expose one read-only list refresh.
+ for(const id of ['youtubeSync','youtubeRefresh','socialSync','socialRefresh'])$(id).hidden=true;
+ $('youtubeConnect').textContent='YouTubeの接続を確認';
+ $('socialConnect').textContent='Bufferの接続・投稿先を確認';
  // The unified list owns discovery; legacy lists remain only as selection plumbing.
  for(const id of ['socialVideos','youtubeVideos','socialSearch','socialFilter','youtubeSearch','youtubeFilter','socialSelectAll','youtubeVideo']){const n=$(id);n.hidden=true;if(n.parentElement.tagName==='LABEL')n.parentElement.hidden=true;}
  for(const editor of [yt,socialEditor])for(const n of editor.querySelectorAll('h2,h3,p.muted'))n.hidden=true;
  const uploadForm=el('div');uploadForm.id='postingUploadForm';yt.insertBefore(uploadForm,$('youtubeSelected'));let uploadNode=$('youtubeSelected');while(uploadNode&&uploadNode!==$('youtubeReview')){const next=uploadNode.nextSibling;uploadForm.append(uploadNode);uploadNode=next;}
  const socialPosts=$('socialPosts'),youtubePosts=$('youtubeUploads');
  function rows(){return postingRows(adapters);}
- function visible(){return rows().filter(r=>(group==='all'||r.group===group)&&(format.value==='all'||(format.value==='social'?(r.kind==='social'||r.video.format==='portrait'):(r.kind==='youtube'&&r.video.format!=='portrait')))&&(type.value==='すべての種類'||r.type===type.value)&&(service.value==='all'||(service.value==='youtube'?(r.kind==='youtube'&&r.video.format!=='portrait'):service.value==='shorts'&&r.kind==='youtube'?r.video.format==='portrait':r.kind==='social'&&(r.posts.some(p=>p.service===(service.value==='shorts'?'youtube':service.value))||!r.posts.length)))&&`${r.video.filename} ${r.video.id} ${r.video.run_id} ${generatedTime(r.video)} ${r.video.tarot?.zodiac||''}`.toLowerCase().includes(search.value.trim().toLowerCase()));}
+ function visible(){return rows().filter(r=>(group==='all'||r.group===group)&&(format.value==='all'||(format.value==='social'?(r.kind==='social'||r.video.format==='portrait'):(r.kind==='youtube'&&r.video.format!=='portrait')))&&(type.value==='すべての種類'||r.type===type.value)&&(service.value==='all'||(service.value==='youtube'?(r.kind==='youtube'&&r.video.format!=='portrait'):service.value==='shorts'&&r.kind==='youtube'?r.video.format==='portrait':r.kind==='social'&&(r.posts.some(p=>p.service===(service.value==='shorts'?'youtube':service.value))||!r.posts.length)))&&`${postingTitle(r.video)} ${r.video.filename} ${r.video.id} ${r.video.run_id} ${generatedTime(r.video)} ${r.video.tarot?.zodiac||''}`.toLowerCase().includes(search.value.trim().toLowerCase()));}
  function render(){
   tabs.replaceChildren();for(const [key,label] of Object.entries(GROUP)){const count=key==='all'?rows().length:rows().filter(r=>r.group===key).length;const b=el('button',`${label} ${count}`);b.className='secondary';b.setAttribute('aria-pressed',String(group===key));b.onclick=()=>{group=key;checked.clear();render();};tabs.append(b);}
   const items=visible();list.replaceChildren();
    for(const r of items){const card=el('article');card.className='posting-card';card.dataset.group=r.group;
-    const choice=el('input');choice.type='checkbox';choice.checked=checked.has(r.key);choice.setAttribute('aria-label',`${r.video.filename}を選択`);choice.onchange=()=>{choice.checked?checked.add(r.key):checked.delete(r.key);render();};
-   const open=el('button',r.video.filename?.replace(/\.mp4$/i,'')||r.video.id);open.className='posting-title';open.onclick=()=>select(r);
+    const choice=el('input');choice.type='checkbox';choice.checked=checked.has(r.key);choice.setAttribute('aria-label',`${postingTitle(r.video)}を選択`);choice.onchange=()=>{choice.checked?checked.add(r.key):checked.delete(r.key);render();};
+   const open=el('button',postingTitle(r.video));open.className='posting-title';open.onclick=()=>select(r);
    const thumb=el('img');thumb.className='posting-thumb';thumb.loading='lazy';thumb.alt='動画のサムネイル';
    const cloud=previewLink(r.video);const remote=r.posts.find(p=>/^[\w-]{11}$/.test(p.video_id||''));
    if(cloud){thumb.src=cloud.replace('/upload/','/upload/so_0,w_160,h_90,c_fill/').replace(/\.[a-z0-9]+(?:\?.*)?$/i,'.jpg');card.append(thumb);}
    else if(r.kind==='youtube'&&remote){thumb.src=`https://i.ytimg.com/vi/${remote.video_id}/default.jpg`;card.append(thumb);}
    thumb.onerror=()=>{thumb.hidden=true;};
-   card.append(choice,open,el('p',`${r.kind==='youtube'&&r.video.format!=='portrait'?'横型':'縦型'} · ${r.type} · ${generatedTime(r.video)} · ${r.video.id.slice(-12)}`),el('span',GROUP[r.group]+(r.unresolved?'・未解決あり':'')));
+   card.append(choice,open,el('p',`${r.type} · ${r.kind==='youtube'?'YouTube直接投稿':'Buffer投稿'} · ${generatedTime(r.video)}`),el('span',GROUP[r.group]+(r.unresolved?'・未解決あり':'')));
    for(const line of r.lines)card.append(el('p',line));list.append(card);
   }
   if(!items.length)list.append(el('p','該当する動画はありません。'));
@@ -132,13 +137,13 @@ export function mountPostingManager(){
     '横型のGitHub成果物は保存期限後に取得できません。見送りは一覧の整理です。YouTube上の動画は削除しません。':
     restorable.length&&!deletable.length?'配信用ファイルを削除できる見送り済み動画はありません。':'見送りは投稿記録を残し、後で戻せます。';
    skip.disabled=selectedBusy;restore.disabled=selectedBusy;prepare.disabled=adapters.social.busy();
-   expiredSkip.disabled=adapters.youtube.busy();sync.disabled=Object.values(adapters).some(a=>a.busy());
+   expiredSkip.disabled=adapters.youtube.busy();
    expiredSkip.hidden=group!=='attention';
   // Recovery stays visible even when no video has been selected.
   for(const id of ['socialStatus','youtubeStatus','socialResume','youtubeRecover']){const n=$(id);if(n&&n.parentElement!==manager)manager.append(n);}
  }
  function renderDetail(r){
-  detail.replaceChildren(el('h3',r.video.filename),el('p',`${GROUP[r.group]} ／ ${fileStatus(r.kind,r.video)}${r.unresolved?'・未解決の結果があります。投稿先を照合してください。':''}`));
+  detail.replaceChildren(el('h3',postingTitle(r.video)),el('p',`${GROUP[r.group]} ／ ${fileStatus(r.kind,r.video)}${r.unresolved?'・未解決の結果があります。投稿先を照合してください。':''}`));
   const href=previewLink(r.video)||sourceLink(r.video,$('repo').value.trim());if(href){const a=el('a','動画を確認・ダウンロード');a.href=href;a.target='_blank';a.rel='noopener noreferrer';detail.append(a);}
   const related=rows().filter(v=>v.key!==r.key&&v.video.receipt_id===r.video.receipt_id&&((v.video.target_id||v.video.id.split(':')[1])===(r.video.target_id||r.video.id.split(':')[1])));for(const other of related){const b=el('button',`関連する${other.kind==='youtube'&&r.video.format!=='portrait'?'横型':'縦型'}を開く`);b.className='secondary';b.onclick=()=>select(other);detail.append(b);}
   if(r.kind==='social'){
@@ -150,12 +155,19 @@ export function mountPostingManager(){
   const actions=el('div');actions.className='actions';for(const [decision,label] of [['skipped',r.posts.length&&r.kind==='youtube'?'公開を見送る':'投稿を見送る'],['active','投稿作業に戻す'],...(r.kind==='youtube'?[['private_complete','非公開のまま完了する']]:[])]){const b=el('button',label);b.className='secondary';b.disabled=adapters[r.kind].busy();b.onclick=()=>manage([r],decision);actions.append(b);}detail.append(actions);
   if(r.kind==='social')for(const c of (adapters.social.snapshot().channels||[]).filter(c=>c.service!=='x')){const skipped=r.video.management?.skipped_channels?.includes(c.id);const intended=(r.video.management?.target_channels||r.posts.map(p=>p.channel_id)).includes(c.id);const b=el('button',`${MEDIA[c.service]}：${skipped?'投稿対象に戻す':intended?'この投稿先を見送る':'投稿対象に追加する'}`);b.className='secondary';b.disabled=adapters.social.busy();b.onclick=()=>manage([r],skipped||!intended?'active':'skipped',c.id);detail.append(b);}
   if(r.kind==='social'&&adapters.social.canWithdraw(r.video.id)){const files=el('details');files.append(el('summary','ファイルの管理'));const remove=el('button','投稿せずCloudinaryのファイルを削除する');remove.className='secondary';remove.disabled=adapters.social.busy();remove.onclick=()=>{if(confirm('Cloudinaryの配信用ファイルを削除します。元に戻せません。元の生成成果物や投稿先の動画は削除しません。実行しますか？'))adapters.social.withdraw(r.video.id);};files.append(remove);detail.append(files);}
-  const info=el('details');info.append(el('summary','識別情報・操作履歴'),el('p',`生成実行ID：${r.video.run_id||'不明'} ／ 動画ID：${r.video.id}`));for(const h of r.video.management?.history||[])info.append(el('p',`${h.at} ${h.decision}${h.channel_id?' ／ '+h.channel_id:''}`));detail.append(info);
+  const info=el('details');info.append(el('summary','元ファイル・識別情報・操作履歴'),el('p',`元ファイル：${r.video.filename} ／ 生成実行ID：${r.video.run_id||'不明'} ／ 動画ID：${r.video.id}`));for(const h of r.video.management?.history||[])info.append(el('p',`${h.at} ${h.decision}${h.channel_id?' ／ '+h.channel_id:''}`));detail.append(info);
+  if(r.kind==='social'&&r.posts.length){const check=el('button','縦型の投稿結果を照合');check.className='secondary';check.disabled=adapters.social.busy();check.onclick=()=>{if(confirm('Bufferの縦型投稿全体の結果を確認します。従来のCloudinary削除条件も確認されます。実行しますか？'))$('socialSync').click();};detail.append(check,el('p','照合はBufferの縦型投稿全体が対象です。処理結果は一覧を更新して確認してください。'));}
   yt.hidden=r.kind!=='youtube';yt.open=true;socialEditor.hidden=r.kind!=='social';
   for(const container of [socialPosts,youtubePosts])for(const n of container.querySelectorAll('[data-posting-video]'))n.hidden=n.dataset.postingVideo!==r.video.id;
   for(const container of [socialPosts,youtubePosts])for(const n of container.querySelectorAll('details'))n.open=true;
   const closed=r.group==='skipped'||r.video.management?.decision==='private_complete';
   uploadForm.hidden=closed||r.posts.length>0;
+  uploadForm.querySelector('#postingTitleSave')?.remove();
+  if(r.kind==='youtube'&&!closed&&!r.posts.length){
+   const wrapper=el('div');wrapper.id='postingTitleSave';const save=el('button','このタイトルを一覧に保存');save.className='secondary';save.disabled=adapters.youtube.busy();
+   save.onclick=()=>window.dispatchEvent(new window.CustomEvent('posting-save-title',{detail:{sourceId:r.video.id}}));
+   wrapper.append(save,el('p','タイトルを編集したら保存できます。送信前にも投稿内容を確認してください。'));uploadForm.append(wrapper);
+  }
   $('youtubeBuild').hidden=closed||r.posts.length>0;
   $('youtubeSubmit').hidden=!$('youtubeReview').children.length;$('socialBuild').hidden=closed;
   // Only the selected video may be acted on; keep external state changes visible.
@@ -189,10 +201,10 @@ export function mountPostingManager(){
   render();
  };
  prepare.onclick=()=>{const items=visible().filter(r=>checked.has(r.key)&&r.kind==='social'&&r.group!=='skipped');if(!items.length){message.textContent='縦型動画を選択してください';return;}select(items[0]);adapters.social.select(items.map(r=>r.video.id));checked=new Set(items.map(r=>r.key));render();message.textContent=`${items.length}本の縦型を選択しました。下の投稿先・日時を確認してください。`;};
- refresh.onclick=async()=>{for(const a of Object.values(adapters))try{await a.refresh();}catch(e){message.textContent=e.message;}render();};
- sync.onclick=()=>{if(confirm('縦型は公開結果の照合と従来のCloudinary削除条件の確認、横型はYouTubeの状態照合を行います。実行しますか？')){$('socialSync').click();$('youtubeSync').click();}};
+ refresh.onclick=async()=>{refresh.disabled=true;message.textContent='保存済みの投稿記録を読み込んでいます。';try{for(const a of Object.values(adapters))await a.refresh();message.textContent='一覧を更新しました。外部サービスの状態照合は行っていません。';}catch(e){message.textContent=e.message;}finally{refresh.disabled=false;render();}};
  for(const n of [search,format,type,service])n.addEventListener(n===search?'input':'change',()=>{checked.clear();render();});back.onclick=close;
  window.addEventListener('posting-state',()=>{if(ready)render();});$('repo').addEventListener('change',()=>{close();checked.clear();render();});
  ready=true;render();
 }
+
 
