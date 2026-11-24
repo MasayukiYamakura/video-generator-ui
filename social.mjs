@@ -1,5 +1,5 @@
 import {identity,matches,newest,sourceLink,previewLink,postingTitle} from './video-list.mjs?v=posting-title-20261118';
-import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
+import {musicCaption,socialBody} from './builder/social-data.mjs?v=music-credits-1';
 const $=id=>document.getElementById(id);
 const STATE='contents/state.json?ref=social-state';
 const workflowFor=p=>p?.workflow||WORKFLOW;
@@ -14,7 +14,13 @@ export function utcFromJst(value){if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(value))
 export function filenameTitle(filename){if(typeof filename!=='string'||!filename.toLowerCase().endsWith('.mp4')||filename.length<=4||/[\\/]/.test(filename))throw Error('動画ファイル名が不正です');return filename.slice(0,-4);}
 export function composeRows(videos,channels,body,start,interval){
  const base=new Date(utcFromJst(start)).getTime();if(!Number.isFinite(interval)||interval<1||interval>10080)throw Error('投稿間隔は1〜10080分にしてください');
- return videos.flatMap((v,i)=>channels.map(c=>({video_id:v.id,channel_id:c.id,service:c.service,title:postingTitle(v),body:socialBody(v.social,v.tarot?.zodiac,body),due_at:new Date(base+i*interval*60000).toISOString()})));
+ return videos.flatMap((video,i)=>{
+  const music=musicCaption(video.music);
+  const caption=music??socialBody(video.social,video.tarot?.zodiac,body);
+  const due_at=new Date(base+i*interval*60000).toISOString();
+  return channels.map(channel=>({video_id:video.id,channel_id:channel.id,service:channel.service,
+   title:postingTitle(video),body:caption,due_at,...(music?{caption_mode:'music'}:{})}));
+ });
 }
 
 export function isCompletedVideo(video, posts, channels){
@@ -33,8 +39,11 @@ export function reviewRows(rows, posts){
  return rows.flatMap(row=>{
   const old=Object.values(posts).find(p=>p.video_id===row.video_id&&p.channel_id===row.channel_id);
   if(!old)return [row];
-  if(['failed','expired'].includes(old.status)&&old.buffer_id)return [{...row,retry_buffer_id:old.buffer_id}];
-  if(!old.buffer_id&&['ready','waiting','api_wait','channel_wait','failed','expired'].includes(old.status))return [row];
+  const prepared=row.caption_mode||old.caption_mode
+   ? {...row,body:old.body??row.body,caption_mode:old.caption_mode}
+   : row;
+  if(['failed','expired'].includes(old.status)&&old.buffer_id)return [{...prepared,retry_buffer_id:old.buffer_id}];
+  if(!old.buffer_id&&['ready','waiting','api_wait','channel_wait','failed','expired'].includes(old.status))return [prepared];
   return [];
  });
 }
@@ -133,7 +142,7 @@ export function mountSocial(){
    if(r.retry_buffer_id)box.append(el('p','失敗したBuffer投稿を同じIDで再予約します。成功済みの投稿先には再送しません。'));
    const time=field(box,'投稿日時（日本時間）',jstInput(r.due_at),'datetime-local');time.onchange=()=>{try{r.due_at=utcFromJst(time.value);}catch(e){say(e.message);}};
    const title=field(box,'投稿タイトル',r.title);title.readOnly=true;
-   const body=field(box,r.service==='youtube'?'説明文':'本文（冒頭にタイトルを自動追加）',r.body,'textarea');body.rows=4;body.oninput=()=>r.body=body.value;
+   const body=field(box,r.service==='youtube'?'説明文':r.caption_mode==='music'?'本文':'本文（冒頭にタイトルを自動追加）',r.body,'textarea');body.rows=4;body.oninput=()=>r.body=body.value;
    const remove=el('button','この投稿を対象から外す');remove.className='secondary';remove.onclick=()=>{rows.splice(i,1);renderRows();};box.append(remove);$('socialReview').append(box);
   });
   $('socialSubmit').disabled=!rows.length||busy||Boolean(pending);
@@ -187,7 +196,7 @@ export function mountSocial(){
  $('socialLoadBody').onclick=()=>{$('socialBody').value=state.settings?.body||'';say('保存済み定型文を読み込みました');};
  $('socialSelectAll').onclick=()=>{for(const input of $('socialVideos').querySelectorAll('input[data-video]'))input.checked=!input.disabled;};
  $('socialBuild').onclick=()=>{queueReview=false;try{const videos=selectedVideos(),channels=selectedChannels();if(!videos.length||!channels.length)throw Error('動画と投稿先を選んでください');const all=composeRows(videos,channels,$('socialBody').value,$('socialStart').value,Number($('socialInterval').value));rows=reviewRows(all.filter(r=>!(r.service==='youtube'&&state.videos[r.video_id]?.youtube_route==='direct')&&!state.videos[r.video_id]?.management?.skipped_channels?.includes(r.channel_id)),state.posts);const skipped=all.length-rows.length;renderRows();const descriptions=videos.map(v=>v.social?.description).filter(Boolean);const duplicate=descriptions.length>1&&new Set(descriptions).size===1?'全動画の説明文が完全一致しています。内容を確認してください。 ':'';say(`${duplicate}各投稿を開いて日時・本文を確認し、一括予約を押してください。投稿は公開設定で予約します。予約済み・成功済み・結果確認中など${skipped}件は対象から除外しました。`);}catch(e){say(e.message);}};
- $('socialSubmit').onclick=()=>{if(rows.length)run({action:queueReview?'queue_waiting':'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id})=>({video_id,channel_id,title,body,due_at,retry_buffer_id}))});};
+ $('socialSubmit').onclick=()=>{if(rows.length)run({action:queueReview?'queue_waiting':'submit',posts:rows.map(({video_id,channel_id,title,body,due_at,retry_buffer_id,caption_mode})=>({video_id,channel_id,title,body,due_at,retry_buffer_id,caption_mode}))});};
  $('socialStart').value=jstInput(new Date(Date.now()+3600000).toISOString());
  window.addEventListener('social-prepare',e=>{if(e.detail.navigate!==false)navigate('social');run({action:'import',run_id:e.detail.runId});});
  $('repo').addEventListener('change',()=>{state={videos:{},posts:{},channels:[],settings:{}};rows=[];queueReview=false;loadPending();render();renderRows();});

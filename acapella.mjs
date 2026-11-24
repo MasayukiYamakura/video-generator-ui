@@ -86,23 +86,29 @@ function saveTextFields(){
 }
 function paintTextStyle(){
  const fmt=$('acPreviewFormat').value,[width,height]=textDimensions(fmt),box=$('acPreviewBox');
+ const inHook=val()<Number($('acHook').value);
+ const label=inHook?$('acReleaseLabel').value.trim():'';
+ for(const [id,active] of [['acLipTitle',lip()&&inHook],['acOverlay',!lip()&&inHook]]){
+  const node=$(id);
+  if(active&&label)node.dataset.releaseLabel=label;
+  else delete node.dataset.releaseLabel;
+ }
  if(!box?.clientWidth)return;
  const slot=textLayouts[fmt],scale=box.clientWidth/width;
  const actual=[];
- for(const [id,kind] of [['acLipTitle','hook'],['acOverlay',lip()?'caption':Number($('acPreview')?.currentTime||0)<Number($('acHook').value)*1?'hook':'caption']]){
+ for(const [id,kind] of [['acLipTitle','hook'],['acOverlay',!lip()&&inHook?'hook':'caption']]){
   const node=$(id),style=slot[kind];if(!node)continue;
   const parts=kind==='hook'&&style.lines==='double'?[$('acTitle').value,$('acArtist').value]:[kind==='hook'?`${$('acTitle').value}  /  ${$('acArtist').value}`:node.textContent];
-  if(kind==='hook'&&$('acReleaseLabel').value.trim())parts.push($('acReleaseLabel').value.trim());
+  if(kind==='hook'&&label)parts.push(label);
   let effective=style.font_size;
   const context=document.createElement('canvas').getContext?.('2d');
   const measure=(part,size)=>{if(context){context.font=`700 ${size}px sans-serif`;return context.measureText(part).width+6;}return part.length*size;};
-  while(parts.some((part,index)=>measure(part,effective*(kind==='hook'&&index===parts.length-1&&$('acReleaseLabel').value.trim()?.6:1))>width*style.max_width_ratio)&&effective>16)effective-=2;
+  while(parts.some((part,index)=>measure(part,effective*(kind==='hook'&&index===parts.length-1&&label?.6:1))>width*style.max_width_ratio)&&effective>16)effective-=2;
   actual.push(`${kind==='hook'?'フック':'歌詞'} ${effective}px${effective<style.font_size?'（幅に合わせ縮小）':''}`);
   node.style.left=`${style.center_x/width*100}%`;node.style.top=`${style.center_y/height*100}%`;
   node.style.maxWidth=`${style.max_width_ratio*100}%`;node.style.width=`${style.max_width_ratio*100}%`;
   node.style.fontSize=`${Math.max(12,effective*scale)}px`;
   node.style.whiteSpace=kind==='hook'&&style.lines==='double'?'pre-line':'nowrap';
-  if(kind==='hook')node.dataset.releaseLabel=$('acReleaseLabel').value.trim();else delete node.dataset.releaseLabel;
   if(kind==='hook'&&style.lines==='double')node.textContent=node.textContent.replace(' / ','\n');
  }
  const hook=slot.hook,caption=slot.caption;
@@ -162,20 +168,26 @@ function buildRows(){
   const text=document.createElement('input');text.value=line;text.setAttribute('aria-label',`${number}行目の歌詞`);
   const start=document.createElement('input');start.type='number';start.step='.01';start.min='0';start.value='';start.setAttribute('aria-label','開始秒');
   const end=document.createElement('input');end.type='number';end.step='.01';end.min='0';end.value='';end.setAttribute('aria-label','終了秒');
-  const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);saveDraft();repaint();};
-  const z=document.createElement('button');z.type='button';z.textContent='終了を記録';z.className='secondary';z.onclick=()=>{end.value=val().toFixed(2);saveDraft();repaint();};
+  const manual=()=>{row.timingSource=null;saveDraft();repaint();};
+  for(const input of [start,end])input.addEventListener('input',manual);
+  const a=document.createElement('button');a.type='button';a.textContent='開始を記録';a.className='secondary';a.onclick=()=>{start.value=val().toFixed(2);manual();};
+  const z=document.createElement('button');z.type='button';z.textContent='終了を記録';z.className='secondary';z.onclick=()=>{end.value=val().toFixed(2);manual();};
   const seek=document.createElement('button');seek.type='button';seek.textContent='この行から再生';seek.className='secondary';
   seek.onclick=()=>{if(start.value==='')return;const player=lip()?chorusPlayer:$('acPreview');
    player.currentTime=Number(start.value);player.play().catch(e=>status(e.message));};
   const timing=document.createElement('details');
   const label=document.createElement('summary');label.textContent='歌詞の時刻';
   timing.append(label,start,end,a,z);box.append(numberLabel,text,seek,timing);root.append(box);
-  rows.push({text,start,end,box,label,seek});
+  const row={text,start,end,box,label,seek,timingSource:null};
+  rows.push(row);
  }
 
 }
+function clearTimes(){
+ return $('acClears').value.split(',').filter(v=>v.trim()).map(v=>Math.round(Number(v)*1000));
+}
 function compiledLyrics(partial=false){
- const clears=$('acClears').value.split(',').filter(v=>v.trim()).map(v=>Math.round(Number(v)*1000));
+ const clears=clearTimes();
  const duration=Math.floor(chorusPlayer.duration*1000);
  if(!Number.isFinite(duration)||clears.some(v=>!Number.isInteger(v)||v<0||v>duration))throw Error('サビ音源または歌詞を消す時刻を確認してください。');
  const selected=partial?rows.filter(r=>r.start.value!==''):rows;
@@ -342,6 +354,56 @@ function lyricInput(){
 function currentLyricMedia(){
  return lip()?{blob:chorus,duration:chorusPlayer.duration}:{blob:file?.blob,duration:file?.duration};
 }
+function editableTiming(row){
+ const toMs=value=>value===''?null:Math.round(Number(value)*1000);
+ return {start_ms:toMs(row.start.value),end_ms:toMs(row.end.value),source:row.timingSource};
+}
+
+export function mergeLyricTimings(current, detected, duration, clears=[]){
+ const isManual=line=>!line.source&&(line.start_ms!=null||line.end_ms!=null);
+ const isComplete=line=>Number.isInteger(line.start_ms)&&Number.isInteger(line.end_ms)
+  &&line.start_ms>=0&&line.end_ms>line.start_ms&&line.end_ms<=duration;
+ const manual=current.map(line=>isManual(line)?line:null);
+ const result=detected.map((line,i)=>{
+  if(manual[i])return {...manual[i]};
+  const candidate={start_ms:line.start_ms,end_ms:Math.min(line.end_ms,duration),source:'matched'};
+  if(isComplete(candidate)&&!manual.some((anchor,j)=>anchor&&(j<i
+   ? (anchor.end_ms??anchor.start_ms)>candidate.start_ms
+   : (anchor.start_ms??anchor.end_ms)<candidate.end_ms)))return candidate;
+  return {start_ms:null,end_ms:null,source:null};
+ });
+ for(let first=0;first<result.length;first++){
+  if(manual[first]||result[first].source)continue;
+  let next=first+1;
+  while(next<result.length&&!manual[next]&&!result[next].source)next++;
+  const previous=result[first-1], following=result[next], count=next-first;
+  if(count<=3&&previous&&following&&isComplete(previous)&&isComplete(following)){
+   const start=previous.end_ms,end=following.start_ms,gap=end-start;
+   const limit=Math.min(12000,count*(previous.end_ms-previous.start_ms+following.end_ms-following.start_ms));
+   if(gap>=500*count&&gap<=limit&&!clears.some(time=>time>=start&&time<end)){
+    for(let i=0;i<count;i++){
+     result[first+i]={start_ms:start+Math.round(i*gap/count),
+      end_ms:start+Math.round((i+1)*gap/count),source:'estimated'};
+    }
+   }
+  }
+  first=next-1;
+ }
+ return result;
+}
+
+function applyLyricTimings(timings,duration){
+ const merged=mergeLyricTimings(rows.map(editableTiming),timings,duration,lip()?clearTimes():[]);
+ for(const [i,line] of merged.entries()){
+  const row=rows[i], {start_ms,end_ms,source}=line;
+  row.start.value=start_ms==null?'':start_ms/1000;
+  row.end.value=end_ms==null?'':end_ms/1000;
+  row.timingSource=source;
+ }
+ saveDraft();repaint();
+ return merged;
+}
+
 async function checkLyricResult(key, {receipt, sha, signature, lines, input, requestedAt}, wait){
  for(let attempt=0;attempt<(wait?80:1);attempt++){
   try{
@@ -363,15 +425,12 @@ async function checkLyricResult(key, {receipt, sha, signature, lines, input, req
    if(timings.length!==lines.length||timings.some((line,i)=>line.text!==lines[i]))
     throw Error('照合結果の歌詞が一致しません。');
    if(builtLyrics!==$('acLyrics').value)buildRows();
-   let matched=0;
-   for(const [i,line] of timings.entries()){
-    if(line.start_ms===undefined){rows[i].start.value='';rows[i].end.value='';continue;}
-    rows[i].start.value=line.start_ms/1000;
-    rows[i].end.value=Math.min(line.end_ms,Math.floor(media.duration*1000))/1000;
-    matched++;
-   }
-   saveDraft();repaint();localStorage.removeItem(key);
-   status(`${matched}/${lines.length}行の時刻を設定しました。${matched<lines.length?'照合できなかった行の時刻を確認・入力してください。':'再生して確認し、必要に応じて修正してください。'}`);
+   const merged=applyLyricTimings(timings,Math.floor(media.duration*1000));
+   localStorage.removeItem(key);
+   const matched=merged.filter(line=>line.source==='matched').length;
+   const estimated=merged.filter(line=>line.source==='estimated').length;
+   const missing=merged.filter(line=>line.start_ms==null||line.end_ms==null).length;
+   status(`音声照合 ${matched}行・推定 ${estimated}行・未設定 ${missing}行。${missing?'未設定の行は時刻を入力してください。':'再生して確認し、必要に応じて修正してください。'}`);
    return;
   }catch(e){if(e.status!==404)throw e;}
   if(attempt%5===0){
@@ -407,11 +466,9 @@ async function reuseFullLyrics(vocal, media, lines){
  const duration=Math.floor(media.duration*1000);
  const selected=fullTiming.lyrics.filter(line=>line.end_ms>shift&&line.start_ms<shift+duration);
  if(selected.length!==lines.length||selected.some((line,i)=>line.text!==lines[i]))return false;
- for(const [i,line] of selected.entries()){
-  rows[i].start.value=Math.max(0,line.start_ms-shift)/1000;
-  rows[i].end.value=Math.min(duration,line.end_ms-shift)/1000;
- }
- saveDraft();repaint();
+ applyLyricTimings(selected.map(line=>({
+  start_ms:Math.max(0,line.start_ms-shift),end_ms:line.end_ms-shift
+ })),duration);
  status('保存済みのフルMVの時刻をサビに反映しました。再生して確認してください。');
  return true;
 }
@@ -429,7 +486,7 @@ async function autoLyrics(resume=false){
   const duration_ms=Math.floor(media.duration*1000);
   if(!media.blob||!Number.isFinite(duration_ms)||duration_ms<=0||duration_ms>limit*1000)
    throw Error('先に完成動画に使う動画または音源を選択してください。');
-  if(!resume&&rows.some(row=>row.start.value!=='')&&!window.confirm('現在の歌詞の時刻を自動同期の結果で更新しますか？'))return;
+  if(!resume&&rows.some(row=>row.start.value!=='')&&!window.confirm('自動同期した時刻を更新しますか？手入力した時刻は保持します。'))return;
   if(builtLyrics!==$('acLyrics').value)buildRows();
   const requestLines=lyricInput();
   if(!requestLines.length||requestLines.length>100||requestLines.some(line=>!line||line.length>100))
@@ -528,6 +585,7 @@ function selectVideo(blob){
  $('acPreview').onloadedmetadata=()=>{if(!file||file.blob!==blob)return;file.duration=$('acPreview').duration;status(`${blob.name}（${file.duration.toFixed(1)}秒）`);updateEditor();};
 }
 $('acPreview').ontimeupdate=repaint;
+$('acPreview').addEventListener('seeked',repaint);
 function previewLayout(){const box=$('acPreviewBox');box.classList.toggle('landscape',$('acPreviewFormat').value==='landscape');box.classList.toggle('crop',$('acFraming').value==='crop');paintTextStyle();}
 $('acPreviewFormat').onchange=previewLayout;$('acFraming').onchange=previewLayout;
 previewLayout();
@@ -591,10 +649,17 @@ const full=$('acFullPlayer');
 const draftFields=['acCutStart','acCutEnd','acOutput','acTitle','acArtist','acReleaseLabel','acHook','acLyrics','acFraming','acOffset','acClears','acTrimEnd','acMaskKind','acMaskStrength','acMaskStart','acMaskEnd','acMaskKeys','acVisualMode','acImage','acStockPercent','acStockProvider','acStockKeywords'];
 const draftKey=()=>`acapella-lip-draft:${repo()}:${$('acMode').value}`;
 let audioIdentity=null;
+function snapshotLyricRows(){
+ return rows.map(row=>[row.text.value,row.start.value,row.end.value,row.timingSource]);
+}
+function restoreLyricRow(row,[text,start,end,source]){
+ row.text.value=text;row.start.value=start;row.end.value=end;
+ row.timingSource=['matched','estimated'].includes(source)?source:null;
+}
 function identity(file){return file?[file.name,file.size,file.lastModified].join(':'):null;}
 function saveDraft(){
  const fields=Object.fromEntries(draftFields.map(id=>[id,$(id).value]));
- try{localStorage.setItem(draftKey(),JSON.stringify({fields,textLayouts,audioIdentity,rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])}));}catch{}
+ try{localStorage.setItem(draftKey(),JSON.stringify({fields,textLayouts,audioIdentity,rows:snapshotLyricRows()}));}catch{}
 }
 function restoreDraft(){
  try{
@@ -606,7 +671,7 @@ function restoreDraft(){
   buildRows();
   for(const [i,values] of draft.rows.entries()){
    if(!rows[i])break;
-   [rows[i].text.value,rows[i].start.value,rows[i].end.value]=values;
+   restoreLyricRow(rows[i],values);
   }
  }catch{}
 }
@@ -622,7 +687,7 @@ function setChorus(file){
  const next=identity(file);
  if(audioIdentity&&audioIdentity!==next){
   $('acOffset').value='0';$('acClears').value='';
-  for(const row of rows){row.start.value='';row.end.value='';}
+  for(const row of rows){row.start.value='';row.end.value='';row.timingSource=null;}
   status('サビ音源を変更しました。映像と歌詞の時刻を再設定してください。');
  }
  audioIdentity=next;
@@ -740,7 +805,7 @@ chorusPlayer.onseeked=()=>{if(lip()&&file)$('acPreview').currentTime=offset()+va
 chorusPlayer.ontimeupdate=repaint;
 $('acNextLyric').onclick=()=>{
  const row=rows.find(r=>r.start.value==='');
- if(row)row.start.value=val().toFixed(3);
+ if(row){row.start.value=val().toFixed(3);row.timingSource=null;}
  saveDraft();repaint();
 };
 $('acClearLyric').onclick=()=>{
@@ -804,7 +869,7 @@ const projectFields=[...draftFields.filter(id=>id!=='acOutput'),'acCandidate'];
 const layoutKey=()=>fullMode()?'full':'short';
 function projectSnapshot(){
  return {fields:Object.fromEntries(projectFields.map(id=>[id,$(id).type==='checkbox'?$(id).checked:$(id).value])),
-   textLayouts:structuredClone(textLayouts),rows:rows.map(row=>[row.text.value,row.start.value,row.end.value])};
+   textLayouts:structuredClone(textLayouts),rows:snapshotLyricRows()};
 }
 function applySnapshot(snapshot){
  textLayouts=mergeTextLayouts(snapshot?.textLayouts);loadTextFields();
@@ -815,7 +880,7 @@ function applySnapshot(snapshot){
  }
  buildRows();
  for(const [i,values] of (snapshot?.rows??[]).entries()){
-  if(rows[i])[rows[i].text.value,rows[i].start.value,rows[i].end.value]=values;
+  if(rows[i])restoreLyricRow(rows[i],values);
  }
  updateVisualMode();
 }
@@ -1143,19 +1208,23 @@ async function refreshCurrentRun(){
 }
 function paintLyricRows(){
  const now=val();
- let missing=0,invalid=0,previous=0;
+ let missing=0,invalid=0,matched=0,estimated=0,previous=0;
  for(const row of rows){
   const start=Number(row.start.value),end=Number(row.end.value);
   const absent=row.start.value===''||row.end.value==='';
   const overlaps=!absent&&(start<previous||end<=start);
   if(absent)missing++;
   if(overlaps)invalid++;
-  if(!absent)previous=Math.max(previous,end);
-  row.label.textContent=absent?'時刻を入力':overlaps?'重複・時間を確認':`${start.toFixed(2)}–${end.toFixed(2)} 秒`;
+  if(!absent){
+   previous=Math.max(previous,end);
+   if(row.timingSource==='matched')matched++;
+   if(row.timingSource==='estimated')estimated++;
+  }
+  row.label.textContent=absent?'時刻を入力':overlaps?'重複・時間を確認':`${row.timingSource==='estimated'?'推定 · ':''}${start.toFixed(2)}–${end.toFixed(2)} 秒`;
   row.seek.disabled=row.start.value==='';
   row.box.classList.toggle('ac-line-active',!absent&&now>=start&&now<end);
  }
- $('acLyricSummary').textContent=rows.length?`${rows.length}行${missing?` · 未設定 ${missing}行`:''}${invalid?` · 時刻を確認 ${invalid}行`:''}`:'';
+ $('acLyricSummary').textContent=rows.length?`${rows.length}行${matched?` · 音声照合 ${matched}行`:''}${estimated?` · 推定 ${estimated}行`:''}${missing?` · 未設定 ${missing}行`:''}${invalid?` · 時刻を確認 ${invalid}行`:''}`:'';
 }
 function updateSourceFields(){
  const source=$('acSource').value;

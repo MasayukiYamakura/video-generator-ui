@@ -1,5 +1,5 @@
 import {identity,matches,newest,youtubeGroup,sourceLink,postingTitle} from './video-list.mjs?v=posting-title-20261118';
-import {socialBody} from './builder/social-data.mjs?v=tarot-display-20261021';
+import {musicCaption,socialBody} from './builder/social-data.mjs?v=music-credits-1';
 import {publicationReview,REMOTE_LABEL,PUBLICATION_LABEL,dueLabel,jstInput} from './youtube-publication.mjs?v=tarot-display-20261021';
 const $=id=>document.getElementById(id);
 const node=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};
@@ -36,7 +36,7 @@ export function mountYouTube(){
   invalidate();const video=state.videos[$('youtubeVideo').value];
   $('youtubeSelected').textContent=video?`選択中：${video.filename} ／ ${identity(video)}`:'未送信の動画を一覧から選択してください';
   $('youtubeTitle').value=video?postingTitle(video):'';
-  try{$('youtubeDescription').value=video?socialBody(video.social,video.tarot?.zodiac,''):'';}catch{$('youtubeDescription').value='';}
+  try{$('youtubeDescription').value=video?(musicCaption(video.music,video.format!=='portrait')??socialBody(video.social,video.tarot?.zodiac,'')):'';}catch{$('youtubeDescription').value='';}
  }
  function render(){
   $('youtubeSetup').textContent=state.setup?`投稿先：${state.channel?.name||'接続確認が必要'} ${state.channel?.id||''} ／ 公開設定の更新権限：${state.channel?.can_update?'確認済み':'PR8の認証手順で登録が必要'}`:'初回認証・Secrets登録待ち（操作ガイド参照）';

@@ -19,3 +19,15 @@ export function socialBody(value,zodiac,fallback=''){
  return social?[social.description,LINE_CTA,social.hashtags.join(' ')].join('\n\n'):fallback;
 }
 
+
+export function musicCaption(music, landscape=false){
+ const artist='大阪のハシモト';
+ if(music?.artist!==artist||typeof music.title!=='string'||!music.title.trim())return null;
+ const label=typeof music.release_label==='string'?music.release_label.trim():'';
+ const name=`${label?label+' ':''}『${music.title.trim()}』／${artist}`;
+ const credit=`作詞・作曲・歌唱｜${artist}`;
+ const composition=`© 2026 ${artist}（歌詞・楽曲）`;
+ const recording=`℗ 2026 ${artist}（音源）`;
+ return landscape?[name,credit,[composition,recording].join('\n')].join('\n\n'):
+  [name,credit,`${composition}／${recording}`].join('\n');
+}
