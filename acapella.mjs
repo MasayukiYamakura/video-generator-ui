@@ -1200,7 +1200,7 @@ function updateEditor(){
  $('acRecover').hidden=!pendingItems().some(item=>!item.mode||item.mode===$('acMode').value);
  $('acOpenHistory').hidden=!run?.accepted;
  $('acOpenHistory').textContent=run?.successful?'完成動画を確認':'生成履歴を確認';
- $('acDerive').hidden=!(run?.successful&&lip()&&(item.projectId||project?.audio));
+ $('acDerive').hidden=!(run?.successful&&lip()&&(run.projectId||project?.audio));
  $('acDerive').textContent=fullMode()?'同じ曲でサビショートを作る':'同じ曲でフルMVを作る';
  if(editorStep===3){
   const details=$('acReview');
